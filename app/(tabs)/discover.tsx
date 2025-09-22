@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, SafeAreaView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ShoppingBag as Shopping } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 
 interface UserCard {
   id: string;
@@ -36,6 +37,8 @@ const ProfileCard = ({ user }: { user: UserCard }) => (
 );
 
 export default function DiscoverScreen() {
+  const { t } = useTranslation();
+
   return (
     <LinearGradient colors={['#FF6B9D', '#C44FAF', '#8E44AD']} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
