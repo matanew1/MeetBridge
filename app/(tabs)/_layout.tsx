@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import { Heart, Search, MessageCircle } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
-import '../i18n';
+import '../../i18n';
 
 export default function TabLayout() {
   const { t } = useTranslation();
@@ -36,18 +36,14 @@ export default function TabLayout() {
         name="discover"
         options={{
           title: t('tabs.discover'),
-          tabBarIcon: ({ size, color }) => (
-            <Heart size={size} color={color} />
-          ),
+          tabBarIcon: ({ size, color }) => <Heart size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="search"
         options={{
           title: t('tabs.search'),
-          tabBarIcon: ({ size, color }) => (
-            <Search size={size} color={color} />
-          ),
+          tabBarIcon: ({ size, color }) => <Search size={size} color={color} />,
         }}
       />
       <Tabs.Screen
