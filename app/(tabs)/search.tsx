@@ -127,31 +127,35 @@ export default function SearchScreen() {
     isLoadingDiscover,
     likedProfiles,
     dislikedProfiles,
+    matchedProfiles,
     updateSearchFilters,
     startSearch,
     clearSearch,
-    generateMockProfiles,
     loadDiscoverProfiles,
+    loadCurrentUser,
     likeProfile,
     dislikeProfile,
     unmatchProfile,
     getMatchedProfiles,
     triggerSearchAnimation,
+    error,
+    isLoadingLike,
+    isLoadingUnmatch,
   } = useUserStore();
 
   // Animation values
   const pulseAnimation = useSharedValue(0);
 
   useEffect(() => {
-    // Auto-trigger search animation on page load - same as button click
-    // First generate profiles, then start animation to avoid empty placeholder
-    generateMockProfiles();
+    // Load current user and discover profiles on component mount
+    loadCurrentUser(); // Ensure we have a current user for like/dislike functionality
+    loadDiscoverProfiles(true);
 
-    // Small delay to ensure profiles are generated before starting animation
+    // Small delay to ensure profiles are loaded before starting animation
     setTimeout(() => {
       setShowAnimation(true);
       triggerSearchAnimation();
-    }, 100);
+    }, 500); // Increased delay to allow for async loading
   }, []); // Empty dependency array means this runs only once on mount
 
   // Handle when isSearching changes (from button trigger or auto-trigger)
@@ -181,10 +185,12 @@ export default function SearchScreen() {
   };
 
   const handleLike = (profileId: string) => {
+    console.log('handleLike called for profile:', profileId);
     likeProfile(profileId);
   };
 
   const handleDislike = (profileId: string) => {
+    console.log('handleDislike called for profile:', profileId);
     dislikeProfile(profileId);
   };
 
@@ -406,12 +412,15 @@ export default function SearchScreen() {
 
       {/* Custom Unmatch Confirmation Modal */}
       {showUnmatchConfirm && (
-        <View style={styles.modalOverlay}>
+        <View style={styles.centeredModalOverlay}>
           <View style={styles.confirmationModal}>
+            <View style={styles.confirmationIcon}>
+              <X size={32} color="#FF6B6B" />
+            </View>
             <Text style={styles.confirmationTitle}>בטל התאמה</Text>
             <Text style={styles.confirmationText}>
               האם אתה בטוח שברצונך לבטל את ההתאמה? פעולה זו תמחק גם את השיחה
-              ביניכם.
+              ביניכם ולא תוכל לשחזר אותה.
             </Text>
             <View style={styles.confirmationButtons}>
               <TouchableOpacity
@@ -447,7 +456,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 50,
+    paddingTop: 15,
     paddingBottom: 20,
   },
   headerTitle: {
@@ -718,27 +727,46 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     zIndex: 1000,
+  },
+  centeredModalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 1000,
     justifyContent: 'center',
     alignItems: 'center',
   },
   confirmationModal: {
     backgroundColor: '#FFF',
-    margin: 20,
-    borderRadius: 20,
-    padding: 30,
+    marginHorizontal: 20,
+    borderRadius: 24,
+    padding: 32,
     alignItems: 'center',
-    elevation: 5,
+    elevation: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    maxWidth: 300,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    maxWidth: 340,
+    width: '90%',
+  },
+  confirmationIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#FFEBEE',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
   },
   confirmationTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 15,
+    marginBottom: 12,
     textAlign: 'center',
   },
   confirmationText: {
@@ -746,34 +774,41 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     lineHeight: 24,
-    marginBottom: 25,
+    marginBottom: 28,
+    paddingHorizontal: 8,
   },
   confirmationButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
-    gap: 15,
+    gap: 12,
   },
   confirmButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 20,
-    borderRadius: 12,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 48,
   },
   cancelButton: {
-    backgroundColor: '#F5F5F5',
-    borderWidth: 1,
-    borderColor: '#DDD',
+    backgroundColor: '#F8F9FA',
+    borderWidth: 1.5,
+    borderColor: '#E9ECEF',
   },
   deleteButton: {
     backgroundColor: '#FF6B6B',
+    elevation: 2,
+    shadowColor: '#FF6B6B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
   cancelButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: '#495057',
   },
   deleteButtonText: {
     fontSize: 16,

@@ -123,17 +123,17 @@ const ProfileDetail = ({
               </View>
             </View>
           )}
+        </View>
 
-          {/* Social Media */}
-          <View style={styles.socialSection}>
-            <Text style={styles.sectionTitle}>רשתות חברתיות</Text>
-            <View style={styles.socialRow}>
-              {socialIcons.map((social, index) => (
-                <TouchableOpacity key={index} style={styles.socialButton}>
-                  <social.icon size={24} color={social.color} />
-                </TouchableOpacity>
-              ))}
-            </View>
+        {/* Social Media */}
+        <View style={styles.socialSection}>
+          <Text style={styles.sectionTitle}>רשתות חברתיות</Text>
+          <View style={styles.socialRow}>
+            {socialIcons.map((social, index) => (
+              <TouchableOpacity key={index} style={styles.socialButton}>
+                <social.icon size={24} color={social.color} />
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
       </ScrollView>
@@ -214,12 +214,13 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   profileInfo: {
-    paddingHorizontal: 20,
+    flex: 1,
     paddingBottom: 100,
   },
   nameSection: {
     alignItems: 'center',
     marginBottom: 20,
+    paddingHorizontal: 20,
   },
   nameText: {
     fontSize: 28,
@@ -238,6 +239,7 @@ const styles = StyleSheet.create({
   },
   bioSection: {
     marginBottom: 25,
+    marginHorizontal: 20,
     backgroundColor: '#FFF',
     borderRadius: 15,
     padding: 20,
@@ -255,6 +257,7 @@ const styles = StyleSheet.create({
   },
   interestsSection: {
     marginBottom: 25,
+    paddingHorizontal: 20,
   },
   sectionTitle: {
     fontSize: 20,
@@ -283,6 +286,7 @@ const styles = StyleSheet.create({
   },
   socialSection: {
     marginBottom: 25,
+    paddingHorizontal: 20,
   },
   socialRow: {
     flexDirection: 'row',
