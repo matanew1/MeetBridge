@@ -16,6 +16,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import '../../i18n';
 
 export default function TabLayout() {
@@ -23,6 +24,7 @@ export default function TabLayout() {
 
   return (
     <View style={styles.container}>
+      <StatusBar style="dark" />
       <View style={[styles.header, { backgroundColor: '#fcf1fcff' }]}>
         <TouchableOpacity style={styles.shoppingButton}>
           <Shopping size={20} color="#8E44AD" />
@@ -49,7 +51,8 @@ export default function TabLayout() {
             shadowRadius: 8,
             paddingTop: 12,
             paddingBottom: 0,
-            height: 80,
+            marginBottom: 0,
+            height: 90,
             position: 'absolute',
             bottom: 0,
             left: 0,
@@ -112,6 +115,7 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingBottom: 10,
     backgroundColor: '#F8F9FA',
+    marginTop: 10,
   },
   profileButton: {
     width: 40,
