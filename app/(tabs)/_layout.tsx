@@ -5,6 +5,8 @@ import {
   MessageCircleMore,
   ShoppingCart as Shopping,
   HeartHandshake,
+  Moon,
+  Sun,
 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import {
@@ -17,18 +19,46 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
+import { useTheme } from '../../contexts/ThemeContext';
+import { lightTheme, darkTheme } from '../../constants/theme';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import '../../i18n';
 
 export default function TabLayout() {
   const { t } = useTranslation();
+  const { isDarkMode, toggleDarkMode } = useTheme();
+  const theme = isDarkMode ? darkTheme : lightTheme;
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="dark" />
-      <View style={[styles.header, { backgroundColor: '#fcf1fcff' }]}>
-        <TouchableOpacity style={styles.shoppingButton}>
-          <Shopping size={20} color="#8E44AD" />
-        </TouchableOpacity>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+      <View
+        style={[styles.header, { backgroundColor: theme.headerBackground }]}
+      >
+        <View style={styles.headerLeft}>
+          <LanguageSwitcher compact style={styles.languageSwitcher} />
+          <TouchableOpacity
+            style={[
+              styles.shoppingButton,
+              { backgroundColor: theme.primaryVariant },
+            ]}
+          >
+            <Shopping size={20} color={theme.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.darkModeButton,
+              { backgroundColor: theme.primaryVariant },
+            ]}
+            onPress={toggleDarkMode}
+          >
+            {isDarkMode ? (
+              <Sun size={20} color={theme.primary} />
+            ) : (
+              <Moon size={20} color={theme.primary} />
+            )}
+          </TouchableOpacity>
+        </View>
         <View style={styles.profileButton}>
           <Image
             source={{
@@ -42,12 +72,12 @@ export default function TabLayout() {
         screenOptions={{
           headerShown: false,
           tabBarStyle: {
-            backgroundColor: '#FFFFFF',
+            backgroundColor: theme.tabBarBackground,
             borderTopWidth: 0,
             elevation: 8,
-            shadowColor: '#000',
+            shadowColor: theme.shadow,
             shadowOffset: { width: 0, height: -2 },
-            shadowOpacity: 0.1,
+            shadowOpacity: isDarkMode ? 0.3 : 0.1,
             shadowRadius: 8,
             paddingTop: 12,
             paddingBottom: 0,
@@ -58,8 +88,8 @@ export default function TabLayout() {
             left: 0,
             right: 0,
           },
-          tabBarActiveTintColor: '#8E44AD',
-          tabBarInactiveTintColor: '#9CA3AF',
+          tabBarActiveTintColor: theme.tabBarActive,
+          tabBarInactiveTintColor: theme.tabBarInactive,
           tabBarLabelStyle: {
             fontSize: 11,
             fontWeight: '500',
@@ -70,7 +100,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="loved"
           options={{
-            title: 'התאמות ואהובים',
+            title: t('tabs.discover'),
             tabBarIcon: ({ size, color }) => (
               <HeartHandshake size={size} color={color} />
             ),
@@ -79,7 +109,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="search"
           options={{
-            title: 'חיפוש וגילוי',
+            title: t('tabs.search'),
             tabBarIcon: ({ size, color }) => (
               <Search size={size} color={color} />
             ),
@@ -102,7 +132,6 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
   },
   safeArea: {
     flex: 1,
@@ -114,8 +143,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 50,
     paddingBottom: 10,
-    backgroundColor: '#F8F9FA',
-    marginTop: 10,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  languageSwitcher: {
+    marginRight: 4,
   },
   profileButton: {
     width: 40,
@@ -131,7 +166,13 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#EDE7F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  darkModeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },

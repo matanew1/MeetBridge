@@ -23,6 +23,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useUserStore } from '../../store';
 import ProfileDetail from '../components/ProfileDetail';
+import { useTheme } from '../../contexts/ThemeContext';
+import { lightTheme, darkTheme } from '../../constants/theme';
 
 const { width, height } = Dimensions.get('window');
 
@@ -39,6 +41,7 @@ interface ProfileCardProps {
   onPress: (user: any) => void;
   isLiked: boolean;
   isDisliked: boolean;
+  theme: any;
 }
 
 const ProfileCard = ({
@@ -48,69 +51,80 @@ const ProfileCard = ({
   onPress,
   isLiked,
   isDisliked,
-}: ProfileCardProps) => (
-  <View style={styles.cardContainer}>
-    <TouchableOpacity
-      style={[
-        styles.card,
-        isLiked && styles.likedCard,
-        isDisliked && styles.dislikedCard,
-      ]}
-      onPress={() => onPress(user)}
-    >
-      <View style={styles.imageContainer}>
-        <Image
-          source={{ uri: user.image }}
-          style={styles.cardImage}
-          resizeMode="cover"
-        />
-      </View>
-      <View style={styles.cardInfo}>
-        <Text style={styles.cardText}>
-          {user.age}, {user.name}
-        </Text>
-      </View>
+  theme,
+}: ProfileCardProps) => {
+  const { t } = useTranslation();
 
-      {/* Action buttons */}
-      <View style={styles.cardActions}>
-        <TouchableOpacity
-          style={[styles.actionBtn, styles.dislikeBtn]}
-          onPress={(e) => {
-            e.stopPropagation();
-            onDislike(user.id);
-          }}
-          disabled={isDisliked || isLiked}
-        >
-          <X size={16} color="#FF6B6B" />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.actionBtn, styles.likeBtn]}
-          onPress={(e) => {
-            e.stopPropagation();
-            onLike(user.id);
-          }}
-          disabled={isLiked || isDisliked}
-        >
-          <Heart
-            size={16}
-            color="#FF69B4"
-            fill={isLiked ? '#FF69B4' : 'transparent'}
+  return (
+    <View style={styles.cardContainer}>
+      <TouchableOpacity
+        style={[
+          styles.card,
+          { backgroundColor: theme.cardBackground },
+          isLiked && styles.likedCard,
+          isDisliked && styles.dislikedCard,
+        ]}
+        onPress={() => onPress(user)}
+      >
+        <View style={styles.imageContainer}>
+          <Image
+            source={{ uri: user.image }}
+            style={styles.cardImage}
+            resizeMode="cover"
           />
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
+        </View>
+        <View style={styles.cardInfo}>
+          <Text style={[styles.cardText, { color: theme.text }]}>
+            {user.age}, {user.name}
+          </Text>
+        </View>
 
-    {user.distance && (
-      <View style={styles.distanceContainer}>
-        <Text style={styles.distanceText}>{user.distance}ק"מ</Text>
-      </View>
-    )}
-  </View>
-);
+        {/* Action buttons */}
+        <View style={styles.cardActions}>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.dislikeBtn]}
+            onPress={(e) => {
+              e.stopPropagation();
+              onDislike(user.id);
+            }}
+            disabled={isDisliked || isLiked}
+          >
+            <X size={16} color="#FF6B6B" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.likeBtn]}
+            onPress={(e) => {
+              e.stopPropagation();
+              onLike(user.id);
+            }}
+            disabled={isLiked || isDisliked}
+          >
+            <Heart
+              size={16}
+              color="#FF69B4"
+              fill={isLiked ? '#FF69B4' : 'transparent'}
+            />
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+
+      {user.distance && (
+        <View style={styles.distanceContainer}>
+          <Text style={styles.distanceText}>
+            {user.distance}
+            {t('search.distance')}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+};
 
 export default function SearchScreen() {
   const { t } = useTranslation();
+  const { isDarkMode, isRTL } = useTheme();
+  const theme = isDarkMode ? darkTheme : lightTheme;
   const [showAnimation, setShowAnimation] = useState(true);
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [showProfileDetail, setShowProfileDetail] = useState(false);
@@ -266,18 +280,44 @@ export default function SearchScreen() {
   // Show animation when searching or triggered by button
   if (showAnimation || isSearching) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
         {/* Circular Search Interface */}
         <View style={styles.searchInterface}>
-          <Text style={styles.searchTitle}>מחפש את ההתאמה המושלמת...</Text>
+          <Text style={[styles.searchTitle, { color: theme.primary }]}>
+            {t('search.searchingPerfectMatch')}
+          </Text>
           {/* Single Animated Structure */}
           <Animated.View style={[styles.circularStructure, pulseStyle]}>
             {/* Outer Circle */}
-            <View style={styles.outerCircle}>
+            <View
+              style={[
+                styles.outerCircle,
+                {
+                  backgroundColor: isDarkMode
+                    ? 'rgba(142, 68, 173, 0.3)'
+                    : 'rgba(225, 200, 235, 0.7)',
+                  borderColor: theme.primary,
+                },
+              ]}
+            >
               {/* Middle Circle */}
-              <View style={styles.middleCircle}>
+              <View
+                style={[
+                  styles.middleCircle,
+                  {
+                    backgroundColor: isDarkMode
+                      ? 'rgba(142, 68, 173, 0.2)'
+                      : 'rgba(245, 225, 250, 0.9)',
+                  },
+                ]}
+              >
                 {/* Inner Circle */}
-                <View style={styles.innerCircle}>
+                <View
+                  style={[
+                    styles.innerCircle,
+                    { backgroundColor: theme.surface },
+                  ]}
+                >
                   {/* Center Profile */}
                   <View style={styles.centerProfileContainer}>
                     {centerProfile ? (
@@ -287,13 +327,38 @@ export default function SearchScreen() {
                         resizeMode="cover"
                       />
                     ) : (
-                      <View style={styles.placeholderProfile}>
-                        <Text style={styles.placeholderText}>?</Text>
+                      <View
+                        style={[
+                          styles.placeholderProfile,
+                          {
+                            backgroundColor: isDarkMode
+                              ? 'rgba(142, 68, 173, 0.4)'
+                              : '#E1C8EB',
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.placeholderText,
+                            { color: theme.primary },
+                          ]}
+                        >
+                          ?
+                        </Text>
                       </View>
                     )}
                     {/* Heart Icon positioned over center profile */}
-                    <View style={styles.heartContainer}>
-                      <Heart size={22} color="#AB47BC" fill="#AB47BC" />
+                    <View
+                      style={[
+                        styles.heartContainer,
+                        { backgroundColor: theme.surface },
+                      ]}
+                    >
+                      <Heart
+                        size={22}
+                        color={theme.primary}
+                        fill={theme.primary}
+                      />
                     </View>
                   </View>
                 </View>
@@ -330,8 +395,24 @@ export default function SearchScreen() {
           </Animated.View>
 
           {/* Searching indicator */}
-          <View style={styles.searchingIndicator}>
-            <Text style={styles.searchingText}>מחפש...</Text>
+          <View
+            style={[
+              styles.searchingIndicator,
+              {
+                backgroundColor: `rgba(${
+                  isDarkMode ? '255, 255, 255' : '142, 68, 173'
+                }, 0.9)`,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.searchingText,
+                { color: isDarkMode ? theme.text : '#FFF' },
+              ]}
+            >
+              {t('search.searching')}
+            </Text>
           </View>
         </View>
       </View>
@@ -341,24 +422,40 @@ export default function SearchScreen() {
   // Show discover content after animation
   if (isLoadingDiscover) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#8E44AD" />
-        <Text style={styles.loadingText}>{t('loading', 'טוען...')}</Text>
+      <View
+        style={[
+          styles.container,
+          styles.centered,
+          { backgroundColor: theme.background },
+        ]}
+      >
+        <ActivityIndicator size="large" color={theme.primary} />
+        <Text style={[styles.loadingText, { color: theme.text }]}>
+          {t('search.loading')}
+        </Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>גלה אנשים</Text>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.header, isRTL && styles.headerRTL]}>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>
+          {t('search.title')}
+        </Text>
         <TouchableOpacity
-          style={[styles.refreshButton, styles.searchButton]}
+          style={[
+            styles.refreshButton,
+            styles.searchButton,
+            { backgroundColor: theme.primary },
+          ]}
           onPress={handleSearchButton}
           disabled={isSearching || showAnimation}
         >
           <Text style={styles.refreshText}>
-            {isSearching || showAnimation ? 'מחפש...' : 'חיפוש חדש'}
+            {isSearching || showAnimation
+              ? t('search.searching')
+              : t('search.newSearch')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -377,6 +474,7 @@ export default function SearchScreen() {
                 onPress={handleProfilePress}
                 isLiked={likedProfiles.includes(user.id)}
                 isDisliked={dislikedProfiles.includes(user.id)}
+                theme={theme}
               />
             </View>
           ))}
@@ -420,23 +518,28 @@ export default function SearchScreen() {
             <View style={styles.confirmationIcon}>
               <X size={32} color="#FF6B6B" />
             </View>
-            <Text style={styles.confirmationTitle}>בטל התאמה</Text>
+            <Text style={styles.confirmationTitle}>
+              {t('modals.unmatchTitle')}
+            </Text>
             <Text style={styles.confirmationText}>
-              האם אתה בטוח שברצונך לבטל את ההתאמה? פעולה זו תמחק גם את השיחה
-              ביניכם ולא תוכל לשחזר אותה.
+              {t('modals.unmatchText')}
             </Text>
             <View style={styles.confirmationButtons}>
               <TouchableOpacity
                 style={[styles.confirmButton, styles.cancelButton]}
                 onPress={cancelUnmatch}
               >
-                <Text style={styles.cancelButtonText}>ביטול</Text>
+                <Text style={styles.cancelButtonText}>
+                  {t('actions.cancel')}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.confirmButton, styles.deleteButton]}
                 onPress={confirmUnmatch}
               >
-                <Text style={styles.deleteButtonText}>בטל התאמה</Text>
+                <Text style={styles.deleteButtonText}>
+                  {t('modals.confirmUnmatch')}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -448,7 +551,6 @@ export default function SearchScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fcf1fcff',
   },
   centered: {
     justifyContent: 'center',
@@ -462,10 +564,12 @@ const styles = StyleSheet.create({
     paddingTop: 15,
     paddingBottom: 20,
   },
+  headerRTL: {
+    flexDirection: 'row-reverse',
+  },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
   },
   refreshButton: {
     backgroundColor: '#8E44AD',
@@ -483,7 +587,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#8E44AD',
     marginTop: 10,
   },
   scrollView: {
@@ -598,7 +701,6 @@ const styles = StyleSheet.create({
   searchTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#8E44AD',
     marginBottom: 40,
     textAlign: 'center',
   },
@@ -613,19 +715,16 @@ const styles = StyleSheet.create({
     width: 320,
     height: 320,
     borderRadius: 160,
-    backgroundColor: 'rgba(225, 200, 235, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
     borderWidth: 1.5,
-    borderColor: '#AB47BC',
     borderStyle: 'dashed',
   },
   middleCircle: {
     width: 240,
     height: 240,
     borderRadius: 120,
-    backgroundColor: 'rgba(245, 225, 250, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -633,7 +732,6 @@ const styles = StyleSheet.create({
     width: 160,
     height: 160,
     borderRadius: 80,
-    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -665,19 +763,16 @@ const styles = StyleSheet.create({
   placeholderProfile: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#E1C8EB',
     justifyContent: 'center',
     alignItems: 'center',
   },
   placeholderText: {
     fontSize: 24,
-    color: '#AB47BC',
     fontWeight: 'bold',
   },
   heartContainer: {
     position: 'absolute',
     bottom: -8,
-    backgroundColor: '#FFF',
     width: 32,
     height: 32,
     borderRadius: 16,
@@ -712,13 +807,11 @@ const styles = StyleSheet.create({
   searchingIndicator: {
     position: 'absolute',
     bottom: -120,
-    backgroundColor: 'rgba(142, 68, 173, 0.9)',
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderRadius: 15,
   },
   searchingText: {
-    color: '#FFF',
     fontSize: 14,
     fontWeight: '600',
   },

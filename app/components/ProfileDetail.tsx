@@ -20,6 +20,8 @@ import {
   Facebook,
 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from '../../contexts/ThemeContext';
+import { lightTheme, darkTheme } from '../../constants/theme';
 
 const { width, height } = Dimensions.get('window');
 
@@ -54,6 +56,8 @@ const ProfileDetail = ({
   isDisliked = false,
 }: ProfileDetailProps) => {
   const { t } = useTranslation();
+  const { isDarkMode } = useTheme();
+  const theme = isDarkMode ? darkTheme : lightTheme;
 
   const socialIcons = [
     { icon: Instagram, color: '#E4405F' },
@@ -62,18 +66,30 @@ const ProfileDetail = ({
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.background }]}
+    >
       {/* Header */}
-      <View style={styles.header}>
+      <View
+        style={[
+          styles.header,
+          {
+            backgroundColor: theme.surface,
+            borderBottomColor: theme.border,
+          },
+        ]}
+      >
         <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-          <ArrowRight size={24} color="#333" />
+          <ArrowRight size={24} color={theme.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>פרופיל</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>
+          {t('profile.title')}
+        </Text>
         <View style={styles.placeholder} />
       </View>
 
       <ScrollView
-        style={styles.scrollView}
+        style={[styles.scrollView, { backgroundColor: theme.background }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Profile Image */}
@@ -85,8 +101,10 @@ const ProfileDetail = ({
           />
 
           {/* Age badge */}
-          <View style={styles.ageBadge}>
-            <Text style={styles.ageText}>{user.age}</Text>
+          <View style={[styles.ageBadge, { backgroundColor: theme.surface }]}>
+            <Text style={[styles.ageText, { color: theme.text }]}>
+              {user.age}
+            </Text>
           </View>
         </View>
 
@@ -94,26 +112,38 @@ const ProfileDetail = ({
         <View style={styles.profileInfo}>
           {/* Name and distance */}
           <View style={styles.nameSection}>
-            <Text style={styles.nameText}>{user.name}</Text>
+            <Text style={[styles.nameText, { color: theme.text }]}>
+              {user.name}
+            </Text>
             {user.distance && (
               <View style={styles.distanceRow}>
-                <MapPin size={16} color="#666" />
-                <Text style={styles.distanceText}>{user.distance} ק"מ ממך</Text>
+                <MapPin size={16} color={theme.textSecondary} />
+                <Text
+                  style={[styles.distanceText, { color: theme.textSecondary }]}
+                >
+                  {user.distance} {t('search.distance')} {t('profile.distance')}
+                </Text>
               </View>
             )}
           </View>
 
           {/* Bio */}
           {user.bio && (
-            <View style={styles.bioSection}>
-              <Text style={styles.bioText}>{user.bio}</Text>
+            <View
+              style={[styles.bioSection, { backgroundColor: theme.surface }]}
+            >
+              <Text style={[styles.bioText, { color: theme.text }]}>
+                {user.bio}
+              </Text>
             </View>
           )}
 
           {/* Interests */}
           {user.interests && user.interests.length > 0 && (
             <View style={styles.interestsSection}>
-              <Text style={styles.sectionTitle}>תחומי עניין</Text>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                {t('profile.interests')}
+              </Text>
               <View style={styles.interestsGrid}>
                 {user.interests.map((interest, index) => (
                   <View key={index} style={styles.interestChip}>
@@ -127,10 +157,18 @@ const ProfileDetail = ({
 
         {/* Social Media */}
         <View style={styles.socialSection}>
-          <Text style={styles.sectionTitle}>רשתות חברתיות</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>
+            {t('profile.about')}
+          </Text>
           <View style={styles.socialRow}>
             {socialIcons.map((social, index) => (
-              <TouchableOpacity key={index} style={styles.socialButton}>
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.socialButton,
+                  { backgroundColor: theme.surface },
+                ]}
+              >
                 <social.icon size={24} color={social.color} />
               </TouchableOpacity>
             ))}
@@ -140,12 +178,17 @@ const ProfileDetail = ({
 
       {/* Unmatch option for matches */}
       {onMessage && onUnmatch && (
-        <View style={styles.unmatchSection}>
+        <View
+          style={[
+            styles.unmatchSection,
+            { backgroundColor: theme.surface, borderTopColor: theme.border },
+          ]}
+        >
           <TouchableOpacity
             style={styles.unmatchButtonDetail}
             onPress={() => onUnmatch(user.id)}
           >
-            <Text style={styles.unmatchButtonText}>בטל התאמה</Text>
+            <Text style={styles.unmatchButtonText}>{t('profile.unmatch')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -156,7 +199,6 @@ const ProfileDetail = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fcf1fcff',
   },
   header: {
     flexDirection: 'row',
@@ -165,8 +207,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-    backgroundColor: '#FFF',
   },
   closeButton: {
     padding: 5,
@@ -174,7 +214,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
   },
   placeholder: {
     width: 34,
@@ -198,7 +237,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 30,
     right: width * 0.15,
-    backgroundColor: '#FFF',
     borderRadius: 15,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -211,11 +249,10 @@ const styles = StyleSheet.create({
   ageText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
   },
   profileInfo: {
     flex: 1,
-    paddingBottom: 100,
+    paddingBottom: 20,
   },
   nameSection: {
     alignItems: 'center',
@@ -225,7 +262,6 @@ const styles = StyleSheet.create({
   nameText: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 8,
   },
   distanceRow: {
@@ -234,13 +270,11 @@ const styles = StyleSheet.create({
   },
   distanceText: {
     fontSize: 16,
-    color: '#666',
     marginLeft: 4,
   },
   bioSection: {
     marginBottom: 25,
     marginHorizontal: 20,
-    backgroundColor: '#FFF',
     borderRadius: 15,
     padding: 20,
     elevation: 2,
@@ -251,18 +285,16 @@ const styles = StyleSheet.create({
   },
   bioText: {
     fontSize: 16,
-    color: '#333',
     lineHeight: 24,
     textAlign: 'center',
   },
   interestsSection: {
-    marginBottom: 25,
+    marginBottom: 2,
     paddingHorizontal: 20,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 15,
     textAlign: 'center',
   },
@@ -285,16 +317,18 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   socialSection: {
-    marginBottom: 25,
+    marginBottom: 100,
     paddingHorizontal: 20,
+    width: '100%',
   },
   socialRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 20,
+    justifyContent: 'space-evenly',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    paddingHorizontal: 10,
   },
   socialButton: {
-    backgroundColor: '#FFF',
     borderRadius: 25,
     width: 50,
     height: 50,
@@ -305,6 +339,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    margin: 5,
   },
   actionButtons: {
     flexDirection: 'row',
@@ -312,9 +347,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 40,
     paddingVertical: 20,
-    backgroundColor: '#FFF',
     borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
   },
   actionButton: {
     width: 60,
@@ -341,9 +374,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
     paddingTop: 10,
     paddingBottom: 20,
-    backgroundColor: '#FFF',
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
   },
   unmatchButtonDetail: {
     backgroundColor: '#FFEBEE',

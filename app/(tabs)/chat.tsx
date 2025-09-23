@@ -7,11 +7,14 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MessageCircle, Heart } from 'lucide-react-native';
+import { MessageCircle } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useUserStore } from '../../store';
+import { useTheme } from '../../contexts/ThemeContext';
+import { lightTheme, darkTheme } from '../../constants/theme';
 
 interface ChatItem {
   id: string;
@@ -21,41 +24,150 @@ interface ChatItem {
   image: string;
   age: number;
   unread?: boolean;
+  isOnline?: boolean;
 }
 
-const ChatItem = ({ chat }: { chat: ChatItem }) => (
-  <TouchableOpacity style={styles.chatItem}>
-    <Image source={{ uri: chat.image }} style={styles.chatAvatar} />
-    <View style={styles.chatContent}>
-      <View style={styles.chatHeader}>
-        <Text style={styles.chatName}>
-          {chat.name}, {chat.age}
-        </Text>
-        <Text style={styles.chatTime}>{chat.time}</Text>
-      </View>
-      <Text style={[styles.chatMessage, chat.unread && styles.unreadMessage]}>
-        {chat.lastMessage}
-      </Text>
-    </View>
-    {chat.unread && <View style={styles.unreadDot} />}
-    <View style={styles.matchBadge}>
-      <Heart size={12} color="#4CAF50" fill="#4CAF50" />
-    </View>
-  </TouchableOpacity>
-);
+const ChatItem = ({
+  chat,
+  theme,
+  index,
+}: {
+  chat: ChatItem;
+  theme: any;
+  index: number;
+}) => {
+  const slideAnim = React.useRef(new Animated.Value(50)).current;
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const scaleAnim = React.useRef(new Animated.Value(0.95)).current;
+  const pulseAnim = React.useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    // Staggered entrance animation
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 400,
+        delay: index * 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        delay: index * 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 400,
+        delay: index * 50,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Online indicator pulse animation
+    if (chat.isOnline) {
+      const pulse = () => {
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.2,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ]).start(() => pulse());
+      };
+      pulse();
+    }
+  }, [index, chat.isOnline]);
+
+  return (
+    <Animated.View
+      style={[
+        {
+          transform: [{ translateX: slideAnim }, { scale: scaleAnim }],
+          opacity: fadeAnim,
+        },
+      ]}
+    >
+      <TouchableOpacity
+        style={[styles.chatItem, { backgroundColor: theme.cardBackground }]}
+        activeOpacity={0.7}
+      >
+        <View style={styles.avatarContainer}>
+          <Image source={{ uri: chat.image }} style={styles.chatAvatar} />
+          {chat.isOnline && (
+            <Animated.View
+              style={[
+                styles.onlineIndicator,
+                {
+                  transform: [{ scale: pulseAnim }],
+                },
+              ]}
+            />
+          )}
+        </View>
+        <View style={styles.chatContent}>
+          <View style={styles.chatHeader}>
+            <Text style={[styles.chatName, { color: theme.text }]}>
+              {chat.name}, {chat.age}
+            </Text>
+            <Text style={[styles.chatTime, { color: theme.textSecondary }]}>
+              {chat.time}
+            </Text>
+          </View>
+          <Text
+            style={[
+              styles.chatMessage,
+              { color: theme.textSecondary },
+              chat.unread && styles.unreadMessage,
+            ]}
+          >
+            {chat.lastMessage}
+          </Text>
+        </View>
+        {chat.unread && (
+          <Animated.View
+            style={[
+              styles.unreadDot,
+              {
+                transform: [{ scale: pulseAnim }],
+              },
+            ]}
+          />
+        )}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
 
 export default function ChatScreen() {
   const { t } = useTranslation();
-  const { 
+  const { isDarkMode, isRTL } = useTheme();
+  const theme = isDarkMode ? darkTheme : lightTheme;
+  const {
     currentUser,
-    conversations, 
-    discoverProfiles, 
-    loadConversations, 
+    conversations,
+    discoverProfiles,
+    loadConversations,
     loadCurrentUser,
-    loadDiscoverProfiles 
+    loadDiscoverProfiles,
   } = useUserStore();
   const [chats, setChats] = useState<ChatItem[]>([]);
 
+  // Animation values
+  const headerSlideAnim = React.useRef(new Animated.Value(-50)).current;
+  const headerFadeAnim = React.useRef(new Animated.Value(0)).current;
+  const contentSlideAnim = React.useRef(new Animated.Value(30)).current;
+  const contentFadeAnim = React.useRef(new Animated.Value(0)).current;
+
+  // Empty state animation values
+  const emptyIconAnim = React.useRef(new Animated.Value(0)).current;
+  const emptyTextAnim = React.useRef(new Animated.Value(50)).current;
+  const emptyFadeAnim = React.useRef(new Animated.Value(0)).current;
   const formatTime = (timestamp: Date): string => {
     const now = new Date();
     const diff = now.getTime() - timestamp.getTime();
@@ -63,15 +175,29 @@ export default function ChatScreen() {
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
-    if (minutes < 5) return 'עכשיו';
-    if (minutes < 60) return `${minutes} דק`;
-    if (hours < 24) return `${hours} שעות`;
-    if (days === 1) return 'אתמול';
-    return `${days} ימים`;
+    if (minutes < 5) return t('chat.now');
+    if (minutes < 60) return `${minutes} ${t('chat.minutes')}`;
+    if (hours < 24) return `${hours} ${t('chat.hours')}`;
+    if (days === 1) return t('chat.yesterday');
+    return `${days} ${t('chat.days')}`;
   };
 
   // Load data when component mounts
   useEffect(() => {
+    // Start header animations
+    Animated.parallel([
+      Animated.timing(headerSlideAnim, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(headerFadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
     loadCurrentUser();
     loadConversations();
     if (discoverProfiles.length === 0) {
@@ -118,35 +244,123 @@ export default function ChatScreen() {
           time: formatTime(conversation.lastMessage.timestamp),
           image: otherParticipant.image,
           unread: conversation.unreadCount > 0,
+          isOnline: otherParticipant.isOnline,
         };
       })
       .filter(Boolean) as ChatItem[];
 
     console.log('Final chat items:', chatItems.length);
     setChats(chatItems);
+
+    // Animate content when chats are loaded
+    if (chatItems.length > 0) {
+      Animated.parallel([
+        Animated.timing(contentSlideAnim, {
+          toValue: 0,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(contentFadeAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
   }, [conversations, discoverProfiles, currentUser]);
 
+  // Empty state animations
+  useEffect(() => {
+    if (chats.length === 0) {
+      Animated.sequence([
+        Animated.timing(emptyFadeAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.parallel([
+          Animated.spring(emptyIconAnim, {
+            toValue: 1,
+            tension: 50,
+            friction: 7,
+            useNativeDriver: true,
+          }),
+          Animated.timing(emptyTextAnim, {
+            toValue: 0,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start();
+    } else {
+      // Reset empty state animations when chats are available
+      emptyIconAnim.setValue(0);
+      emptyTextAnim.setValue(50);
+      emptyFadeAnim.setValue(0);
+    }
+  }, [chats.length]);
+
   const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <MessageCircle size={60} color="#E1C8EB" />
-      <Text style={styles.emptyTitle}>אין לך עדיין שיחות</Text>
-      <Text style={styles.emptyText}>
-        כשתקבל התאמות חדשות, תוכל להתחיל לשוחח איתן כאן!
+    <Animated.View
+      style={[
+        styles.emptyState,
+        {
+          opacity: emptyFadeAnim,
+          transform: [{ translateY: emptyTextAnim }],
+        },
+      ]}
+    >
+      <Animated.View
+        style={{
+          transform: [{ scale: emptyIconAnim }],
+        }}
+      >
+        <MessageCircle size={60} color={theme.textSecondary} />
+      </Animated.View>
+      <Text style={[styles.emptyTitle, { color: theme.text }]}>
+        {t('chat.noConversations')}
       </Text>
-      <Text style={styles.emptySubtext}>
-        עבור לעמוד החיפוש כדי למצוא התאמות
+      <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+        {t('chat.startMatching')}
       </Text>
-    </View>
+    </Animated.View>
   );
 
   return (
-    <LinearGradient colors={['#fcf1fc', '#f8e8f8']} style={styles.container}>
+    <LinearGradient
+      colors={
+        isDarkMode
+          ? [theme.background, theme.surfaceVariant]
+          : ['#fcf1fc', '#f8e8f8']
+      }
+      style={styles.container}
+    >
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.header}>
-          <Text style={styles.title}>צ'אטים ({chats.length})</Text>
-        </View>
+        <Animated.View
+          style={[
+            styles.header,
+            {
+              transform: [{ translateY: headerSlideAnim }],
+              opacity: headerFadeAnim,
+            },
+            isRTL && styles.headerRTL,
+          ]}
+        >
+          <Text style={[styles.title, { color: theme.text }]}>
+            {t('chat.title')} ({chats.length})
+          </Text>
+        </Animated.View>
 
-        <View style={styles.content}>
+        <Animated.View
+          style={[
+            styles.content,
+            {
+              backgroundColor: theme.surface,
+              transform: [{ translateY: contentSlideAnim }],
+              opacity: contentFadeAnim,
+            },
+          ]}
+        >
           {chats.length === 0 ? (
             renderEmptyState()
           ) : (
@@ -154,12 +368,17 @@ export default function ChatScreen() {
               style={styles.chatList}
               showsVerticalScrollIndicator={false}
             >
-              {chats.map((chat) => (
-                <ChatItem key={chat.id} chat={chat} />
+              {chats.map((chat, index) => (
+                <ChatItem
+                  key={chat.id}
+                  chat={chat}
+                  theme={theme}
+                  index={index}
+                />
               ))}
             </ScrollView>
           )}
-        </View>
+        </Animated.View>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -183,7 +402,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#8E44AD',
   },
   searchButton: {
     width: 40,
@@ -204,19 +422,63 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
   },
+  headerRTL: {
+    flexDirection: 'row-reverse',
+  },
   chatItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 16,
+    paddingHorizontal: 4,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
     position: 'relative',
+    borderRadius: 12,
+    marginVertical: 2,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   chatAvatar: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    marginRight: 16,
+  },
+  onlineIndicator: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#4CAF50',
+    borderWidth: 2,
+    borderColor: '#FFF',
+    shadowColor: '#4CAF50',
+    shadowOffset: {
+      width: 0,
+      height: 0,
+    },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 5,
   },
   chatContent: {
     flex: 1,
@@ -230,19 +492,15 @@ const styles = StyleSheet.create({
   chatName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
   },
   chatTime: {
     fontSize: 12,
-    color: '#999',
   },
   chatMessage: {
     fontSize: 14,
-    color: '#666',
   },
   unreadMessage: {
     fontWeight: '600',
-    color: '#333',
   },
   unreadDot: {
     width: 8,
@@ -250,17 +508,14 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#8E44AD',
     marginLeft: 8,
-  },
-  matchBadge: {
-    position: 'absolute',
-    top: 12,
-    right: 8,
-    backgroundColor: '#E8F5E8',
-    borderRadius: 10,
-    width: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    shadowColor: '#8E44AD',
+    shadowOffset: {
+      width: 0,
+      height: 0,
+    },
+    shadowOpacity: 0.4,
+    shadowRadius: 3,
+    elevation: 4,
   },
   emptyState: {
     flex: 1,
@@ -271,21 +526,18 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
     marginTop: 20,
     marginBottom: 10,
     textAlign: 'center',
   },
   emptyText: {
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 10,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#8E44AD',
     textAlign: 'center',
     fontWeight: '500',
   },

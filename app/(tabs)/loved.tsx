@@ -7,12 +7,15 @@ import {
   Image,
   TouchableOpacity,
   Alert,
+  Animated,
 } from 'react-native';
 import { Heart, MessageCircle, Users, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useUserStore } from '../../store';
 import ProfileDetail from '../components/ProfileDetail';
+import { useTheme } from '../../contexts/ThemeContext';
+import { lightTheme, darkTheme } from '../../constants/theme';
 import '../../i18n';
 
 interface LikedProfileCardProps {
@@ -28,6 +31,8 @@ interface LikedProfileCardProps {
   onPress?: (user: any) => void;
   onUnmatch?: (id: string) => void;
   isMatch?: boolean;
+  theme: any;
+  index: number;
 }
 
 const LikedProfileCard = ({
@@ -36,7 +41,59 @@ const LikedProfileCard = ({
   onPress,
   onUnmatch,
   isMatch = false,
+  theme,
+  index,
 }: LikedProfileCardProps) => {
+  const { t } = useTranslation();
+  const slideAnim = React.useRef(new Animated.Value(50)).current;
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const scaleAnim = React.useRef(new Animated.Value(0.9)).current;
+  const heartAnim = React.useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    // Staggered entrance animation
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 500,
+        delay: index * 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        delay: index * 100,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        delay: index * 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Heart pulse animation for matches
+    if (isMatch) {
+      const pulse = () => {
+        Animated.sequence([
+          Animated.timing(heartAnim, {
+            toValue: 1.2,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(heartAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ]).start(() => pulse());
+      };
+      pulse();
+    }
+  }, [index, isMatch]);
+
   const handleUnmatchPress = (e: any) => {
     e.stopPropagation();
     console.log('Unmatch button pressed for user:', user.id);
@@ -53,31 +110,60 @@ const LikedProfileCard = ({
   };
 
   return (
-    <View style={styles.cardContainer}>
-      <TouchableOpacity style={styles.card} onPress={() => onPress?.(user)}>
+    <Animated.View
+      style={[
+        styles.cardContainer,
+        {
+          transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
+          opacity: fadeAnim,
+        },
+      ]}
+    >
+      <TouchableOpacity
+        style={[styles.card, { backgroundColor: theme.cardBackground }]}
+        onPress={() => onPress?.(user)}
+        activeOpacity={0.8}
+      >
         <View style={styles.imageContainer}>
           <Image
             source={{ uri: user.image }}
             style={styles.cardImage}
             resizeMode="cover"
           />
-          <View style={[styles.heartOverlay, isMatch && styles.matchOverlay]}>
+          <Animated.View
+            style={[
+              styles.heartOverlay,
+              { backgroundColor: theme.surface },
+              isMatch && [
+                styles.matchOverlay,
+                { backgroundColor: theme.success + '20' },
+              ],
+              {
+                transform: [{ scale: heartAnim }],
+              },
+            ]}
+          >
             {isMatch ? (
-              <Users size={16} color="#4CAF50" />
+              <Users size={16} color={theme.success} />
             ) : (
               <Heart size={16} color="#FF69B4" fill="#FF69B4" />
             )}
-          </View>
+          </Animated.View>
         </View>
         <View style={styles.cardInfo}>
-          <Text style={styles.cardTitle}>
+          <Text style={[styles.cardTitle, { color: theme.text }]}>
             {user.name}, {user.age}
           </Text>
           {user.distance && (
-            <Text style={styles.distanceText}>{user.distance} ק"מ ממך</Text>
+            <Text style={[styles.distanceText, { color: theme.textSecondary }]}>
+              {user.distance} {t('search.distance')} {t('profile.distance')}
+            </Text>
           )}
           {user.bio && (
-            <Text style={styles.bioText} numberOfLines={2}>
+            <Text
+              style={[styles.bioText, { color: theme.textSecondary }]}
+              numberOfLines={2}
+            >
               {user.bio}
             </Text>
           )}
@@ -87,30 +173,50 @@ const LikedProfileCard = ({
         {isMatch && (
           <View style={styles.matchActions}>
             <TouchableOpacity
-              style={[styles.messageButton, styles.matchMessageButton]}
+              style={[
+                styles.messageButton,
+                styles.matchMessageButton,
+                { backgroundColor: theme.success + '20' },
+              ]}
               onPress={handleMessagePress}
             >
-              <MessageCircle size={20} color="#4CAF50" />
-              <Text style={[styles.messageText, styles.matchMessageText]}>
-                צ'אט
+              <MessageCircle size={20} color={theme.success} />
+              <Text
+                style={[
+                  styles.messageText,
+                  styles.matchMessageText,
+                  { color: theme.success },
+                ]}
+              >
+                {t('loved.message')}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.unmatchButton]}
+              style={[
+                styles.unmatchButton,
+                {
+                  backgroundColor: theme.errorBackground,
+                  borderColor: theme.error + '40',
+                },
+              ]}
               onPress={handleUnmatchPress}
             >
-              <Text style={styles.unmatchText}>בטל התאמה</Text>
+              <Text style={[styles.unmatchText, { color: theme.error }]}>
+                {t('loved.unmatch')}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
       </TouchableOpacity>
-    </View>
+    </Animated.View>
   );
 };
 
 export default function LovedScreen() {
   const { t } = useTranslation();
+  const { isDarkMode } = useTheme();
+  const theme = isDarkMode ? darkTheme : lightTheme;
   const router = useRouter();
   const {
     discoverProfiles,
@@ -134,8 +240,56 @@ export default function LovedScreen() {
   const [showUnmatchConfirm, setShowUnmatchConfirm] = useState(false);
   const [unmatchProfileId, setUnmatchProfileId] = useState<string | null>(null);
 
+  // Animation values
+  const headerSlideAnim = React.useRef(new Animated.Value(-50)).current;
+  const headerFadeAnim = React.useRef(new Animated.Value(0)).current;
+  const tabSlideAnim = React.useRef(new Animated.Value(30)).current;
+  const tabFadeAnim = React.useRef(new Animated.Value(0)).current;
+  const contentSlideAnim = React.useRef(new Animated.Value(50)).current;
+  const contentFadeAnim = React.useRef(new Animated.Value(0)).current;
+
   // Load profiles on component mount
   useEffect(() => {
+    // Start header and tab animations
+    Animated.sequence([
+      Animated.parallel([
+        Animated.timing(headerSlideAnim, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(headerFadeAnim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.parallel([
+        Animated.timing(tabSlideAnim, {
+          toValue: 0,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(tabFadeAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.parallel([
+        Animated.timing(contentSlideAnim, {
+          toValue: 0,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(contentFadeAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+
     loadCurrentUser(); // Ensure current user is loaded for actions
     loadConversations(); // Load existing conversations
     if (discoverProfiles.length === 0) {
@@ -212,15 +366,15 @@ export default function LovedScreen() {
   const renderEmptyState = (type: 'loved' | 'matches') => (
     <View style={styles.emptyState}>
       {type === 'loved' ? (
-        <Heart size={60} color="#E1C8EB" />
+        <Heart size={60} color={theme.textSecondary} />
       ) : (
-        <Users size={60} color="#C8E6C9" />
+        <Users size={60} color={theme.textSecondary} />
       )}
-      <Text style={styles.emptyTitle}>
-        {type === 'loved' ? 'עדיין לא אהבת אף אחד' : 'עדיין אין לך התאמות'}
+      <Text style={[styles.emptyTitle, { color: theme.text }]}>
+        {type === 'loved' ? t('loved.noLiked') : t('loved.noMatches')}
       </Text>
-      <Text style={styles.emptyText}>
-        עבור לעמוד החיפוש כדי למצוא אנשים מעניינים!
+      <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+        {type === 'loved' ? t('loved.keepSwiping') : t('loved.startSwiping')}
       </Text>
     </View>
   );
@@ -228,7 +382,7 @@ export default function LovedScreen() {
   const renderProfileGrid = (profiles: any[], isMatch: boolean = false) => (
     <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
       <View style={styles.grid}>
-        {profiles.map((user) => (
+        {profiles.map((user, index) => (
           <View key={user.id} style={styles.gridItem}>
             <LikedProfileCard
               user={user}
@@ -236,6 +390,8 @@ export default function LovedScreen() {
               onPress={handleProfilePress}
               onUnmatch={handleUnmatch}
               isMatch={isMatch}
+              theme={theme}
+              index={index}
             />
           </View>
         ))}
@@ -244,34 +400,63 @@ export default function LovedScreen() {
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>אהובים והתאמות</Text>
-        <Text style={styles.headerSubtitle}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <Animated.View
+        style={[
+          styles.header,
+          {
+            transform: [{ translateY: headerSlideAnim }],
+            opacity: headerFadeAnim,
+          },
+        ]}
+      >
+        <Text style={[styles.headerTitle, { color: theme.text }]}>
+          {t('loved.title')}
+        </Text>
+        <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
           {activeTab === 'loved'
             ? `${onlyLikedProfiles.length} ${
-                onlyLikedProfiles.length === 1 ? 'אדם שאהבתי' : 'אנשים שאהבתי'
+                onlyLikedProfiles.length === 1
+                  ? t('loved.personLiked')
+                  : t('loved.peopleLiked')
               }`
             : `${matchedProfilesData.length} ${
-                matchedProfilesData.length === 1 ? 'התאמה' : 'התאמות'
+                matchedProfilesData.length === 1
+                  ? t('loved.oneMatch')
+                  : t('loved.multipleMatches')
               }`}
         </Text>
-      </View>
+      </Animated.View>
 
       {/* Tab Navigation */}
-      <View style={styles.tabContainer}>
+      <Animated.View
+        style={[
+          styles.tabContainer,
+          {
+            transform: [{ translateY: tabSlideAnim }],
+            opacity: tabFadeAnim,
+          },
+        ]}
+      >
         <TouchableOpacity
           style={[styles.tab, activeTab === 'loved' && styles.activeTab]}
           onPress={() => setActiveTab('loved')}
         >
-          <Heart size={20} color={activeTab === 'loved' ? '#8E44AD' : '#999'} />
+          <Heart
+            size={20}
+            color={activeTab === 'loved' ? theme.primary : theme.textSecondary}
+          />
           <Text
             style={[
               styles.tabText,
+              {
+                color:
+                  activeTab === 'loved' ? theme.primary : theme.textSecondary,
+              },
               activeTab === 'loved' && styles.activeTabText,
             ]}
           >
-            אהבתי ({onlyLikedProfiles.length})
+            {t('loved.liked')} ({onlyLikedProfiles.length})
           </Text>
         </TouchableOpacity>
 
@@ -281,27 +466,43 @@ export default function LovedScreen() {
         >
           <Users
             size={20}
-            color={activeTab === 'matches' ? '#4CAF50' : '#999'}
+            color={
+              activeTab === 'matches' ? theme.primary : theme.textSecondary
+            }
           />
           <Text
             style={[
               styles.tabText,
+              {
+                color:
+                  activeTab === 'matches' ? theme.primary : theme.textSecondary,
+              },
               activeTab === 'matches' && styles.activeTabText,
             ]}
           >
-            ההתאמות שלי ({matchedProfilesData.length})
+            {t('loved.matches')} ({matchedProfilesData.length})
           </Text>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       {/* Tab Content */}
-      {activeTab === 'loved'
-        ? onlyLikedProfiles.length === 0
-          ? renderEmptyState('loved')
-          : renderProfileGrid(onlyLikedProfiles, false)
-        : matchedProfilesData.length === 0
-        ? renderEmptyState('matches')
-        : renderProfileGrid(matchedProfilesData, true)}
+      <Animated.View
+        style={[
+          styles.contentContainer,
+          {
+            transform: [{ translateY: contentSlideAnim }],
+            opacity: contentFadeAnim,
+          },
+        ]}
+      >
+        {activeTab === 'loved'
+          ? onlyLikedProfiles.length === 0
+            ? renderEmptyState('loved')
+            : renderProfileGrid(onlyLikedProfiles, false)
+          : matchedProfilesData.length === 0
+          ? renderEmptyState('matches')
+          : renderProfileGrid(matchedProfilesData, true)}
+      </Animated.View>
 
       {/* Profile Detail Modal */}
       {showProfileDetail && selectedProfile && (
@@ -336,21 +537,44 @@ export default function LovedScreen() {
       {/* Custom Unmatch Confirmation Modal */}
       {showUnmatchConfirm && (
         <View style={styles.centeredModalOverlay}>
-          <View style={styles.confirmationModal}>
-            <View style={styles.confirmationIcon}>
+          <View
+            style={[
+              styles.confirmationModal,
+              { backgroundColor: theme.surface },
+            ]}
+          >
+            <View
+              style={[
+                styles.confirmationIcon,
+                { backgroundColor: theme.errorBackground || '#FFEBEE' },
+              ]}
+            >
               <X size={32} color="#FF6B6B" />
             </View>
-            <Text style={styles.confirmationTitle}>בטל התאמה</Text>
-            <Text style={styles.confirmationText}>
+            <Text style={[styles.confirmationTitle, { color: theme.text }]}>
+              בטל התאמה
+            </Text>
+            <Text
+              style={[styles.confirmationText, { color: theme.textSecondary }]}
+            >
               האם אתה בטוח שברצונך לבטל את ההתאמה? פעולה זו תמחק גם את השיחה
               ביניכם ולא תוכל לשחזר אותה.
             </Text>
             <View style={styles.confirmationButtons}>
               <TouchableOpacity
-                style={[styles.confirmButton, styles.cancelButton]}
+                style={[
+                  styles.confirmButton,
+                  styles.cancelButton,
+                  {
+                    backgroundColor: theme.cardBackground,
+                    borderColor: theme.border,
+                  },
+                ]}
                 onPress={cancelUnmatch}
               >
-                <Text style={styles.cancelButtonText}>ביטול</Text>
+                <Text style={[styles.cancelButtonText, { color: theme.text }]}>
+                  ביטול
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.confirmButton, styles.deleteButton]}
@@ -369,7 +593,6 @@ export default function LovedScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fcf1fcff',
   },
   header: {
     paddingHorizontal: 20,
@@ -380,12 +603,10 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 5,
   },
   headerSubtitle: {
     fontSize: 16,
-    color: '#666',
   },
   tabContainer: {
     flexDirection: 'row',
@@ -393,6 +614,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
+  },
+  contentContainer: {
+    flex: 1,
   },
   tab: {
     flex: 1,
@@ -409,11 +633,9 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#999',
     marginLeft: 8,
   },
   activeTabText: {
-    color: '#333',
     fontWeight: '600',
   },
   emptyState: {
@@ -425,14 +647,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
     marginTop: 20,
     marginBottom: 10,
     textAlign: 'center',
   },
   emptyText: {
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
     lineHeight: 24,
   },
@@ -447,7 +667,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   cardContainer: {
-    backgroundColor: '#FFF',
     borderRadius: 16,
     overflow: 'hidden',
     elevation: 3,
@@ -476,7 +695,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 5,
     right: 5,
-    backgroundColor: '#FFF',
     borderRadius: 12,
     width: 24,
     height: 24,
@@ -488,9 +706,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 2,
   },
-  matchOverlay: {
-    backgroundColor: '#E8F5E8',
-  },
+  matchOverlay: {},
   cardInfo: {
     alignItems: 'center',
     marginBottom: 16,
@@ -498,17 +714,14 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 4,
   },
   distanceText: {
     fontSize: 14,
-    color: '#666',
     marginBottom: 8,
   },
   bioText: {
     fontSize: 14,
-    color: '#666',
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -516,7 +729,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#E8D5F3',
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 12,
@@ -525,32 +737,25 @@ const styles = StyleSheet.create({
   matchActions: {
     width: '100%',
   },
-  matchMessageButton: {
-    backgroundColor: '#E8F5E8',
-  },
+  matchMessageButton: {},
   messageText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#8E44AD',
     marginLeft: 8,
   },
-  matchMessageText: {
-    color: '#4CAF50',
-  },
+  matchMessageText: {},
   unmatchButton: {
-    backgroundColor: '#FFEBEE',
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#FFCDD2',
   },
   unmatchText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#D32F2F',
+    textAlign: 'center',
   },
   modalOverlay: {
     position: 'absolute',
@@ -573,7 +778,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   confirmationModal: {
-    backgroundColor: '#FFF',
     marginHorizontal: 20,
     borderRadius: 24,
     padding: 32,
@@ -590,7 +794,6 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#FFEBEE',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
@@ -598,14 +801,14 @@ const styles = StyleSheet.create({
   confirmationTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 12,
     textAlign: 'center',
   },
   confirmationText: {
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
+    justifyContent: 'center',
+
     lineHeight: 24,
     marginBottom: 28,
     paddingHorizontal: 8,
@@ -626,9 +829,9 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   cancelButton: {
-    backgroundColor: '#F8F9FA',
     borderWidth: 1.5,
-    borderColor: '#E9ECEF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   deleteButton: {
     backgroundColor: '#FF6B6B',
@@ -637,15 +840,19 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cancelButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#495057',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   deleteButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#FFF',
+    textAlign: 'center',
   },
 });
