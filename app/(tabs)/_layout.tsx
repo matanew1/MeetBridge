@@ -23,7 +23,7 @@ export default function TabLayout() {
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: '#fcf1fcff' }]}>
           <TouchableOpacity style={styles.shoppingButton}>
             <Shopping size={20} color="#8E44AD" />
           </TouchableOpacity>
