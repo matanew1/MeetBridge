@@ -141,6 +141,8 @@ export default function SearchScreen() {
     error,
     isLoadingLike,
     isLoadingUnmatch,
+    loadConversations,
+    createConversation,
   } = useUserStore();
 
   // Animation values
@@ -149,6 +151,7 @@ export default function SearchScreen() {
   useEffect(() => {
     // Load current user and discover profiles on component mount
     loadCurrentUser(); // Ensure we have a current user for like/dislike functionality
+    loadConversations(); // Load existing conversations
     loadDiscoverProfiles(true);
 
     // Small delay to ensure profiles are loaded before starting animation

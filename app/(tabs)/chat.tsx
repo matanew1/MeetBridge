@@ -46,7 +46,14 @@ const ChatItem = ({ chat }: { chat: ChatItem }) => (
 
 export default function ChatScreen() {
   const { t } = useTranslation();
-  const { conversations, discoverProfiles } = useUserStore();
+  const { 
+    currentUser,
+    conversations, 
+    discoverProfiles, 
+    loadConversations, 
+    loadCurrentUser,
+    loadDiscoverProfiles 
+  } = useUserStore();
   const [chats, setChats] = useState<ChatItem[]>([]);
 
   const formatTime = (timestamp: Date): string => {
@@ -63,6 +70,15 @@ export default function ChatScreen() {
     return `${days} ימים`;
   };
 
+  // Load data when component mounts
+  useEffect(() => {
+    loadCurrentUser();
+    loadConversations();
+    if (discoverProfiles.length === 0) {
+      loadDiscoverProfiles(true);
+    }
+  }, []);
+
   useEffect(() => {
     console.log('🔍 Chat screen useEffect triggered');
     console.log('Conversations count:', conversations.length);
@@ -77,7 +93,7 @@ export default function ChatScreen() {
       .map((conversation) => {
         // Find the other participant (not current user)
         const otherParticipantId = conversation.participants.find(
-          (id) => id !== 'current-user'
+          (id) => id !== currentUser?.id
         );
         const otherParticipant = discoverProfiles.find(
           (profile) => profile.id === otherParticipantId
@@ -108,7 +124,7 @@ export default function ChatScreen() {
 
     console.log('Final chat items:', chatItems.length);
     setChats(chatItems);
-  }, [conversations, discoverProfiles]);
+  }, [conversations, discoverProfiles, currentUser]);
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>

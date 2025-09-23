@@ -7,48 +7,56 @@ const resources = {
       tabs: {
         discover: 'אהבתי',
         search: 'חיפוש',
-        chat: 'צ\'אט'
+        chat: "צ'אט",
       },
       discover: {
-        title: 'גילוי'
+        title: 'גילוי',
       },
       search: {
-        title: 'חיפוש'
+        title: 'חיפוש',
       },
       chat: {
-        title: 'צ\'אט'
-      }
-    }
+        title: "צ'אט",
+        noConversations: 'אין שיחות',
+        startMatching: 'התחל להכיר אנשים חדשים',
+      },
+      common: {
+        noMessages: 'אין הודעות',
+      },
+    },
   },
   en: {
     translation: {
       tabs: {
         discover: 'Liked',
         search: 'Search',
-        chat: 'Chat'
+        chat: 'Chat',
       },
       discover: {
-        title: 'Discover'
+        title: 'Discover',
       },
       search: {
-        title: 'Search'
+        title: 'Search',
       },
       chat: {
-        title: 'Chats'
-      }
-    }
-  }
+        title: 'Chats',
+        noConversations: 'No conversations',
+        startMatching: 'Start meeting new people',
+      },
+      common: {
+        noMessages: 'No messages',
+      },
+    },
+  },
 };
 
-i18n
-  .use(initReactI18next)
-  .init({
-    resources,
-    lng: 'he', // default language
-    fallbackLng: 'en',
-    interpolation: {
-      escapeValue: false
-    }
-  });
+i18n.use(initReactI18next).init({
+  resources,
+  lng: 'he', // default language
+  fallbackLng: 'en',
+  interpolation: {
+    escapeValue: false,
+  },
+});
 
 export default i18n;

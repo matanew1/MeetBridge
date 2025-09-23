@@ -477,6 +477,13 @@ export class MockChatService implements IChatService {
     matchInterests?: string[]
   ): Conversation {
     const conversationId = `conv_${userId}_${matchId}`;
+
+    // Check if conversation already exists
+    const existingConversation = this.conversations.get(conversationId);
+    if (existingConversation) {
+      return existingConversation;
+    }
+
     const initialMessage = generateMockChatMessage(matchId, matchInterests);
 
     const conversation: Conversation = {

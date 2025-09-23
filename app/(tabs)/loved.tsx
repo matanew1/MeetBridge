@@ -125,6 +125,8 @@ export default function LovedScreen() {
     isLoadingUnmatch,
     loadDiscoverProfiles,
     loadCurrentUser,
+    loadConversations,
+    createConversation,
   } = useUserStore();
   const [activeTab, setActiveTab] = useState<'loved' | 'matches'>('loved');
   const [selectedProfile, setSelectedProfile] = useState(null);
@@ -135,6 +137,7 @@ export default function LovedScreen() {
   // Load profiles on component mount
   useEffect(() => {
     loadCurrentUser(); // Ensure current user is loaded for actions
+    loadConversations(); // Load existing conversations
     if (discoverProfiles.length === 0) {
       loadDiscoverProfiles(true);
     }
@@ -153,7 +156,12 @@ export default function LovedScreen() {
     (profile) => !matchedProfilesData.some((match) => match.id === profile.id)
   );
 
-  const handleMessage = (profileId: string) => {
+  const handleMessage = async (profileId: string) => {
+    console.log('Creating/finding conversation for:', profileId);
+
+    // Create conversation if it doesn't exist
+    await createConversation(profileId);
+
     // Navigate to chat tab when message button is clicked
     router.push('/chat');
   };

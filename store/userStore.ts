@@ -296,12 +296,23 @@ export const useUserStore = create<UserState>((set, get) => ({
           const matchProfile = get().discoverProfiles.find(
             (p) => p.id === profileId
           );
-          if (matchProfile) {
-            chatService.createConversationWithMessage(
+
+          // Check if conversation already exists
+          const existingConversation = get().conversations.find((conv) =>
+            conv.participants.includes(profileId)
+          );
+
+          if (matchProfile && !existingConversation) {
+            const conversation = chatService.createConversationWithMessage(
               currentUser.id,
               profileId,
               matchProfile.interests
             );
+
+            // Add the conversation to the store
+            set((state) => ({
+              conversations: [conversation, ...state.conversations],
+            }));
           }
         }
 
@@ -473,8 +484,17 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   createConversation: async (matchedUserId) => {
-    const { currentUser } = get();
+    const { currentUser, conversations } = get();
     if (!currentUser) return;
+
+    // Check if conversation already exists in state
+    const existingConversation = conversations.find((conv) =>
+      conv.participants.includes(matchedUserId)
+    );
+
+    if (existingConversation) {
+      return; // Don't create duplicate conversation
+    }
 
     const matchProfile = get().discoverProfiles.find(
       (p) => p.id === matchedUserId
