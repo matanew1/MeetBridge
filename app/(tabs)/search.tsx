@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,27 @@ import {
 } from 'react-native';
 import { Heart, Check } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  withSequence,
+  interpolate,
+  Easing,
+} from 'react-native-reanimated';
 
 const { width, height } = Dimensions.get('window');
 
 export default function SearchScreen() {
   const { t } = useTranslation();
   const [selectedGender, setSelectedGender] = useState('woman');
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Animation values
+  const pulseAnimation = useSharedValue(0);
+  const rotationAnimation = useSharedValue(0);
+  const profileAnimation = useSharedValue(0);
 
   const centerProfile = {
     id: 'center',
@@ -50,6 +65,63 @@ export default function SearchScreen() {
     },
   ];
 
+  useEffect(() => {
+    // Start animations when component mounts
+    setIsSearching(true);
+    
+    // Pulse animation for circles
+    pulseAnimation.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0, { duration: 2000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      false
+    );
+
+    // Rotation animation for surrounding profiles
+    rotationAnimation.value = withRepeat(
+      withTiming(360, { duration: 8000, easing: Easing.linear }),
+      -1,
+      false
+    );
+
+    // Profile floating animation
+    profileAnimation.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 3000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0, { duration: 3000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      false
+    );
+  }, []);
+
+  // Animated styles
+  const pulseStyle = useAnimatedStyle(() => {
+    const scale = interpolate(pulseAnimation.value, [0, 1], [1, 1.1]);
+    const opacity = interpolate(pulseAnimation.value, [0, 1], [0.3, 0.6]);
+    
+    return {
+      transform: [{ scale }],
+      opacity,
+    };
+  });
+
+  const rotationStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ rotate: `${rotationAnimation.value}deg` }],
+    };
+  });
+
+  const profileFloatStyle = useAnimatedStyle(() => {
+    const translateY = interpolate(profileAnimation.value, [0, 1], [0, -10]);
+    
+    return {
+      transform: [{ translateY }],
+    };
+  });
+
   return (
     <View style={styles.container}>
       {/* Gender Selection */}
@@ -58,12 +130,12 @@ export default function SearchScreen() {
           style={[
             styles.genderButton,
             styles.manButton,
-            selectedGender === 'man' && styles.selectedButton,
+            selectedGender === 'man' && styles.selectedManButton,
           ]}
           onPress={() => setSelectedGender('man')}
         >
           <Text style={styles.manIcon}>♂</Text>
-          <Text style={styles.genderText}>איש</Text>
+          <Text style={styles.manText}>איש</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -86,52 +158,62 @@ export default function SearchScreen() {
 
       {/* Circular Search Interface */}
       <View style={styles.searchInterface}>
-        {/* Outer Circle */}
-        <View style={styles.outerCircle}>
-          {/* Middle Circle */}
-          <View style={styles.middleCircle}>
+        {/* Animated Outer Circle */}
+        <Animated.View style={[styles.outerCircle, pulseStyle]}>
+          {/* Animated Middle Circle */}
+          <Animated.View style={[styles.middleCircle, pulseStyle]}>
             {/* Inner Circle */}
             <View style={styles.innerCircle}>
               {/* Center Profile */}
-              <View style={styles.centerProfileContainer}>
+              <Animated.View style={[styles.centerProfileContainer, profileFloatStyle]}>
                 <Image
                   source={{ uri: centerProfile.image }}
                   style={styles.centerProfile}
                 />
-              </View>
+              </Animated.View>
             </View>
-          </View>
-        </View>
+          </Animated.View>
+        </Animated.View>
 
-        {/* Surrounding Profiles */}
-        {surroundingProfiles.map((profile, index) => {
-          const angle = index * 72 - 90; // 360/5 = 72 degrees apart, start from top
-          const radius = 140;
-          const x = Math.cos((angle * Math.PI) / 180) * radius;
-          const y = Math.sin((angle * Math.PI) / 180) * radius;
+        {/* Surrounding Profiles with Rotation */}
+        <Animated.View style={[styles.profilesContainer, rotationStyle]}>
+          {surroundingProfiles.map((profile, index) => {
+            const angle = index * 72 - 90; // 360/5 = 72 degrees apart, start from top
+            const radius = 140;
+            const x = Math.cos((angle * Math.PI) / 180) * radius;
+            const y = Math.sin((angle * Math.PI) / 180) * radius;
 
-          return (
-            <View
-              key={profile.id}
-              style={[
-                styles.surroundingProfile,
-                {
-                  transform: [{ translateX: x }, { translateY: y }],
-                },
-              ]}
-            >
-              <Image
-                source={{ uri: profile.image }}
-                style={styles.profileImage}
-              />
-            </View>
-          );
-        })}
+            return (
+              <Animated.View
+                key={profile.id}
+                style={[
+                  styles.surroundingProfile,
+                  profileFloatStyle,
+                  {
+                    transform: [{ translateX: x }, { translateY: y }],
+                  },
+                ]}
+              >
+                <Image
+                  source={{ uri: profile.image }}
+                  style={styles.profileImage}
+                />
+              </Animated.View>
+            );
+          })}
+        </Animated.View>
 
-        {/* Heart Icon */}
-        <View style={styles.heartContainer}>
+        {/* Animated Heart Icon */}
+        <Animated.View style={[styles.heartContainer, profileFloatStyle]}>
           <Heart size={24} color="#8E44AD" fill="#8E44AD" />
-        </View>
+        </Animated.View>
+
+        {/* Searching indicator */}
+        {isSearching && (
+          <View style={styles.searchingIndicator}>
+            <Text style={styles.searchingText}>מחפש...</Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -165,6 +247,9 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
   },
+  selectedManButton: {
+    backgroundColor: '#29B6F6',
+  },
   womanButton: {
     backgroundColor: '#AB47BC',
     borderRadius: 20,
@@ -197,7 +282,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 4,
   },
-  genderText: {
+  manText: {
     color: '#FFF',
     fontSize: 14,
     fontWeight: '600',
@@ -217,7 +302,7 @@ const styles = StyleSheet.create({
     width: 320,
     height: 320,
     borderRadius: 160,
-    backgroundColor: 'rgba(171, 71, 188, 0.1)',
+    backgroundColor: 'rgba(171, 71, 188, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -225,7 +310,7 @@ const styles = StyleSheet.create({
     width: 240,
     height: 240,
     borderRadius: 120,
-    backgroundColor: 'rgba(171, 71, 188, 0.2)',
+    backgroundColor: 'rgba(171, 71, 188, 0.25)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -236,17 +321,29 @@ const styles = StyleSheet.create({
     backgroundColor: '#4FC3F7',
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
   },
   centerProfileContainer: {
     width: 80,
     height: 80,
     borderRadius: 40,
     overflow: 'hidden',
+    borderWidth: 3,
+    borderColor: '#FFF',
   },
   centerProfile: {
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
+  },
+  profilesContainer: {
+    position: 'absolute',
+    width: 320,
+    height: 320,
   },
   surroundingProfile: {
     position: 'absolute',
@@ -254,6 +351,13 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#FFF',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   profileImage: {
     width: '100%',
@@ -269,10 +373,23 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 3,
+    elevation: 6,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
     shadowRadius: 8,
+  },
+  searchingIndicator: {
+    position: 'absolute',
+    bottom: -180,
+    backgroundColor: 'rgba(142, 68, 173, 0.9)',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  searchingText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
