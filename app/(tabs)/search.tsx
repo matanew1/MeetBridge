@@ -23,6 +23,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useUserStore } from '../../store';
 import ProfileDetail from '../components/ProfileDetail';
+import MatchModal from '../components/MatchModal';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 
@@ -130,6 +131,8 @@ export default function SearchScreen() {
   const [showProfileDetail, setShowProfileDetail] = useState(false);
   const [showUnmatchConfirm, setShowUnmatchConfirm] = useState(false);
   const [unmatchProfileId, setUnmatchProfileId] = useState<string | null>(null);
+  const [showMatchModal, setShowMatchModal] = useState(false);
+  const [matchedUser, setMatchedUser] = useState(null);
 
   // Zustand store
   const {
@@ -157,6 +160,7 @@ export default function SearchScreen() {
     isLoadingUnmatch,
     loadConversations,
     createConversation,
+    currentUser,
   } = useUserStore();
 
   // Animation values
@@ -203,7 +207,16 @@ export default function SearchScreen() {
 
   const handleLike = (profileId: string) => {
     console.log('handleLike called for profile:', profileId);
-    likeProfile(profileId);
+    likeProfile(profileId).then((isMatch) => {
+      if (isMatch) {
+        // Find the matched user
+        const matchedUserData = discoverProfiles.find(p => p.id === profileId);
+        if (matchedUserData) {
+          setMatchedUser(matchedUserData);
+          setShowMatchModal(true);
+        }
+      }
+    });
   };
 
   const handleDislike = (profileId: string) => {
@@ -248,6 +261,20 @@ export default function SearchScreen() {
   const cancelUnmatch = () => {
     setShowUnmatchConfirm(false);
     setUnmatchProfileId(null);
+  };
+
+  const handleStartChatting = () => {
+    setShowMatchModal(false);
+    if (matchedUser) {
+      createConversation(matchedUser.id);
+      // Navigate to chat tab
+      // You can add navigation logic here if needed
+    }
+  };
+
+  const handleCloseMatchModal = () => {
+    setShowMatchModal(false);
+    setMatchedUser(null);
   };
 
   const handleSearchButton = () => {
@@ -545,6 +572,15 @@ export default function SearchScreen() {
           </View>
         </View>
       )}
+
+      {/* Match Modal */}
+      <MatchModal
+        visible={showMatchModal}
+        onClose={handleCloseMatchModal}
+        onStartChatting={handleStartChatting}
+        matchedUser={matchedUser}
+        currentUser={currentUser}
+      />
     </View>
   );
 }
