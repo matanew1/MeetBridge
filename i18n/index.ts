@@ -7,7 +7,7 @@ const resources = {
       tabs: {
         discover: 'אהבתי',
         search: 'חיפוש',
-        chat: 'צ\'אטים'
+        chat: 'צ\'אט'
       },
       discover: {
         title: 'גילוי'
@@ -16,7 +16,7 @@ const resources = {
         title: 'חיפוש'
       },
       chat: {
-        title: 'צ\'אטים'
+        title: 'צ\'אט'
       }
     }
   },
@@ -25,7 +25,7 @@ const resources = {
       tabs: {
         discover: 'Liked',
         search: 'Search',
-        chat: 'Chats'
+        chat: 'Chat'
       },
       discover: {
         title: 'Discover'
