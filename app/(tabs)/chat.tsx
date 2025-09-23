@@ -1,8 +1,17 @@
-import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Image, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  TouchableOpacity,
+  Image,
+  ScrollView,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MessageCircle, Search } from 'lucide-react-native';
+import { MessageCircle, Heart } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
+import { useUserStore } from '../../store';
 
 interface ChatItem {
   id: string;
@@ -10,40 +19,18 @@ interface ChatItem {
   lastMessage: string;
   time: string;
   image: string;
+  age: number;
   unread?: boolean;
 }
-
-const mockChats: ChatItem[] = [
-  {
-    id: '1',
-    name: 'דנה',
-    lastMessage: 'היי! איך אתה?',
-    time: '10:30',
-    image: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=100',
-    unread: true
-  },
-  {
-    id: '2',
-    name: 'אילנה',
-    lastMessage: 'תודה על הערב הנחמד',
-    time: 'אתמול',
-    image: 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=100'
-  },
-  {
-    id: '3',
-    name: 'תמרה',
-    lastMessage: 'נשמע מעולה!',
-    time: 'שלשום',
-    image: 'https://images.pexels.com/photos/1130626/pexels-photo-1130626.jpeg?auto=compress&cs=tinysrgb&w=100'
-  }
-];
 
 const ChatItem = ({ chat }: { chat: ChatItem }) => (
   <TouchableOpacity style={styles.chatItem}>
     <Image source={{ uri: chat.image }} style={styles.chatAvatar} />
     <View style={styles.chatContent}>
       <View style={styles.chatHeader}>
-        <Text style={styles.chatName}>{chat.name}</Text>
+        <Text style={styles.chatName}>
+          {chat.name}, {chat.age}
+        </Text>
         <Text style={styles.chatTime}>{chat.time}</Text>
       </View>
       <Text style={[styles.chatMessage, chat.unread && styles.unreadMessage]}>
@@ -51,28 +38,111 @@ const ChatItem = ({ chat }: { chat: ChatItem }) => (
       </Text>
     </View>
     {chat.unread && <View style={styles.unreadDot} />}
+    <View style={styles.matchBadge}>
+      <Heart size={12} color="#4CAF50" fill="#4CAF50" />
+    </View>
   </TouchableOpacity>
 );
 
 export default function ChatScreen() {
   const { t } = useTranslation();
+  const { conversations, discoverProfiles } = useUserStore();
+  const [chats, setChats] = useState<ChatItem[]>([]);
+
+  const formatTime = (timestamp: Date): string => {
+    const now = new Date();
+    const diff = now.getTime() - timestamp.getTime();
+    const minutes = Math.floor(diff / (1000 * 60));
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+    if (minutes < 5) return 'עכשיו';
+    if (minutes < 60) return `${minutes} דק`;
+    if (hours < 24) return `${hours} שעות`;
+    if (days === 1) return 'אתמול';
+    return `${days} ימים`;
+  };
+
+  useEffect(() => {
+    console.log('🔍 Chat screen useEffect triggered');
+    console.log('Conversations count:', conversations.length);
+    console.log('Discover profiles count:', discoverProfiles.length);
+
+    // Sort conversations by most recent first
+    const sortedConversations = [...conversations].sort(
+      (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
+    );
+
+    const chatItems: ChatItem[] = sortedConversations
+      .map((conversation) => {
+        // Find the other participant (not current user)
+        const otherParticipantId = conversation.participants.find(
+          (id) => id !== 'current-user'
+        );
+        const otherParticipant = discoverProfiles.find(
+          (profile) => profile.id === otherParticipantId
+        );
+
+        console.log('Processing conversation:', {
+          conversationId: conversation.id,
+          otherParticipantId,
+          foundProfile: !!otherParticipant,
+          hasLastMessage: !!conversation.lastMessage,
+        });
+
+        if (!otherParticipant || !conversation.lastMessage) {
+          return null;
+        }
+
+        return {
+          id: conversation.id,
+          name: otherParticipant.name,
+          age: otherParticipant.age,
+          lastMessage: conversation.lastMessage.text,
+          time: formatTime(conversation.lastMessage.timestamp),
+          image: otherParticipant.image,
+          unread: conversation.unreadCount > 0,
+        };
+      })
+      .filter(Boolean) as ChatItem[];
+
+    console.log('Final chat items:', chatItems.length);
+    setChats(chatItems);
+  }, [conversations, discoverProfiles]);
+
+  const renderEmptyState = () => (
+    <View style={styles.emptyState}>
+      <MessageCircle size={60} color="#E1C8EB" />
+      <Text style={styles.emptyTitle}>אין לך עדיין שיחות</Text>
+      <Text style={styles.emptyText}>
+        כשתקבל התאמות חדשות, תוכל להתחיל לשוחח איתן כאן!
+      </Text>
+      <Text style={styles.emptySubtext}>
+        עבור לעמוד החיפוש כדי למצוא התאמות
+      </Text>
+    </View>
+  );
 
   return (
-    <LinearGradient colors={['#FF6B9D', '#C44FAF', '#8E44AD']} style={styles.container}>
+    <LinearGradient colors={['#fcf1fc', '#f8e8f8']} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <Text style={styles.title}>{t('chat.title')}</Text>
-          <TouchableOpacity style={styles.searchButton}>
-            <Search size={24} color="#FFF" />
-          </TouchableOpacity>
+          <Text style={styles.title}>צ'אטים ({chats.length})</Text>
         </View>
 
         <View style={styles.content}>
-          <ScrollView style={styles.chatList} showsVerticalScrollIndicator={false}>
-            {mockChats.map((chat) => (
-              <ChatItem key={chat.id} chat={chat} />
-            ))}
-          </ScrollView>
+          {chats.length === 0 ? (
+            renderEmptyState()
+          ) : (
+            <ScrollView
+              style={styles.chatList}
+              showsVerticalScrollIndicator={false}
+            >
+              {chats.map((chat) => (
+                <ChatItem key={chat.id} chat={chat} />
+              ))}
+            </ScrollView>
+          )}
         </View>
       </SafeAreaView>
     </LinearGradient>
@@ -97,7 +167,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#FFF',
+    color: '#8E44AD',
   },
   searchButton: {
     width: 40,
@@ -124,6 +194,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
+    position: 'relative',
   },
   chatAvatar: {
     width: 56,
@@ -163,5 +234,43 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#8E44AD',
     marginLeft: 8,
+  },
+  matchBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 8,
+    backgroundColor: '#E8F5E8',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 20,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 10,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#8E44AD',
+    textAlign: 'center',
+    fontWeight: '500',
   },
 });

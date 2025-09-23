@@ -29,3 +29,21 @@ export interface SearchFilters {
   maxDistance: number;
   interests?: string[];
 }
+
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  text: string;
+  timestamp: Date;
+  isRead: boolean;
+}
+
+export interface Conversation {
+  id: string;
+  participants: [string, string]; // [currentUserId, matchedUserId]
+  messages: ChatMessage[];
+  lastMessage?: ChatMessage;
+  createdAt: Date;
+  updatedAt: Date;
+  unreadCount: number;
+}

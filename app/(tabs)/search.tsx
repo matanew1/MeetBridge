@@ -8,6 +8,7 @@ import {
   Dimensions,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Heart, Check, ShoppingCart, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
@@ -21,6 +22,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { useUserStore } from '../../store';
+import ProfileDetail from '../components/ProfileDetail';
 
 const { width, height } = Dimensions.get('window');
 
@@ -34,6 +36,7 @@ interface ProfileCardProps {
   };
   onLike: (id: string) => void;
   onDislike: (id: string) => void;
+  onPress: (user: any) => void;
   isLiked: boolean;
   isDisliked: boolean;
 }
@@ -42,6 +45,7 @@ const ProfileCard = ({
   user,
   onLike,
   onDislike,
+  onPress,
   isLiked,
   isDisliked,
 }: ProfileCardProps) => (
@@ -52,6 +56,7 @@ const ProfileCard = ({
         isLiked && styles.likedCard,
         isDisliked && styles.dislikedCard,
       ]}
+      onPress={() => onPress(user)}
     >
       <View style={styles.imageContainer}>
         <Image
@@ -70,7 +75,10 @@ const ProfileCard = ({
       <View style={styles.cardActions}>
         <TouchableOpacity
           style={[styles.actionBtn, styles.dislikeBtn]}
-          onPress={() => onDislike(user.id)}
+          onPress={(e) => {
+            e.stopPropagation();
+            onDislike(user.id);
+          }}
           disabled={isDisliked || isLiked}
         >
           <X size={16} color="#FF6B6B" />
@@ -78,7 +86,10 @@ const ProfileCard = ({
 
         <TouchableOpacity
           style={[styles.actionBtn, styles.likeBtn]}
-          onPress={() => onLike(user.id)}
+          onPress={(e) => {
+            e.stopPropagation();
+            onLike(user.id);
+          }}
           disabled={isLiked || isDisliked}
         >
           <Heart
@@ -101,6 +112,10 @@ const ProfileCard = ({
 export default function SearchScreen() {
   const { t } = useTranslation();
   const [showAnimation, setShowAnimation] = useState(true);
+  const [selectedProfile, setSelectedProfile] = useState(null);
+  const [showProfileDetail, setShowProfileDetail] = useState(false);
+  const [showUnmatchConfirm, setShowUnmatchConfirm] = useState(false);
+  const [unmatchProfileId, setUnmatchProfileId] = useState<string | null>(null);
 
   // Zustand store
   const {
@@ -119,6 +134,8 @@ export default function SearchScreen() {
     loadDiscoverProfiles,
     likeProfile,
     dislikeProfile,
+    unmatchProfile,
+    getMatchedProfiles,
     triggerSearchAnimation,
   } = useUserStore();
 
@@ -126,29 +143,21 @@ export default function SearchScreen() {
   const pulseAnimation = useSharedValue(0);
 
   useEffect(() => {
-    // Generate initial profiles if none exist
-    if (!centerProfile && matchProfiles.length === 0) {
-      generateMockProfiles();
-    }
+    // Auto-trigger search animation on page load - same as button click
+    // First generate profiles, then start animation to avoid empty placeholder
+    generateMockProfiles();
 
-    // Start animation for 5 seconds (only if showAnimation is true and not triggered by button)
-    if (showAnimation && !isSearching) {
-      const animationTimer = setTimeout(() => {
-        setShowAnimation(false);
-        // Load discover profiles when animation ends
-        if (discoverProfiles.length === 0) {
-          loadDiscoverProfiles();
-        }
-      }, 5000);
+    // Small delay to ensure profiles are generated before starting animation
+    setTimeout(() => {
+      setShowAnimation(true);
+      triggerSearchAnimation();
+    }, 100);
+  }, []); // Empty dependency array means this runs only once on mount
 
-      return () => clearTimeout(animationTimer);
-    }
-  }, [showAnimation, isSearching]);
-
-  // Handle when isSearching changes (from button trigger)
+  // Handle when isSearching changes (from button trigger or auto-trigger)
   useEffect(() => {
     if (!isSearching && showAnimation) {
-      // Animation ended via button trigger
+      // Animation ended via trigger
       setShowAnimation(false);
     }
   }, [isSearching]);
@@ -177,6 +186,45 @@ export default function SearchScreen() {
 
   const handleDislike = (profileId: string) => {
     dislikeProfile(profileId);
+  };
+
+  const handleProfilePress = (user: any) => {
+    setSelectedProfile(user);
+    setShowProfileDetail(true);
+  };
+
+  const handleCloseProfile = () => {
+    setShowProfileDetail(false);
+    setSelectedProfile(null);
+  };
+
+  const handleMessage = (profileId: string) => {
+    // TODO: Navigate to chat with this profile
+    console.log('Message profile:', profileId);
+    handleCloseProfile();
+  };
+
+  const handleUnmatch = (profileId: string) => {
+    console.log('handleUnmatch called with profileId:', profileId);
+
+    // Use custom modal instead of Alert.alert
+    setUnmatchProfileId(profileId);
+    setShowUnmatchConfirm(true);
+  };
+
+  const confirmUnmatch = () => {
+    if (unmatchProfileId) {
+      console.log('Confirming unmatch for:', unmatchProfileId);
+      unmatchProfile(unmatchProfileId);
+      handleCloseProfile();
+    }
+    setShowUnmatchConfirm(false);
+    setUnmatchProfileId(null);
+  };
+
+  const cancelUnmatch = () => {
+    setShowUnmatchConfirm(false);
+    setUnmatchProfileId(null);
   };
 
   const handleSearchButton = () => {
@@ -317,6 +365,7 @@ export default function SearchScreen() {
                 user={user}
                 onLike={handleLike}
                 onDislike={handleDislike}
+                onPress={handleProfilePress}
                 isLiked={likedProfiles.includes(user.id)}
                 isDisliked={dislikedProfiles.includes(user.id)}
               />
@@ -324,13 +373,70 @@ export default function SearchScreen() {
           ))}
         </View>
       </ScrollView>
+
+      {/* Profile Detail Modal */}
+      {showProfileDetail && selectedProfile && (
+        <View style={styles.modalOverlay}>
+          <ProfileDetail
+            user={selectedProfile}
+            onClose={handleCloseProfile}
+            onLike={handleLike}
+            onDislike={handleDislike}
+            onMessage={
+              // Only allow messaging if it's a match
+              getMatchedProfiles().some(
+                (match) => match.id === selectedProfile.id
+              )
+                ? handleMessage
+                : undefined
+            }
+            onUnmatch={
+              // Only allow unmatching if it's a match
+              getMatchedProfiles().some(
+                (match) => match.id === selectedProfile.id
+              )
+                ? handleUnmatch
+                : undefined
+            }
+            isLiked={likedProfiles.includes(selectedProfile.id)}
+            isDisliked={dislikedProfiles.includes(selectedProfile.id)}
+          />
+        </View>
+      )}
+
+      {/* Custom Unmatch Confirmation Modal */}
+      {showUnmatchConfirm && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.confirmationModal}>
+            <Text style={styles.confirmationTitle}>בטל התאמה</Text>
+            <Text style={styles.confirmationText}>
+              האם אתה בטוח שברצונך לבטל את ההתאמה? פעולה זו תמחק גם את השיחה
+              ביניכם.
+            </Text>
+            <View style={styles.confirmationButtons}>
+              <TouchableOpacity
+                style={[styles.confirmButton, styles.cancelButton]}
+                onPress={cancelUnmatch}
+              >
+                <Text style={styles.cancelButtonText}>ביטול</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmButton, styles.deleteButton]}
+                onPress={confirmUnmatch}
+              >
+                <Text style={styles.deleteButtonText}>בטל התאמה</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5E6F8',
+    backgroundColor: '#fcf1fcff',
   },
   centered: {
     justifyContent: 'center',
@@ -603,5 +709,75 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 14,
     fontWeight: '600',
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 1000,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  confirmationModal: {
+    backgroundColor: '#FFF',
+    margin: 20,
+    borderRadius: 20,
+    padding: 30,
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    maxWidth: 300,
+  },
+  confirmationTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  confirmationText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 25,
+  },
+  confirmationButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    gap: 15,
+  },
+  confirmButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
+    borderColor: '#DDD',
+  },
+  deleteButton: {
+    backgroundColor: '#FF6B6B',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  deleteButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFF',
   },
 });
