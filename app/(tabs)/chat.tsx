@@ -12,6 +12,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MessageCircle } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
+import { useRouter } from 'expo-router';
 import { useUserStore } from '../../store';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
@@ -31,10 +32,12 @@ const ChatItem = ({
   chat,
   theme,
   index,
+  onPress,
 }: {
   chat: ChatItem;
   theme: any;
   index: number;
+  onPress: () => void;
 }) => {
   const slideAnim = React.useRef(new Animated.Value(50)).current;
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -96,6 +99,7 @@ const ChatItem = ({
       <TouchableOpacity
         style={[styles.chatItem, { backgroundColor: theme.cardBackground }]}
         activeOpacity={0.7}
+        onPress={onPress}
       >
         <View style={styles.avatarContainer}>
           <Image source={{ uri: chat.image }} style={styles.chatAvatar} />
@@ -148,6 +152,7 @@ export default function ChatScreen() {
   const { t } = useTranslation();
   const { isDarkMode, isRTL } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
+  const router = useRouter();
   const {
     currentUser,
     conversations,
@@ -269,6 +274,10 @@ export default function ChatScreen() {
     }
   }, [conversations, discoverProfiles, currentUser]);
 
+  const handleChatPress = (chatId: string) => {
+    router.push(`/chat/${chatId}`);
+  };
+
   // Empty state animations
   useEffect(() => {
     if (chats.length === 0) {
@@ -374,6 +383,7 @@ export default function ChatScreen() {
                   chat={chat}
                   theme={theme}
                   index={index}
+                  onPress={() => handleChatPress(chat.id)}
                 />
               ))}
             </ScrollView>

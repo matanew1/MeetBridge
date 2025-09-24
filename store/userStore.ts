@@ -239,10 +239,13 @@ export const useUserStore = create<UserState>((set, get) => ({
       );
 
       if (response.success) {
+        // Sort by distance
+        const sortedProfiles = response.data.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+        
         set((state) => ({
           discoverProfiles: refresh
-            ? response.data
-            : [...state.discoverProfiles, ...response.data],
+            ? sortedProfiles
+            : [...state.discoverProfiles, ...sortedProfiles],
           hasMoreProfiles: response.pagination?.hasMore || false,
           currentPage: page,
         }));

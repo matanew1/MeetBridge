@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { Heart, Check, ShoppingCart, X } from 'lucide-react-native';
+import { Heart, Check, ShoppingCart, X, Filter } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import Animated, {
   useSharedValue,
@@ -24,6 +24,7 @@ import Animated, {
 import { useUserStore } from '../../store';
 import ProfileDetail from '../components/ProfileDetail';
 import MatchModal from '../components/MatchModal';
+import FilterModal from '../components/FilterModal';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 
@@ -133,6 +134,8 @@ export default function SearchScreen() {
   const [unmatchProfileId, setUnmatchProfileId] = useState<string | null>(null);
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [matchedUser, setMatchedUser] = useState(null);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [maxDistance, setMaxDistance] = useState(50);
 
   // Zustand store
   const {
@@ -162,6 +165,11 @@ export default function SearchScreen() {
     createConversation,
     currentUser,
   } = useUserStore();
+
+  // Sort profiles by distance
+  const sortedDiscoverProfiles = [...discoverProfiles]
+    .filter(profile => !profile.distance || profile.distance <= maxDistance)
+    .sort((a, b) => (a.distance || 0) - (b.distance || 0));
 
   // Animation values
   const pulseAnimation = useSharedValue(0);
@@ -275,6 +283,17 @@ export default function SearchScreen() {
   const handleCloseMatchModal = () => {
     setShowMatchModal(false);
     setMatchedUser(null);
+  };
+
+  const handleFilterPress = () => {
+    setShowFilterModal(true);
+  };
+
+  const handleDistanceChange = (distance: number) => {
+    setMaxDistance(distance);
+    updateSearchFilters({ maxDistance: distance });
+    // Refresh profiles with new filter
+    loadDiscoverProfiles(true);
   };
 
   const handleSearchButton = () => {
@@ -485,6 +504,15 @@ export default function SearchScreen() {
               : t('search.newSearch')}
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.filterButton,
+            { backgroundColor: theme.surface, borderColor: theme.border },
+          ]}
+          onPress={handleFilterPress}
+        >
+          <Filter size={20} color={theme.primary} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -492,7 +520,7 @@ export default function SearchScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.grid}>
-          {discoverProfiles.map((user) => (
+          {sortedDiscoverProfiles.map((user) => (
             <View key={user.id} style={styles.gridItem}>
               <ProfileCard
                 user={user}
@@ -582,6 +610,13 @@ export default function SearchScreen() {
         currentUser={currentUser}
       />
     </View>
+      {/* Filter Modal */}
+      <FilterModal
+        visible={showFilterModal}
+        onClose={() => setShowFilterModal(false)}
+        currentDistance={maxDistance}
+        onDistanceChange={handleDistanceChange}
+      />
   );
 }
 const styles = StyleSheet.create({
@@ -620,6 +655,15 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 14,
     fontWeight: '600',
+  },
+  filterButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    marginLeft: 8,
   },
   loadingText: {
     fontSize: 16,
