@@ -125,15 +125,15 @@ const ProfileCard = ({
 
 export default function SearchScreen() {
   const { t } = useTranslation();
-  const { isDarkMode, isRTL } = useTheme();
+  const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
   const [showAnimation, setShowAnimation] = useState(true);
-  const [selectedProfile, setSelectedProfile] = useState(null);
+  const [selectedProfile, setSelectedProfile] = useState<any>(null);
   const [showProfileDetail, setShowProfileDetail] = useState(false);
   const [showUnmatchConfirm, setShowUnmatchConfirm] = useState(false);
   const [unmatchProfileId, setUnmatchProfileId] = useState<string | null>(null);
   const [showMatchModal, setShowMatchModal] = useState(false);
-  const [matchedUser, setMatchedUser] = useState(null);
+  const [matchedUser, setMatchedUser] = useState<any>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [maxDistance, setMaxDistance] = useState(50);
 
@@ -168,7 +168,7 @@ export default function SearchScreen() {
 
   // Sort profiles by distance
   const sortedDiscoverProfiles = [...discoverProfiles]
-    .filter(profile => !profile.distance || profile.distance <= maxDistance)
+    .filter((profile) => !profile.distance || profile.distance <= maxDistance)
     .sort((a, b) => (a.distance || 0) - (b.distance || 0));
 
   // Animation values
@@ -218,7 +218,9 @@ export default function SearchScreen() {
     likeProfile(profileId).then((isMatch) => {
       if (isMatch) {
         // Find the matched user
-        const matchedUserData = discoverProfiles.find(p => p.id === profileId);
+        const matchedUserData = discoverProfiles.find(
+          (p) => p.id === profileId
+        );
         if (matchedUserData) {
           setMatchedUser(matchedUserData);
           setShowMatchModal(true);
@@ -485,7 +487,7 @@ export default function SearchScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={[styles.header, isRTL && styles.headerRTL]}>
+      <View style={styles.header}>
         <Text style={[styles.headerTitle, { color: theme.text }]}>
           {t('search.title')}
         </Text>
@@ -609,7 +611,7 @@ export default function SearchScreen() {
         matchedUser={matchedUser}
         currentUser={currentUser}
       />
-    </View>
+
       {/* Filter Modal */}
       <FilterModal
         visible={showFilterModal}
@@ -617,6 +619,7 @@ export default function SearchScreen() {
         currentDistance={maxDistance}
         onDistanceChange={handleDistanceChange}
       />
+    </View>
   );
 }
 const styles = StyleSheet.create({
@@ -634,9 +637,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 15,
     paddingBottom: 20,
-  },
-  headerRTL: {
-    flexDirection: 'row-reverse',
   },
   headerTitle: {
     fontSize: 24,

@@ -1,14 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Appearance, ColorSchemeName } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useTranslation } from 'react-i18next';
 
 interface ThemeContextType {
   isDarkMode: boolean;
   toggleDarkMode: () => void;
   colorScheme: ColorSchemeName;
   currentLanguage: string;
-  toggleLanguage: () => void;
   isRTL: boolean;
 }
 
@@ -27,12 +25,10 @@ interface ThemeProviderProps {
 }
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
-  const { i18n } = useTranslation();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [colorScheme, setColorScheme] = useState<ColorSchemeName>(
     Appearance.getColorScheme()
   );
-  const [currentLanguage, setCurrentLanguage] = useState('he');
 
   // Load saved theme preference on app start
   useEffect(() => {
@@ -57,35 +53,6 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     loadThemePreference();
   }, []);
 
-  // Load and sync language preference
-  useEffect(() => {
-    const loadLanguagePreference = async () => {
-      try {
-        const savedLanguage = await AsyncStorage.getItem('language');
-        if (savedLanguage) {
-          setCurrentLanguage(savedLanguage);
-          i18n.changeLanguage(savedLanguage);
-        }
-      } catch (error) {
-        console.error('Error loading language preference:', error);
-      }
-    };
-
-    loadLanguagePreference();
-  }, [i18n]);
-
-  // Listen to i18n language changes
-  useEffect(() => {
-    const handleLanguageChange = (lng: string) => {
-      setCurrentLanguage(lng);
-    };
-
-    i18n.on('languageChanged', handleLanguageChange);
-    return () => {
-      i18n.off('languageChanged', handleLanguageChange);
-    };
-  }, [i18n]);
-
   // Listen to system color scheme changes
   useEffect(() => {
     const subscription = Appearance.addChangeListener(({ colorScheme }) => {
@@ -107,27 +74,12 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     }
   };
 
-  const toggleLanguage = async () => {
-    const newLanguage = currentLanguage === 'he' ? 'en' : 'he';
-
-    try {
-      await i18n.changeLanguage(newLanguage);
-      await AsyncStorage.setItem('language', newLanguage);
-      setCurrentLanguage(newLanguage);
-    } catch (error) {
-      console.error('Error changing language:', error);
-    }
-  };
-
-  const isRTL = currentLanguage === 'he';
-
   const value: ThemeContextType = {
     isDarkMode,
     toggleDarkMode,
     colorScheme,
-    currentLanguage,
-    toggleLanguage,
-    isRTL,
+    currentLanguage: 'en', // Fixed to English
+    isRTL: false, // Fixed to LTR
   };
 
   return (

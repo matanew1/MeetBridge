@@ -3,126 +3,6 @@ import { initReactI18next } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const resources = {
-  he: {
-    translation: {
-      // Navigation & Tabs
-      tabs: {
-        discover: 'אהבתי',
-        search: 'חיפוש',
-        chat: "צ'אט",
-      },
-
-      // Search Screen
-      search: {
-        title: 'גלה אנשים',
-        searchingPerfectMatch: 'מחפש את ההתאמה המושלמת...',
-        searching: 'מחפש...',
-        newSearch: 'חיפוש חדש',
-        loading: 'טוען...',
-        distance: 'ק"מ',
-      },
-
-      // Chat Screen
-      chat: {
-        title: "צ'אטים",
-        noConversations: 'אין לך עדיין שיחות',
-        startMatching: 'התחל להכיר אנשים חדשים',
-        chatsCount: "צ'אטים",
-        now: 'עכשיו',
-        minutes: 'דק',
-        hours: 'שעות',
-        yesterday: 'אתמול',
-        days: 'ימים',
-      },
-
-      // Loved/Liked Screen
-      loved: {
-        title: 'התאמות ולייקים',
-        matches: 'התאמות',
-        liked: 'לייקים',
-        noMatches: 'אין התאמות עדיין',
-        noLiked: 'אין לייקים עדיין',
-        startSwiping: 'התחל לסוייפ כדי למצוא התאמות',
-        keepSwiping: 'המשך לסוייפ כדי למצוא אנשים שתאהב',
-        message: 'הודעה',
-        unmatch: 'בטל התאמה',
-        personLiked: 'אדם שאהבתי',
-        peopleLiked: 'אנשים שאהבתי',
-        oneMatch: 'התאמה',
-        multipleMatches: 'התאמות',
-      },
-
-      // Profile Detail
-      profile: {
-        title: 'פרופיל',
-        interests: 'תחומי עניין',
-        about: 'אודות',
-        location: 'מיקום',
-        age: 'גיל',
-        distance: 'מרחק',
-        sendMessage: 'שלח הודעה',
-        like: 'לייק',
-        pass: 'עבור',
-        unmatch: 'בטל התאמה',
-      },
-
-      // Actions & Buttons
-      actions: {
-        like: 'אהבתי',
-        dislike: 'לא אהבתי',
-        message: 'הודעה',
-        close: 'סגור',
-        cancel: 'ביטול',
-        confirm: 'אישור',
-        save: 'שמור',
-        edit: 'עריכה',
-        delete: 'מחק',
-        back: 'חזור',
-        next: 'הבא',
-        skip: 'דלג',
-        done: 'סיום',
-      },
-
-      // Modals & Confirmations
-      modals: {
-        unmatchTitle: 'בטל התאמה',
-        unmatchText:
-          'האם אתה בטוח שברצונך לבטל את ההתאמה? פעולה זו תמחק גם את השיחה ביניכם ולא תוכל לשחזר אותה.',
-        confirmUnmatch: 'בטל התאמה',
-        matchTitle: 'זו התאמה!',
-        matchText: 'שניכם אוהבים אחד את השני',
-        startChatting: 'התחילו לשוחח',
-      },
-
-      // Settings & Theme
-      settings: {
-        title: 'הגדרות',
-        language: 'שפה',
-        theme: 'נושא',
-        darkMode: 'מצב כהה',
-        lightMode: 'מצב בהיר',
-        hebrew: 'עברית',
-        english: 'English',
-        notifications: 'הודעות',
-        privacy: 'פרטיות',
-        help: 'עזרה',
-        about: 'אודות',
-        logout: 'התנתק',
-      },
-
-      // Common
-      common: {
-        loading: 'טוען...',
-        error: 'שגיאה',
-        retry: 'נסה שוב',
-        noData: 'אין נתונים',
-        comingSoon: 'בקרוב',
-        ok: 'אישור',
-        yes: 'כן',
-        no: 'לא',
-      },
-    },
-  },
   en: {
     translation: {
       // Navigation & Tabs
@@ -139,7 +19,7 @@ const resources = {
         searching: 'Searching...',
         newSearch: 'New Search',
         loading: 'Loading...',
-        distance: 'km',
+        distance: 'm',
       },
 
       // Chat Screen
@@ -153,6 +33,10 @@ const resources = {
         hours: 'hrs',
         yesterday: 'yesterday',
         days: 'days',
+        loading: 'Loading...',
+        online: 'Online now',
+        offline: 'Offline',
+        messageInputPlaceholder: 'Write a message...',
       },
 
       // Loved/Liked Screen
@@ -214,6 +98,14 @@ const resources = {
         startChatting: 'Start Chatting',
       },
 
+      // Filter Modal
+      filter: {
+        title: 'Search Distance',
+        apply: 'Apply',
+        upTo: 'Up to',
+        meters: 'm',
+      },
+
       // Settings & Theme
       settings: {
         title: 'Settings',
@@ -221,8 +113,6 @@ const resources = {
         theme: 'Theme',
         darkMode: 'Dark Mode',
         lightMode: 'Light Mode',
-        hebrew: 'עברית',
-        english: 'English',
         notifications: 'Notifications',
         privacy: 'Privacy',
         help: 'Help',
@@ -245,30 +135,16 @@ const resources = {
   },
 };
 
-// Language detection and persistence
+// Language detection and persistence (English only)
 const languageDetector = {
   type: 'languageDetector' as const,
   async: true,
   detect: async (callback: (lng: string) => void) => {
-    try {
-      const savedLanguage = await AsyncStorage.getItem('language');
-      if (savedLanguage) {
-        callback(savedLanguage);
-      } else {
-        callback('he'); // Default to Hebrew
-      }
-    } catch (error) {
-      console.error('Error loading language:', error);
-      callback('he');
-    }
+    callback('en'); // Always default to English
   },
   init: () => {},
   cacheUserLanguage: async (lng: string) => {
-    try {
-      await AsyncStorage.setItem('language', lng);
-    } catch (error) {
-      console.error('Error saving language:', error);
-    }
+    // No-op since we only support English
   },
 };
 
@@ -277,7 +153,7 @@ i18n
   .use(initReactI18next)
   .init({
     resources,
-    lng: 'he', // default language
+    lng: 'en', // default and only language
     fallbackLng: 'en',
     interpolation: {
       escapeValue: false,

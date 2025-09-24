@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,6 @@ import {
 } from 'react-native';
 import { X, MapPin, Check } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 
@@ -27,138 +21,102 @@ interface FilterModalProps {
   onDistanceChange: (distance: number) => void;
 }
 
-const DISTANCE_OPTIONS = [10, 25, 50, 100, 200];
+const DISTANCE_OPTIONS = [5, 10, 25, 50, 100];
 
-const FilterModal: React.FC<FilterModalProps> = ({
-  visible,
-  onClose,
-  currentDistance,
-  onDistanceChange,
-}) => {
-  const { t } = useTranslation();
-  const { isDarkMode } = useTheme();
-  const theme = isDarkMode ? darkTheme : lightTheme;
+const FilterModal: React.FC<FilterModalProps> = React.memo(
+  ({ visible, onClose, currentDistance, onDistanceChange }) => {
+    const { t } = useTranslation();
+    const { isDarkMode } = useTheme();
+    const theme = isDarkMode ? darkTheme : lightTheme;
 
-  // Animation values
-  const overlayOpacity = useSharedValue(0);
-  const modalTranslateY = useSharedValue(height);
+    const handleDistanceSelect = (distance: number) => {
+      onDistanceChange(distance);
+      onClose();
+    };
 
-  useEffect(() => {
-    if (visible) {
-      overlayOpacity.value = withTiming(1, { duration: 300 });
-      modalTranslateY.value = withSpring(0, {
-        damping: 15,
-        stiffness: 150,
-      });
-    } else {
-      overlayOpacity.value = withTiming(0, { duration: 200 });
-      modalTranslateY.value = withTiming(height, { duration: 200 });
+    if (!visible) {
+      return null;
     }
-  }, [visible]);
 
-  const overlayStyle = useAnimatedStyle(() => ({
-    opacity: overlayOpacity.value,
-  }));
-
-  const modalStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: modalTranslateY.value }],
-  }));
-
-  const handleDistanceSelect = (distance: number) => {
-    onDistanceChange(distance);
-    onClose();
-  };
-
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="none"
-      statusBarTranslucent
-    >
-      <Animated.View style={[styles.overlay, overlayStyle]}>
-        <TouchableOpacity
-          style={styles.overlayTouchable}
-          activeOpacity={1}
-          onPress={onClose}
-        />
-        <Animated.View
-          style={[
-            styles.modalContainer,
-            { backgroundColor: theme.surface },
-            modalStyle,
-          ]}
-        >
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerLeft}>
-              <MapPin size={24} color={theme.primary} />
-              <Text style={[styles.headerTitle, { color: theme.text }]}>
-                מרחק חיפוש
-              </Text>
-            </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <X size={24} color={theme.textSecondary} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Distance Options */}
-          <View style={styles.optionsContainer}>
-            {DISTANCE_OPTIONS.map((distance) => (
-              <TouchableOpacity
-                key={distance}
-                style={[
-                  styles.optionItem,
-                  {
-                    backgroundColor:
-                      currentDistance === distance
-                        ? theme.primaryVariant
-                        : theme.background,
-                    borderColor:
-                      currentDistance === distance
-                        ? theme.primary
-                        : theme.border,
-                  },
-                ]}
-                onPress={() => handleDistanceSelect(distance)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.optionContent}>
-                  <Text
-                    style={[
-                      styles.optionText,
-                      {
-                        color:
-                          currentDistance === distance
-                            ? theme.primary
-                            : theme.text,
-                        fontWeight: currentDistance === distance ? '600' : '400',
-                      },
-                    ]}
-                  >
-                    עד {distance} ק"מ
-                  </Text>
-                  {currentDistance === distance && (
-                    <Check size={20} color={theme.primary} />
-                  )}
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Apply Button */}
+    return (
+      <Modal
+        visible={visible}
+        transparent
+        animationType="slide"
+        statusBarTranslucent
+      >
+        <View style={styles.overlay}>
           <TouchableOpacity
-            style={[styles.applyButton, { backgroundColor: theme.primary }]}
+            style={styles.overlayTouchable}
+            activeOpacity={1}
             onPress={onClose}
-            activeOpacity={0.8}
+          />
+          <View
+            style={[styles.modalContainer, { backgroundColor: theme.surface }]}
           >
-            <Text style={styles.applyButtonText}>החל</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      </Animated.View>
-    </Modal>
-  );
-};
+            {/* Header */}
+            <View style={styles.header}>
+              <View style={styles.headerLeft}>
+                <MapPin size={24} color={theme.primary} />
+                <Text style={[styles.headerTitle, { color: theme.text }]}>
+                  {t('filter.title')}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                <X size={24} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Distance Options */}
+            <View style={styles.optionsContainer}>
+              {DISTANCE_OPTIONS.map((distance) => (
+                <TouchableOpacity
+                  key={distance}
+                  style={[
+                    styles.optionItem,
+                    {
+                      backgroundColor:
+                        currentDistance === distance
+                          ? theme.primaryVariant
+                          : theme.background,
+                      borderColor:
+                        currentDistance === distance
+                          ? theme.primary
+                          : theme.border,
+                    },
+                  ]}
+                  onPress={() => handleDistanceSelect(distance)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.optionContent}>
+                    <Text
+                      style={[
+                        styles.optionText,
+                        {
+                          color:
+                            currentDistance === distance
+                              ? theme.primary
+                              : theme.text,
+                          fontWeight:
+                            currentDistance === distance ? '600' : '400',
+                        },
+                      ]}
+                    >
+                      {t('filter.upTo')} {distance} {t('filter.meters')}
+                    </Text>
+                    {currentDistance === distance && (
+                      <Check size={20} color={theme.primary} />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+);
 
 const styles = StyleSheet.create({
   overlay: {
@@ -197,7 +155,7 @@ const styles = StyleSheet.create({
   },
   optionsContainer: {
     gap: 12,
-    marginBottom: 30,
+    marginBottom: 20,
   },
   optionItem: {
     borderRadius: 16,
@@ -211,17 +169,6 @@ const styles = StyleSheet.create({
   },
   optionText: {
     fontSize: 16,
-  },
-  applyButton: {
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  applyButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFF',
   },
 });
 

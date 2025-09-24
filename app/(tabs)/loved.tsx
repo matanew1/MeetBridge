@@ -235,7 +235,7 @@ export default function LovedScreen() {
     createConversation,
   } = useUserStore();
   const [activeTab, setActiveTab] = useState<'loved' | 'matches'>('loved');
-  const [selectedProfile, setSelectedProfile] = useState(null);
+  const [selectedProfile, setSelectedProfile] = useState<any>(null);
   const [showProfileDetail, setShowProfileDetail] = useState(false);
   const [showUnmatchConfirm, setShowUnmatchConfirm] = useState(false);
   const [unmatchProfileId, setUnmatchProfileId] = useState<string | null>(null);

@@ -21,7 +21,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
-import LanguageSwitcher from '../components/LanguageSwitcher';
 import '../../i18n';
 
 export default function TabLayout() {
@@ -36,7 +35,6 @@ export default function TabLayout() {
         style={[styles.header, { backgroundColor: theme.headerBackground }]}
       >
         <View style={styles.headerLeft}>
-          <LanguageSwitcher compact style={styles.languageSwitcher} />
           <TouchableOpacity
             style={[
               styles.shoppingButton,
@@ -148,9 +146,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  languageSwitcher: {
-    marginRight: 4,
   },
   profileButton: {
     width: 40,

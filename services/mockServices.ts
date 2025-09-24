@@ -81,14 +81,8 @@ export class MockUserProfileService implements IUserProfileService {
 
 // Mock Discovery Service
 export class MockDiscoveryService implements IDiscoveryService {
-  private mockProfiles: User[] = [];
   private likedProfileIds: Set<string> = new Set();
   private dislikedProfileIds: Set<string> = new Set();
-
-  constructor() {
-    // Initialize with mock profiles
-    this.mockProfiles = generateMockUsers(50);
-  }
 
   async getDiscoverProfiles(
     filters: SearchFilters,
@@ -96,8 +90,11 @@ export class MockDiscoveryService implements IDiscoveryService {
   ): Promise<ApiResponse<User[]>> {
     await mockDelay(600);
 
+    // Generate fresh profiles each time to avoid duplicate IDs
+    const freshProfiles = generateMockUsers(50);
+
     // Apply filters to mock profiles
-    let filteredProfiles = this.mockProfiles.filter((profile) => {
+    let filteredProfiles = freshProfiles.filter((profile) => {
       // Filter by age range
       if (
         profile.age < filters.ageRange[0] ||

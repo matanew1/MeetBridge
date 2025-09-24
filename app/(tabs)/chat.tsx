@@ -150,7 +150,7 @@ const ChatItem = ({
 
 export default function ChatScreen() {
   const { t } = useTranslation();
-  const { isDarkMode, isRTL } = useTheme();
+  const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
   const router = useRouter();
   const {
@@ -352,7 +352,6 @@ export default function ChatScreen() {
               transform: [{ translateY: headerSlideAnim }],
               opacity: headerFadeAnim,
             },
-            isRTL && styles.headerRTL,
           ]}
         >
           <Text style={[styles.title, { color: theme.text }]}>
@@ -431,9 +430,6 @@ const styles = StyleSheet.create({
   chatList: {
     flex: 1,
     paddingHorizontal: 20,
-  },
-  headerRTL: {
-    flexDirection: 'row-reverse',
   },
   chatItem: {
     flexDirection: 'row',

@@ -13,7 +13,14 @@ import {
   Dimensions,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Send, Phone, Video, MoveHorizontal as MoreHorizontal, Heart } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  Send,
+  Phone,
+  Video,
+  MoveHorizontal as MoreHorizontal,
+  Heart,
+} from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import Animated, {
   useSharedValue,
@@ -35,9 +42,93 @@ interface Message {
   isFromCurrentUser: boolean;
 }
 
+interface MessageItemProps {
+  message: Message;
+  index: number;
+  theme: any;
+}
+
+const MessageItem: React.FC<MessageItemProps> = ({ message, index, theme }) => {
+  const messageAnim = useSharedValue(0);
+  const fadeAnim = useSharedValue(0);
+
+  React.useEffect(() => {
+    setTimeout(() => {
+      messageAnim.value = withSpring(1, {
+        damping: 15,
+        stiffness: 150,
+      });
+    }, index * 50);
+
+    setTimeout(() => {
+      fadeAnim.value = withTiming(1, { duration: 400 });
+    }, index * 50);
+  }, []);
+
+  const messageStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        translateX: interpolate(
+          messageAnim.value,
+          [0, 1],
+          [message.isFromCurrentUser ? 50 : -50, 0]
+        ),
+      },
+      { scale: interpolate(messageAnim.value, [0, 1], [0.8, 1]) },
+    ],
+    opacity: fadeAnim.value,
+  }));
+
+  return (
+    <Animated.View
+      style={[
+        styles.messageContainer,
+        message.isFromCurrentUser
+          ? styles.myMessageContainer
+          : styles.otherMessageContainer,
+        messageStyle,
+      ]}
+    >
+      <View
+        style={[
+          styles.messageBubble,
+          message.isFromCurrentUser
+            ? [styles.myMessage, { backgroundColor: theme.primary }]
+            : [styles.otherMessage, { backgroundColor: theme.surface }],
+        ]}
+      >
+        <Text
+          style={[
+            styles.messageText,
+            {
+              color: message.isFromCurrentUser ? '#FFF' : theme.text,
+            },
+          ]}
+        >
+          {message.text}
+        </Text>
+      </View>
+      <Text
+        style={[
+          styles.messageTime,
+          { color: theme.textSecondary },
+          message.isFromCurrentUser
+            ? styles.myMessageTime
+            : styles.otherMessageTime,
+        ]}
+      >
+        {message.timestamp.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })}
+      </Text>
+    </Animated.View>
+  );
+};
+
 const ChatScreen = () => {
   const { t } = useTranslation();
-  const { isDarkMode, isRTL } = useTheme();
+  const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
   const router = useRouter();
   const { id } = useLocalSearchParams();
@@ -127,81 +218,9 @@ const ChatScreen = () => {
     }
   };
 
-  const renderMessage = ({ item, index }: { item: Message; index: number }) => {
-    const messageAnim = useSharedValue(0);
-    const fadeAnim = useSharedValue(0);
-
-    React.useEffect(() => {
-      messageAnim.value = withSpring(1, {
-        damping: 15,
-        stiffness: 150,
-        delay: index * 50,
-      });
-      fadeAnim.value = withTiming(1, { duration: 400, delay: index * 50 });
-    }, []);
-
-    const messageStyle = useAnimatedStyle(() => ({
-      transform: [
-        {
-          translateX: interpolate(
-            messageAnim.value,
-            [0, 1],
-            [item.isFromCurrentUser ? 50 : -50, 0]
-          ),
-        },
-        { scale: interpolate(messageAnim.value, [0, 1], [0.8, 1]) },
-      ],
-      opacity: fadeAnim.value,
-    }));
-
-    return (
-      <Animated.View
-        style={[
-          styles.messageContainer,
-          item.isFromCurrentUser
-            ? styles.myMessageContainer
-            : styles.otherMessageContainer,
-          messageStyle,
-        ]}
-      >
-        <View
-          style={[
-            styles.messageBubble,
-            item.isFromCurrentUser
-              ? [styles.myMessage, { backgroundColor: theme.primary }]
-              : [styles.otherMessage, { backgroundColor: theme.surface }],
-          ]}
-        >
-          <Text
-            style={[
-              styles.messageText,
-              {
-                color: item.isFromCurrentUser
-                  ? '#FFF'
-                  : theme.text,
-              },
-            ]}
-          >
-            {item.text}
-          </Text>
-        </View>
-        <Text
-          style={[
-            styles.messageTime,
-            { color: theme.textSecondary },
-            item.isFromCurrentUser
-              ? styles.myMessageTime
-              : styles.otherMessageTime,
-          ]}
-        >
-          {item.timestamp.toLocaleTimeString('he-IL', {
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
-        </Text>
-      </Animated.View>
-    );
-  };
+  const renderMessage = ({ item, index }: { item: Message; index: number }) => (
+    <MessageItem message={item} index={index} theme={theme} />
+  );
 
   if (!otherUser) {
     return (
@@ -210,7 +229,7 @@ const ChatScreen = () => {
       >
         <View style={styles.loadingContainer}>
           <Text style={[styles.loadingText, { color: theme.text }]}>
-            טוען...
+            {t('chat.loading')}
           </Text>
         </View>
       </SafeAreaView>
@@ -246,7 +265,7 @@ const ChatScreen = () => {
                 {otherUser.name}
               </Text>
               <Text style={[styles.userStatus, { color: theme.textSecondary }]}>
-                {otherUser.isOnline ? 'מחובר/ת עכשיו' : 'לא מחובר/ת'}
+                {otherUser.isOnline ? t('chat.online') : t('chat.offline')}
               </Text>
             </View>
           </View>
@@ -300,10 +319,10 @@ const ChatScreen = () => {
               ]}
               value={inputText}
               onChangeText={setInputText}
-              placeholder="כתוב הודעה..."
+              placeholder={t('chat.messageInputPlaceholder')}
               placeholderTextColor={theme.textSecondary}
               multiline
-              textAlign={isRTL ? 'right' : 'left'}
+              textAlign="left"
             />
             <TouchableOpacity
               style={[
