@@ -37,6 +37,11 @@ const resources = {
         online: 'Online now',
         offline: 'Offline',
         messageInputPlaceholder: 'Write a message...',
+        viewProfile: 'View Profile',
+        unmatch: 'Unmatch',
+        unmatchTitle: 'Unmatch',
+        unmatchConfirm:
+          'Are you sure you want to unmatch {{name}}? This cannot be undone.',
       },
 
       // Loved/Liked Screen
@@ -130,6 +135,8 @@ const resources = {
         ok: 'OK',
         yes: 'Yes',
         no: 'No',
+        cancel: 'Cancel',
+        unmatch: 'Unmatch',
       },
     },
   },

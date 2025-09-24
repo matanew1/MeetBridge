@@ -19,6 +19,7 @@ import {
   RefreshCw,
 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
+import { useRouter } from 'expo-router';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -50,6 +51,7 @@ interface ProfileCardProps {
   onPress: (user: any) => void;
   isLiked: boolean;
   isDisliked: boolean;
+  isAnimatingOut: boolean;
   theme: any;
 }
 
@@ -60,12 +62,32 @@ const ProfileCard = ({
   onPress,
   isLiked,
   isDisliked,
+  isAnimatingOut,
   theme,
 }: ProfileCardProps) => {
   const { t } = useTranslation();
+  const opacity = useSharedValue(1);
+  const translateY = useSharedValue(0);
+  const scale = useSharedValue(1);
+
+  // Animate out when card is being animated out
+  React.useEffect(() => {
+    if (isAnimatingOut) {
+      opacity.value = withTiming(0, { duration: 300 });
+      translateY.value = withTiming(isLiked || !isDisliked ? -50 : 50, {
+        duration: 300,
+      });
+      scale.value = withTiming(0.8, { duration: 300 });
+    }
+  }, [isAnimatingOut, isLiked, isDisliked]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }, { scale: scale.value }],
+  }));
 
   return (
-    <View style={styles.cardContainer}>
+    <Animated.View style={[styles.cardContainer, animatedStyle]}>
       <TouchableOpacity
         style={[
           styles.card,
@@ -74,6 +96,7 @@ const ProfileCard = ({
           isDisliked && styles.dislikedCard,
         ]}
         onPress={() => onPress(user)}
+        disabled={isLiked || isDisliked || isAnimatingOut}
       >
         <View style={styles.imageContainer}>
           <Image
@@ -126,7 +149,7 @@ const ProfileCard = ({
           </Text>
         </View>
       )}
-    </View>
+    </Animated.View>
   );
 };
 
@@ -134,6 +157,7 @@ export default function SearchScreen() {
   const { t } = useTranslation();
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
+  const router = useRouter();
   const [showAnimation, setShowAnimation] = useState(true);
   const [selectedProfile, setSelectedProfile] = useState<any>(null);
   const [showProfileDetail, setShowProfileDetail] = useState(false);
@@ -143,6 +167,11 @@ export default function SearchScreen() {
   const [matchedUser, setMatchedUser] = useState<any>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [maxDistance, setMaxDistance] = useState(50);
+
+  // Local state to track cards being animated out
+  const [animatingOutCards, setAnimatingOutCards] = useState<Set<string>>(
+    new Set()
+  );
 
   // Zustand store
   const {
@@ -222,23 +251,57 @@ export default function SearchScreen() {
 
   const handleLike = (profileId: string) => {
     console.log('handleLike called for profile:', profileId);
-    likeProfile(profileId).then((isMatch) => {
-      if (isMatch) {
-        // Find the matched user
-        const matchedUserData = discoverProfiles.find(
-          (p) => p.id === profileId
-        );
-        if (matchedUserData) {
-          setMatchedUser(matchedUserData);
-          setShowMatchModal(true);
-        }
-      }
-    });
+
+    // Find the user data before we remove it from the store
+    const userToLike = discoverProfiles.find((p) => p.id === profileId);
+
+    // Add to animating cards immediately for UI feedback
+    setAnimatingOutCards((prev) => new Set([...prev, profileId]));
+
+    // Delay the actual like action to allow animation to play
+    setTimeout(() => {
+      likeProfile(profileId)
+        .then((isMatch) => {
+          // Remove from animating cards
+          setAnimatingOutCards((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(profileId);
+            return newSet;
+          });
+
+          if (isMatch && userToLike) {
+            setMatchedUser(userToLike);
+            setShowMatchModal(true);
+          }
+        })
+        .catch((error) => {
+          console.error('Error in handleLike:', error);
+          // Remove from animating cards even on error
+          setAnimatingOutCards((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(profileId);
+            return newSet;
+          });
+        });
+    }, 300); // Match animation duration
   };
 
   const handleDislike = (profileId: string) => {
     console.log('handleDislike called for profile:', profileId);
-    dislikeProfile(profileId);
+
+    // Add to animating cards immediately for UI feedback
+    setAnimatingOutCards((prev) => new Set([...prev, profileId]));
+
+    // Delay the actual dislike action to allow animation to play
+    setTimeout(() => {
+      dislikeProfile(profileId);
+      // Remove from animating cards
+      setAnimatingOutCards((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(profileId);
+        return newSet;
+      });
+    }, 300); // Match animation duration
   };
 
   const handleProfilePress = (user: any) => {
@@ -282,10 +345,12 @@ export default function SearchScreen() {
 
   const handleStartChatting = () => {
     setShowMatchModal(false);
-    if (matchedUser) {
+    if (matchedUser && currentUser) {
       createConversation(matchedUser.id);
-      // Navigate to chat tab
-      // You can add navigation logic here if needed
+      // Generate the conversation ID that matches the backend format
+      const conversationId = `conv_${currentUser.id}_${matchedUser.id}`;
+      // Navigate to the specific chat
+      router.push(`/chat/${conversationId}`);
     }
   };
 
@@ -539,6 +604,7 @@ export default function SearchScreen() {
                 onPress={handleProfilePress}
                 isLiked={likedProfiles.includes(user.id)}
                 isDisliked={dislikedProfiles.includes(user.id)}
+                isAnimatingOut={animatingOutCards.has(user.id)}
                 theme={theme}
               />
             </View>
@@ -703,9 +769,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     aspectRatio: 1,
-    padding: 25,
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 10,
   },
   likedCard: {
     borderColor: '#FF69B4',
@@ -772,9 +838,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cardText: {
-    fontSize: 17,
+    fontSize: 15,
     color: '#333',
     textAlign: 'center',
+    fontWeight: '600',
   },
   // Animation styles
   searchInterface: {

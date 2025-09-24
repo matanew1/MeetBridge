@@ -222,6 +222,7 @@ export default function LovedScreen() {
     discoverProfiles,
     likedProfiles,
     matchedProfiles,
+    getLikedProfiles,
     getMatchedProfiles,
     likeProfile,
     dislikeProfile,
@@ -297,12 +298,8 @@ export default function LovedScreen() {
     }
   }, []);
 
-  // Get liked profiles in real-time
-  const likedProfilesData = discoverProfiles.filter((profile) =>
-    likedProfiles.includes(profile.id)
-  );
-
-  // Get matched profiles
+  // Get liked and matched profiles from store
+  const likedProfilesData = getLikedProfiles();
   const matchedProfilesData = getMatchedProfiles();
 
   // Get only liked profiles that are not matches
@@ -552,13 +549,12 @@ export default function LovedScreen() {
               <X size={32} color="#FF6B6B" />
             </View>
             <Text style={[styles.confirmationTitle, { color: theme.text }]}>
-              בטל התאמה
+              {t('modals.unmatchTitle')}
             </Text>
             <Text
               style={[styles.confirmationText, { color: theme.textSecondary }]}
             >
-              האם אתה בטוח שברצונך לבטל את ההתאמה? פעולה זו תמחק גם את השיחה
-              ביניכם ולא תוכל לשחזר אותה.
+              {t('modals.unmatchText')}
             </Text>
             <View style={styles.confirmationButtons}>
               <TouchableOpacity
@@ -573,14 +569,16 @@ export default function LovedScreen() {
                 onPress={cancelUnmatch}
               >
                 <Text style={[styles.cancelButtonText, { color: theme.text }]}>
-                  ביטול
+                  {t('actions.cancel')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.confirmButton, styles.deleteButton]}
                 onPress={confirmUnmatch}
               >
-                <Text style={styles.deleteButtonText}>בטל התאמה</Text>
+                <Text style={styles.deleteButtonText}>
+                  {t('modals.confirmUnmatch')}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

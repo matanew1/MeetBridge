@@ -172,6 +172,7 @@ export default function ChatScreen() {
     currentUser,
     conversations,
     discoverProfiles,
+    matchedProfilesData,
     loadConversations,
     loadCurrentUser,
     loadDiscoverProfiles,
@@ -241,9 +242,14 @@ export default function ChatScreen() {
         const otherParticipantId = conversation.participants.find(
           (id) => id !== currentUser?.id
         );
-        const otherParticipant = discoverProfiles.find(
-          (profile) => profile.id === otherParticipantId
-        );
+        // Look in both discoverProfiles and matchedProfilesData
+        const otherParticipant =
+          discoverProfiles.find(
+            (profile) => profile.id === otherParticipantId
+          ) ||
+          matchedProfilesData.find(
+            (profile) => profile.id === otherParticipantId
+          );
 
         console.log('Processing conversation:', {
           conversationId: conversation.id,
@@ -287,7 +293,7 @@ export default function ChatScreen() {
         }),
       ]).start();
     }
-  }, [conversations, discoverProfiles, currentUser]);
+  }, [conversations, discoverProfiles, matchedProfilesData, currentUser]);
 
   const handleChatPress = (chatId: string) => {
     router.push(`/chat/${chatId}`);

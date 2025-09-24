@@ -38,6 +38,8 @@ interface UserState {
   likedProfiles: string[]; // Array of profile IDs
   dislikedProfiles: string[]; // Array of profile IDs
   matchedProfiles: string[]; // Array of profile IDs that are mutual matches
+  likedProfilesData: User[]; // Array of actual User objects that were liked
+  matchedProfilesData: User[]; // Array of actual User objects that were matched
   hasMoreProfiles: boolean;
   currentPage: number;
 
@@ -120,6 +122,8 @@ export const useUserStore = create<UserState>((set, get) => ({
   likedProfiles: [],
   dislikedProfiles: [],
   matchedProfiles: [],
+  likedProfilesData: [],
+  matchedProfilesData: [],
   hasMoreProfiles: true,
   currentPage: 1,
   conversations: [],
@@ -240,8 +244,10 @@ export const useUserStore = create<UserState>((set, get) => ({
 
       if (response.success) {
         // Sort by distance
-        const sortedProfiles = response.data.sort((a, b) => (a.distance || 0) - (b.distance || 0));
-        
+        const sortedProfiles = response.data.sort(
+          (a, b) => (a.distance || 0) - (b.distance || 0)
+        );
+
         set((state) => ({
           discoverProfiles: refresh
             ? sortedProfiles
@@ -287,35 +293,53 @@ export const useUserStore = create<UserState>((set, get) => ({
       );
 
       if (response.success) {
+        // Find the user object before removing from discoverProfiles
+        const userProfile = get().discoverProfiles.find(
+          (p) => p.id === profileId
+        );
+
         set((state) => ({
           likedProfiles: [...state.likedProfiles, profileId],
+          likedProfilesData: userProfile
+            ? [...state.likedProfilesData, userProfile]
+            : state.likedProfilesData,
+          discoverProfiles: state.discoverProfiles.filter(
+            (profile) => profile.id !== profileId
+          ),
           ...(response.data && {
             matchedProfiles: [...state.matchedProfiles, profileId],
+            matchedProfilesData: userProfile
+              ? [...state.matchedProfilesData, userProfile]
+              : state.matchedProfilesData,
           }),
         }));
 
         // If it's a match, create a conversation
-        if (response.data) {
-          const matchProfile = get().discoverProfiles.find(
-            (p) => p.id === profileId
-          );
-
+        if (response.data && userProfile) {
+          console.log('🔴 Match detected! Creating conversation...');
           // Check if conversation already exists
           const existingConversation = get().conversations.find((conv) =>
             conv.participants.includes(profileId)
           );
 
-          if (matchProfile && !existingConversation) {
+          if (!existingConversation) {
+            console.log('🔴 Creating new conversation for match');
             const conversation = chatService.createConversationWithMessage(
               currentUser.id,
               profileId,
-              matchProfile.interests
+              userProfile.interests
             );
 
+            console.log('🔴 Conversation created:', conversation.id);
             // Add the conversation to the store
             set((state) => ({
               conversations: [conversation, ...state.conversations],
             }));
+          } else {
+            console.log(
+              '🔴 Conversation already exists:',
+              existingConversation.id
+            );
           }
         }
 
@@ -351,6 +375,9 @@ export const useUserStore = create<UserState>((set, get) => ({
       if (response.success) {
         set((state) => ({
           dislikedProfiles: [...state.dislikedProfiles, profileId],
+          discoverProfiles: state.discoverProfiles.filter(
+            (profile) => profile.id !== profileId
+          ),
         }));
       } else {
         set({ error: response.message || 'Failed to dislike profile' });
@@ -374,10 +401,24 @@ export const useUserStore = create<UserState>((set, get) => ({
       );
 
       if (response.success) {
+        // Find the user object before removing from discoverProfiles
+        const userProfile = get().discoverProfiles.find(
+          (p) => p.id === profileId
+        );
+
         set((state) => ({
           likedProfiles: [...state.likedProfiles, profileId],
+          likedProfilesData: userProfile
+            ? [...state.likedProfilesData, userProfile]
+            : state.likedProfilesData,
+          discoverProfiles: state.discoverProfiles.filter(
+            (profile) => profile.id !== profileId
+          ),
           ...(response.data && {
             matchedProfiles: [...state.matchedProfiles, profileId],
+            matchedProfilesData: userProfile
+              ? [...state.matchedProfilesData, userProfile]
+              : state.matchedProfilesData,
           }),
         }));
 
@@ -396,31 +437,47 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   unmatchProfile: async (profileId) => {
+    console.log('🔴 Store unmatchProfile called with profileId:', profileId);
     const { currentUser } = get();
-    if (!currentUser) return;
+    if (!currentUser) {
+      console.log('🔴 No current user found');
+      return;
+    }
 
+    console.log('🔴 Current user:', currentUser.id);
     set({ isLoadingUnmatch: true, error: null });
 
     try {
+      console.log('🔴 Calling matchingService.unmatchProfile');
       const response = await matchingService.unmatchProfile(
         currentUser.id,
         profileId
       );
 
+      console.log('🔴 Unmatch response:', response);
       if (response.success) {
         set((state) => ({
           matchedProfiles: state.matchedProfiles.filter(
             (id) => id !== profileId
           ),
+          matchedProfilesData: state.matchedProfilesData.filter(
+            (profile) => profile.id !== profileId
+          ),
           likedProfiles: state.likedProfiles.filter((id) => id !== profileId),
+          likedProfilesData: state.likedProfilesData.filter(
+            (profile) => profile.id !== profileId
+          ),
           conversations: state.conversations.filter(
             (conv) => !conv.participants.includes(profileId)
           ),
         }));
+        console.log('🔴 Unmatch successful, state updated');
       } else {
+        console.log('🔴 Unmatch failed:', response.message);
         set({ error: response.message || 'Failed to unmatch profile' });
       }
     } catch (error) {
+      console.log('🔴 Unmatch error:', error);
       set({ error: 'Failed to unmatch profile' });
       console.error('Error unmatching profile:', error);
     } finally {
@@ -450,17 +507,13 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   // Getters
   getLikedProfiles: () => {
-    const { discoverProfiles, likedProfiles } = get();
-    return discoverProfiles.filter((profile) =>
-      likedProfiles.includes(profile.id)
-    );
+    const { likedProfilesData } = get();
+    return likedProfilesData;
   },
 
   getMatchedProfiles: () => {
-    const { discoverProfiles, matchedProfiles } = get();
-    return discoverProfiles.filter((profile) =>
-      matchedProfiles.includes(profile.id)
-    );
+    const { matchedProfilesData } = get();
+    return matchedProfilesData;
   },
 
   // Chat Actions
@@ -499,7 +552,8 @@ export const useUserStore = create<UserState>((set, get) => ({
       return; // Don't create duplicate conversation
     }
 
-    const matchProfile = get().discoverProfiles.find(
+    // Look for the matched profile in matchedProfilesData instead of discoverProfiles
+    const matchProfile = get().matchedProfilesData.find(
       (p) => p.id === matchedUserId
     );
     const conversation = chatService.createConversationWithMessage(
@@ -603,6 +657,8 @@ export const useUserStore = create<UserState>((set, get) => ({
       likedProfiles: [],
       dislikedProfiles: [],
       matchedProfiles: [],
+      likedProfilesData: [],
+      matchedProfilesData: [],
       conversations: [],
       error: null,
       hasMoreProfiles: true,
