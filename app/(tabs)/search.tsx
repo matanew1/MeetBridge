@@ -10,7 +10,14 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { Heart, Check, ShoppingCart, X, Filter } from 'lucide-react-native';
+import {
+  Heart,
+  Check,
+  ShoppingCart,
+  X,
+  Filter,
+  RefreshCw,
+} from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import Animated, {
   useSharedValue,
@@ -491,30 +498,31 @@ export default function SearchScreen() {
         <Text style={[styles.headerTitle, { color: theme.text }]}>
           {t('search.title')}
         </Text>
-        <TouchableOpacity
-          style={[
-            styles.refreshButton,
-            styles.searchButton,
-            { backgroundColor: theme.primary },
-          ]}
-          onPress={handleSearchButton}
-          disabled={isSearching || showAnimation}
-        >
-          <Text style={styles.refreshText}>
-            {isSearching || showAnimation
-              ? t('search.searching')
-              : t('search.newSearch')}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.filterButton,
-            { backgroundColor: theme.surface, borderColor: theme.border },
-          ]}
-          onPress={handleFilterPress}
-        >
-          <Filter size={20} color={theme.primary} />
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity
+            style={[
+              styles.refreshButton,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+            ]}
+            onPress={handleSearchButton}
+            disabled={isSearching || showAnimation}
+          >
+            {isSearching || showAnimation ? (
+              <ActivityIndicator size="small" color={theme.primary} />
+            ) : (
+              <RefreshCw size={20} color={theme.primary} />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.filterButton,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+            ]}
+            onPress={handleFilterPress}
+          >
+            <Filter size={20} color={theme.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -638,23 +646,22 @@ const styles = StyleSheet.create({
     paddingTop: 15,
     paddingBottom: 20,
   },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
   },
   refreshButton: {
-    backgroundColor: '#8E44AD',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    width: 44,
+    height: 44,
     borderRadius: 12,
-  },
-  searchButton: {
-    backgroundColor: '#AB47BC',
-  },
-  refreshText: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '600',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    marginRight: 8,
   },
   filterButton: {
     width: 44,
@@ -663,7 +670,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    marginLeft: 8,
   },
   loadingText: {
     fontSize: 16,
@@ -697,7 +703,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     aspectRatio: 1,
-    padding: 20,
+    padding: 25,
     alignItems: 'center',
     justifyContent: 'center',
   },

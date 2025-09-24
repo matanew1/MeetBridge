@@ -49,20 +49,21 @@ const ChatItem = ({
     Animated.parallel([
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 400,
-        delay: index * 50,
+        duration: 500,
+        delay: index * 100,
         useNativeDriver: true,
       }),
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 400,
-        delay: index * 50,
+        duration: 500,
+        delay: index * 100,
         useNativeDriver: true,
       }),
-      Animated.timing(scaleAnim, {
+      Animated.spring(scaleAnim, {
         toValue: 1,
-        duration: 400,
-        delay: index * 50,
+        tension: 50,
+        friction: 7,
+        delay: index * 100,
         useNativeDriver: true,
       }),
     ]).start();
@@ -97,7 +98,18 @@ const ChatItem = ({
       ]}
     >
       <TouchableOpacity
-        style={[styles.chatItem, { backgroundColor: theme.cardBackground }]}
+        style={[
+          styles.chatItem,
+          {
+            backgroundColor: theme.cardBackground,
+            borderBottomColor: theme.borderLight,
+            shadowColor: theme.shadow,
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.05,
+            shadowRadius: 2,
+            elevation: 1,
+          },
+        ]}
         activeOpacity={0.7}
         onPress={onPress}
       >
@@ -108,6 +120,8 @@ const ChatItem = ({
               style={[
                 styles.onlineIndicator,
                 {
+                  backgroundColor: theme.success,
+                  borderColor: theme.surface,
                   transform: [{ scale: pulseAnim }],
                 },
               ]}
@@ -138,6 +152,7 @@ const ChatItem = ({
             style={[
               styles.unreadDot,
               {
+                backgroundColor: theme.primary,
                 transform: [{ scale: pulseAnim }],
               },
             ]}
@@ -262,12 +277,12 @@ export default function ChatScreen() {
       Animated.parallel([
         Animated.timing(contentSlideAnim, {
           toValue: 0,
-          duration: 400,
+          duration: 500,
           useNativeDriver: true,
         }),
         Animated.timing(contentFadeAnim, {
           toValue: 1,
-          duration: 400,
+          duration: 500,
           useNativeDriver: true,
         }),
       ]).start();
@@ -296,7 +311,7 @@ export default function ChatScreen() {
           }),
           Animated.timing(emptyTextAnim, {
             toValue: 0,
-            duration: 400,
+            duration: 500,
             useNativeDriver: true,
           }),
         ]),
@@ -337,11 +352,7 @@ export default function ChatScreen() {
 
   return (
     <LinearGradient
-      colors={
-        isDarkMode
-          ? [theme.background, theme.surfaceVariant]
-          : ['#fcf1fc', '#f8e8f8']
-      }
+      colors={[theme.background, theme.surfaceVariant]}
       style={styles.container}
     >
       <SafeAreaView style={styles.safeArea}>
@@ -422,9 +433,8 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: '#FFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
     paddingTop: 20,
   },
   chatList: {
@@ -437,30 +447,13 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 4,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
     position: 'relative',
     borderRadius: 12,
     marginVertical: 2,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
   },
   avatarContainer: {
     position: 'relative',
     marginRight: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   chatAvatar: {
     width: 56,
@@ -474,17 +467,7 @@ const styles = StyleSheet.create({
     width: 14,
     height: 14,
     borderRadius: 7,
-    backgroundColor: '#4CAF50',
     borderWidth: 2,
-    borderColor: '#FFF',
-    shadowColor: '#4CAF50',
-    shadowOffset: {
-      width: 0,
-      height: 0,
-    },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
-    elevation: 5,
   },
   chatContent: {
     flex: 1,
@@ -512,16 +495,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#8E44AD',
     marginLeft: 8,
-    shadowColor: '#8E44AD',
-    shadowOffset: {
-      width: 0,
-      height: 0,
-    },
-    shadowOpacity: 0.4,
-    shadowRadius: 3,
-    elevation: 4,
   },
   emptyState: {
     flex: 1,
