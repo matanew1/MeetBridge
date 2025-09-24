@@ -13,14 +13,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import {
-  ArrowLeft,
-  Send,
-  Phone,
-  Video,
-  MoreHorizontal,
-  Heart,
-} from 'lucide-react-native';
+import { ArrowLeft, Send, Phone, Video, MoveHorizontal as MoreHorizontal, Heart } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import Animated, {
   useSharedValue,
