@@ -21,7 +21,7 @@ interface FilterModalProps {
   onDistanceChange: (distance: number) => void;
 }
 
-const DISTANCE_OPTIONS = [5, 10, 25, 50, 100];
+const DISTANCE_OPTIONS = [5, 10, 25, 50, 100, 200, 500];
 
 const FilterModal: React.FC<FilterModalProps> = React.memo(
   ({ visible, onClose, currentDistance, onDistanceChange }) => {

@@ -1,4 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+  memo,
+} from 'react';
 import {
   View,
   Text,
@@ -54,102 +61,124 @@ interface MessageItemProps {
   theme: any;
 }
 
-const MessageItem: React.FC<MessageItemProps> = ({ message, index, theme }) => {
-  const messageAnim = useSharedValue(0);
-  const fadeAnim = useSharedValue(0);
+const MessageItem: React.FC<MessageItemProps> = memo(
+  ({ message, index, theme }) => {
+    const messageAnim = useSharedValue(0);
+    const fadeAnim = useSharedValue(0);
 
-  React.useEffect(() => {
-    setTimeout(() => {
-      messageAnim.value = withSpring(1, {
-        damping: 15,
-        stiffness: 150,
-      });
-    }, index * 50);
+    const isHeartMessage = useMemo(() => message.text === '❤️', [message.text]);
 
-    setTimeout(() => {
-      fadeAnim.value = withTiming(1, { duration: 400 });
-    }, index * 50);
-  }, []);
+    React.useEffect(() => {
+      const animationDelay = index * 30; // Reduced delay for better performance
 
-  const messageStyle = useAnimatedStyle(() => ({
-    transform: [
-      {
-        translateX: interpolate(
-          messageAnim.value,
-          [0, 1],
-          [message.isFromCurrentUser ? 50 : -50, 0]
-        ),
-      },
-      { scale: interpolate(messageAnim.value, [0, 1], [0.8, 1]) },
-    ],
-    opacity: fadeAnim.value,
-  }));
+      const messageTimer = setTimeout(() => {
+        messageAnim.value = withSpring(1, {
+          damping: 20, // Increased damping for smoother animation
+          stiffness: 180,
+        });
+      }, animationDelay);
 
-  return (
-    <Animated.View
-      style={[
-        styles.messageContainer,
+      const fadeTimer = setTimeout(() => {
+        fadeAnim.value = withTiming(1, { duration: 300 }); // Reduced duration
+      }, animationDelay);
+
+      return () => {
+        clearTimeout(messageTimer);
+        clearTimeout(fadeTimer);
+      };
+    }, [index, messageAnim, fadeAnim]);
+
+    const messageStyle = useAnimatedStyle(
+      () => ({
+        transform: [
+          {
+            translateX: interpolate(
+              messageAnim.value,
+              [0, 1],
+              [message.isFromCurrentUser ? 50 : -50, 0]
+            ),
+          },
+          { scale: interpolate(messageAnim.value, [0, 1], [0.8, 1]) },
+        ],
+        opacity: fadeAnim.value,
+      }),
+      [message.isFromCurrentUser]
+    );
+
+    const bubbleStyle = useMemo(
+      () => [
+        styles.messageBubble,
+        isHeartMessage ? styles.heartMessage : null,
         message.isFromCurrentUser
-          ? styles.myMessageContainer
-          : styles.otherMessageContainer,
-        messageStyle,
-      ]}
-    >
-      <View
-        style={[
-          styles.messageBubble,
-          message.text === '❤️' ? styles.heartMessage : null,
-          message.isFromCurrentUser
-            ? [
-                styles.myMessage,
-                {
-                  backgroundColor:
-                    message.text === '❤️' ? 'transparent' : theme.primary,
-                },
-              ]
-            : [
-                styles.otherMessage,
-                {
-                  backgroundColor:
-                    message.text === '❤️' ? 'transparent' : theme.surface,
-                },
-              ],
-        ]}
-      >
-        <Text
-          style={[
-            styles.messageText,
-            message.text === '❤️' ? styles.heartText : null,
-            {
-              color:
-                message.text === '❤️'
-                  ? '#FF6B9D'
-                  : message.isFromCurrentUser
-                  ? '#FFF'
-                  : theme.text,
-            },
-          ]}
-        >
-          {message.text}
-        </Text>
-      </View>
-      <Text
-        style={[
-          styles.messageTime,
-          { color: theme.textSecondary },
-          message.isFromCurrentUser
-            ? styles.myMessageTime
-            : styles.otherMessageTime,
-        ]}
-      >
-        {message.timestamp.toLocaleTimeString('en-US', {
+          ? [
+              styles.myMessage,
+              {
+                backgroundColor: isHeartMessage ? 'transparent' : theme.primary,
+              },
+            ]
+          : [
+              styles.otherMessage,
+              {
+                backgroundColor: isHeartMessage ? 'transparent' : theme.surface,
+              },
+            ],
+      ],
+      [isHeartMessage, message.isFromCurrentUser, theme.primary, theme.surface]
+    );
+
+    const textStyle = useMemo(
+      () => [
+        styles.messageText,
+        isHeartMessage ? styles.heartText : null,
+        {
+          color: isHeartMessage
+            ? '#FF6B9D'
+            : message.isFromCurrentUser
+            ? '#FFF'
+            : theme.text,
+        },
+      ],
+      [isHeartMessage, message.isFromCurrentUser, theme.text]
+    );
+
+    const timeStyle = useMemo(
+      () => [
+        styles.messageTime,
+        { color: theme.textSecondary },
+        message.isFromCurrentUser
+          ? styles.myMessageTime
+          : styles.otherMessageTime,
+      ],
+      [message.isFromCurrentUser, theme.textSecondary]
+    );
+
+    const formattedTime = useMemo(
+      () =>
+        message.timestamp.toLocaleTimeString('en-US', {
           hour: '2-digit',
           minute: '2-digit',
-        })}
-      </Text>
-    </Animated.View>
-  );
-};
+        }),
+      [message.timestamp]
+    );
+
+    return (
+      <Animated.View
+        style={[
+          styles.messageContainer,
+          message.isFromCurrentUser
+            ? styles.myMessageContainer
+            : styles.otherMessageContainer,
+          messageStyle,
+        ]}
+      >
+        <View style={bubbleStyle}>
+          <Text style={textStyle}>{message.text}</Text>
+        </View>
+        <Text style={timeStyle}>{formattedTime}</Text>
+      </Animated.View>
+    );
+  }
+);
 
 const ChatScreen = () => {
   const { t } = useTranslation();
@@ -174,6 +203,7 @@ const ChatScreen = () => {
   const [showProfileDetail, setShowProfileDetail] = useState(false);
   const [showUnmatchConfirm, setShowUnmatchConfirm] = useState(false);
   const [heartAnimation, setHeartAnimation] = useState(false);
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   // Animation values
@@ -184,23 +214,98 @@ const ChatScreen = () => {
   const heartScale = useSharedValue(1);
   const heartOpacity = useSharedValue(1);
 
+  // Add timeout effect to prevent infinite loading
   useEffect(() => {
-    // Start animations
-    headerSlideAnim.value = withSpring(0, { damping: 15, stiffness: 150 });
-    headerFadeAnim.value = withTiming(1, { duration: 500 });
-    inputSlideAnim.value = withSpring(0, { damping: 15, stiffness: 150 });
-    inputFadeAnim.value = withTiming(1, { duration: 500 });
+    const timeout = setTimeout(() => {
+      console.log('⏰ Loading timeout reached');
+      setLoadingTimeout(true);
+    }, 5000); // 5 second timeout
 
-    // Find conversation and other user
-    const conversation = conversations.find((conv) => conv.id === id);
-    if (conversation && currentUser) {
-      const otherUserId = conversation.participants.find(
-        (participantId) => participantId !== currentUser.id
-      );
-      // Look for the user in matchedProfilesData first, then fallback to discoverProfiles
-      const foundUser =
-        matchedProfilesData.find((profile) => profile.id === otherUserId) ||
-        discoverProfiles.find((profile) => profile.id === otherUserId);
+    return () => clearTimeout(timeout);
+  }, []);
+
+  // Add cleanup effect for better memory management
+  useEffect(() => {
+    return () => {
+      // Cancel any pending animations on unmount
+      headerSlideAnim.value = -50;
+      headerFadeAnim.value = 0;
+      inputSlideAnim.value = 50;
+      inputFadeAnim.value = 0;
+      heartScale.value = 1;
+    };
+  }, []);
+
+  // Memoized values for better performance
+  const conversation = useMemo(
+    () => conversations.find((conv) => conv.id === id),
+    [conversations, id]
+  );
+
+  const otherUserId = useMemo(
+    () =>
+      conversation?.participants.find(
+        (participantId) => participantId !== currentUser?.id
+      ),
+    [conversation?.participants, currentUser?.id]
+  );
+
+  const foundUser = useMemo(() => {
+    console.log('🔍 Looking for user with ID:', otherUserId);
+    console.log(
+      '🔍 In matchedProfilesData:',
+      matchedProfilesData?.map((p) => p.id)
+    );
+    console.log(
+      '🔍 In discoverProfiles:',
+      discoverProfiles?.map((p) => p.id)
+    );
+
+    if (!otherUserId) return null;
+
+    const matchedUser = matchedProfilesData.find(
+      (profile) => profile.id === otherUserId
+    );
+    const discoverUser = discoverProfiles.find(
+      (profile) => profile.id === otherUserId
+    );
+
+    console.log('🔍 Found matched user:', matchedUser?.name);
+    console.log('🔍 Found discover user:', discoverUser?.name);
+
+    return matchedUser || discoverUser;
+  }, [matchedProfilesData, discoverProfiles, otherUserId]);
+
+  // Initialize and manage component state more efficiently
+  useEffect(() => {
+    let isMounted = true;
+
+    // Start animations only if component is still mounted
+    if (isMounted) {
+      headerSlideAnim.value = withSpring(0, { damping: 20, stiffness: 180 });
+      headerFadeAnim.value = withTiming(1, { duration: 400 });
+      inputSlideAnim.value = withSpring(0, { damping: 20, stiffness: 180 });
+      inputFadeAnim.value = withTiming(1, { duration: 400 });
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Separate effect for data initialization
+  useEffect(() => {
+    console.log('🔍 Chat Debug - Data initialization check:');
+    console.log('🔍 conversation:', conversation);
+    console.log('🔍 currentUser:', currentUser);
+    console.log('🔍 foundUser:', foundUser);
+    console.log('🔍 id:', id);
+    console.log('🔍 conversations:', conversations?.length);
+    console.log('🔍 matchedProfilesData:', matchedProfilesData?.length);
+    console.log('🔍 discoverProfiles:', discoverProfiles?.length);
+
+    if (conversation && currentUser && foundUser) {
+      console.log('✅ All conditions met, setting otherUser');
       setOtherUser(foundUser);
 
       // Convert conversation messages to display format
@@ -212,60 +317,87 @@ const ChatScreen = () => {
       }));
       setMessages(displayMessages);
 
-      // Mark messages as read
+      // Mark messages as read (debounced)
       const unreadMessageIds = conversation.messages
         .filter((msg) => !msg.isRead && msg.senderId !== currentUser.id)
         .map((msg) => msg.id);
+
       if (unreadMessageIds.length > 0) {
-        markMessagesAsRead(conversation.id, unreadMessageIds);
+        // Batch read operations for better performance
+        requestAnimationFrame(() => {
+          markMessagesAsRead(conversation.id, unreadMessageIds);
+        });
       }
+    } else {
+      console.log('❌ Missing required data for chat initialization');
+      if (!conversation) console.log('❌ Missing conversation');
+      if (!currentUser) console.log('❌ Missing currentUser');
+      if (!foundUser) console.log('❌ Missing foundUser');
     }
-  }, [id, conversations, currentUser, discoverProfiles, matchedProfilesData]);
+  }, [conversation, currentUser, foundUser, markMessagesAsRead]);
 
-  const headerStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: headerSlideAnim.value }],
-    opacity: headerFadeAnim.value,
-  }));
+  // Memoized animation styles
+  const headerStyle = useAnimatedStyle(
+    () => ({
+      transform: [{ translateY: headerSlideAnim.value }],
+      opacity: headerFadeAnim.value,
+    }),
+    []
+  );
 
-  const inputStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: inputSlideAnim.value }],
-    opacity: inputFadeAnim.value,
-  }));
+  const inputStyle = useAnimatedStyle(
+    () => ({
+      transform: [{ translateY: inputSlideAnim.value }],
+      opacity: inputFadeAnim.value,
+    }),
+    []
+  );
 
-  const heartAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: heartScale.value }],
-  }));
+  const heartAnimatedStyle = useAnimatedStyle(
+    () => ({
+      transform: [{ scale: heartScale.value }],
+    }),
+    []
+  );
 
-  const handleSendMessage = () => {
+  // Optimized message handlers with useCallback
+  const handleSendMessage = useCallback(() => {
     if (inputText.trim() && id && currentUser) {
+      const messageText = inputText.trim();
       const newMessage: Message = {
-        id: `msg_${Date.now()}`,
-        text: inputText.trim(),
+        id: `msg_${Date.now()}_${Math.random()}`,
+        text: messageText,
         timestamp: new Date(),
         isFromCurrentUser: true,
       };
 
+      // Batch state updates
       setMessages((prev) => [...prev, newMessage]);
-      sendMessage(id as string, inputText.trim());
       setInputText('');
 
-      // Scroll to bottom
-      setTimeout(() => {
+      // Send message to store
+      sendMessage(id as string, messageText);
+
+      // Optimized scroll with requestAnimationFrame
+      requestAnimationFrame(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-    }
-  };
-
-  const handleSendHeart = () => {
-    if (id && currentUser) {
-      // Start heart animation
-      heartScale.value = withSpring(1.5, { damping: 8, stiffness: 150 }, () => {
-        heartScale.value = withSpring(1, { damping: 10, stiffness: 200 });
       });
+    }
+  }, [inputText, id, currentUser, sendMessage]);
 
-      // Send heart message
+  const handleSendHeart = useCallback(() => {
+    if (id && currentUser) {
+      // Optimized heart animation
+      heartScale.value = withSpring(
+        1.4,
+        { damping: 12, stiffness: 200 },
+        () => {
+          heartScale.value = withSpring(1, { damping: 15, stiffness: 250 });
+        }
+      );
+
       const heartMessage: Message = {
-        id: `msg_heart_${Date.now()}`,
+        id: `msg_heart_${Date.now()}_${Math.random()}`,
         text: '❤️',
         timestamp: new Date(),
         isFromCurrentUser: true,
@@ -274,27 +406,26 @@ const ChatScreen = () => {
       setMessages((prev) => [...prev, heartMessage]);
       sendMessage(id as string, '❤️');
 
-      // Scroll to bottom
-      setTimeout(() => {
+      requestAnimationFrame(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+      });
     }
-  };
+  }, [id, currentUser, sendMessage, heartScale]);
 
-  const handleViewProfile = () => {
+  const handleViewProfile = useCallback(() => {
     setShowOptionsMenu(false);
     setShowProfileDetail(true);
-  };
+  }, []);
 
-  const handleUnmatch = () => {
+  const handleUnmatch = useCallback(() => {
     console.log('🔴 handleUnmatch called');
     console.log('🔴 otherUser:', otherUser);
     console.log('🔴 Current user:', currentUser);
     setShowOptionsMenu(false);
     setShowUnmatchConfirm(true);
-  };
+  }, [otherUser, currentUser]);
 
-  const confirmUnmatch = () => {
+  const confirmUnmatch = useCallback(() => {
     console.log('🔴 confirmUnmatch called');
     console.log('🔴 About to unmatch user ID:', otherUser?.id);
     setShowUnmatchConfirm(false);
@@ -308,34 +439,96 @@ const ChatScreen = () => {
           console.log('🔴 Unmatch failed:', error);
         });
     }
-  };
+  }, [otherUser, unmatchProfile, router]);
 
-  const cancelUnmatch = () => {
+  const cancelUnmatch = useCallback(() => {
     console.log('🔴 cancelUnmatch called');
     setShowUnmatchConfirm(false);
-  };
+  }, []);
 
-  const handleMessageFromProfile = () => {
+  const handleMessageFromProfile = useCallback(() => {
     setShowProfileDetail(false);
     // Already in chat, so just close the modal
-  };
+  }, []);
 
-  const renderMessage = ({ item, index }: { item: Message; index: number }) => (
-    <MessageItem message={item} index={index} theme={theme} />
+  // Optimized render function for FlatList
+  const renderMessage = useCallback(
+    ({ item, index }: { item: Message; index: number }) => (
+      <MessageItem message={item} index={index} theme={theme} />
+    ),
+    [theme]
   );
 
-  if (!otherUser) {
-    return (
+  // Memoized key extractor for better FlatList performance
+  const keyExtractor = useCallback((item: Message) => item.id, []);
+
+  // FlatList optimization methods
+  const getItemLayout = useCallback(
+    (data: Message[] | null | undefined, index: number) => ({
+      length: 70, // Estimated item height
+      offset: 70 * index,
+      index,
+    }),
+    []
+  );
+
+  const onContentSizeChange = useCallback(() => {
+    requestAnimationFrame(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    });
+  }, []);
+
+  // Memoized modal handlers
+  const closeOptionsMenu = useCallback(() => setShowOptionsMenu(false), []);
+  const closeProfileDetail = useCallback(() => setShowProfileDetail(false), []);
+
+  // Memoized loading component
+  const LoadingComponent = useMemo(
+    () => (
       <SafeAreaView
         style={[styles.container, { backgroundColor: theme.background }]}
       >
         <View style={styles.loadingContainer}>
-          <Text style={[styles.loadingText, { color: theme.text }]}>
-            {t('chat.loading')}
-          </Text>
+          {loadingTimeout ? (
+            <>
+              <Text style={[styles.loadingText, { color: theme.error }]}>
+                {t('chat.errorLoading')}
+              </Text>
+              <TouchableOpacity
+                style={[styles.retryButton, { backgroundColor: theme.primary }]}
+                onPress={() => {
+                  setLoadingTimeout(false);
+                  router.back();
+                }}
+              >
+                <Text style={styles.retryButtonText}>{t('common.goBack')}</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <Text style={[styles.loadingText, { color: theme.text }]}>
+              {t('chat.loading')}
+            </Text>
+          )}
         </View>
       </SafeAreaView>
-    );
+    ),
+    [
+      theme.background,
+      theme.text,
+      theme.error,
+      theme.primary,
+      t,
+      loadingTimeout,
+      router,
+    ]
+  );
+
+  if (!otherUser && !loadingTimeout) {
+    return LoadingComponent;
+  }
+
+  if (loadingTimeout && !otherUser) {
+    return LoadingComponent;
   }
 
   return (
@@ -395,13 +588,21 @@ const ChatScreen = () => {
           ref={flatListRef}
           data={messages}
           renderItem={renderMessage}
-          keyExtractor={(item) => item.id}
+          keyExtractor={keyExtractor}
+          getItemLayout={getItemLayout}
           style={[styles.messagesList, { backgroundColor: theme.background }]}
           contentContainerStyle={styles.messagesContent}
           showsVerticalScrollIndicator={false}
-          onContentSizeChange={() =>
-            flatListRef.current?.scrollToEnd({ animated: true })
-          }
+          onContentSizeChange={onContentSizeChange}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          initialNumToRender={15}
+          updateCellsBatchingPeriod={50}
+          disableVirtualization={false}
+          maintainVisibleContentPosition={{
+            minIndexForVisible: 0,
+          }}
         />
 
         {/* Input */}
@@ -464,12 +665,12 @@ const ChatScreen = () => {
         visible={showOptionsMenu}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setShowOptionsMenu(false)}
+        onRequestClose={closeOptionsMenu}
       >
         <TouchableOpacity
           style={styles.optionsModalOverlay}
           activeOpacity={1}
-          onPress={() => setShowOptionsMenu(false)}
+          onPress={closeOptionsMenu}
         >
           <View
             style={[styles.optionsMenu, { backgroundColor: theme.surface }]}
@@ -509,7 +710,7 @@ const ChatScreen = () => {
         <View style={styles.modalOverlay}>
           <ProfileDetail
             user={otherUser}
-            onClose={() => setShowProfileDetail(false)}
+            onClose={closeProfileDetail}
             onLike={() => {}}
             onDislike={() => {}}
             onMessage={handleMessageFromProfile}
@@ -596,9 +797,23 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
   loadingText: {
     fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  retryButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   header: {
     flexDirection: 'row',
