@@ -6,20 +6,14 @@ import {
   Conversation,
   ChatMessage,
 } from './types';
-import {
-  MockUserProfileService,
-  MockDiscoveryService,
-  MockMatchingService,
-  MockChatService,
-} from '../services/mockServices';
+import { services } from '../services';
 import { APP_CONFIG, DATING_CONSTANTS } from '../constants';
-import { generateMockUsers } from '../data/mockData';
 
-// Initialize services (these will be replaced with real services when connecting to backend)
-const userProfileService = new MockUserProfileService();
-const discoveryService = new MockDiscoveryService();
-const matchingService = new MockMatchingService(discoveryService);
-const chatService = new MockChatService();
+// Use Firebase services
+const userProfileService = services.userProfile;
+const discoveryService = services.discovery;
+const matchingService = services.matching;
+const chatService = services.chat;
 
 interface UserState {
   // Current user
@@ -95,10 +89,6 @@ interface UserState {
   setError: (error: string | null) => void;
   clearError: () => void;
   resetState: () => void;
-
-  // Mock data generation (for development only - will be removed)
-  generateMockProfiles: () => void;
-  generateRandomProfile: () => User;
 }
 
 // Default search filters
@@ -196,33 +186,63 @@ export const useUserStore = create<UserState>((set, get) => ({
       isSearching: false,
     }),
 
-  triggerSearchAnimation: () => {
-    const { searchFilters } = get();
+  triggerSearchAnimation: async () => {
+    const { searchFilters, discoverProfiles } = get();
 
-    // Generate mock match profiles for animation
-    const mockProfiles = generateMockUsers(5);
-    const matchProfiles: MatchProfile[] = mockProfiles.map(
-      (profile, index) => ({
-        ...profile,
-        size: 50 + Math.random() * 30, // Random size between 50-80
-        radius: 80 + index * 10, // Radius increases with index
-        matchScore: 0.7 + Math.random() * 0.3, // Score between 0.7-1.0
-      })
-    );
+    set({ isSearching: true });
 
-    const centerProfile =
-      mockProfiles[Math.floor(Math.random() * mockProfiles.length)];
+    try {
+      // Use existing profiles for animation or load some new ones
+      let animationProfiles = discoverProfiles.slice(0, 5);
 
-    set({
-      matchProfiles,
-      centerProfile,
-      isSearching: true,
-    });
+      if (animationProfiles.length < 3) {
+        // Load some profiles for the animation if we don't have enough
+        const response = await discoveryService.getDiscoverProfiles(
+          searchFilters,
+          1
+        );
+        if (response.success) {
+          animationProfiles = response.data.slice(0, 5);
+        }
+      }
 
-    // End search animation after duration
-    setTimeout(() => {
-      set({ isSearching: false });
-    }, APP_CONFIG.ANIMATION_DURATION);
+      const matchProfiles: MatchProfile[] = animationProfiles.map(
+        (profile, index) => ({
+          ...profile,
+          size: 50 + Math.random() * 30, // Random size between 50-80
+          radius: 80 + index * 10, // Radius increases with index
+          matchScore: 0.7 + Math.random() * 0.3, // Score between 0.7-1.0
+        })
+      );
+
+      const centerProfile =
+        animationProfiles[
+          Math.floor(Math.random() * animationProfiles.length)
+        ] || null;
+
+      set({
+        matchProfiles,
+        centerProfile,
+        isSearching: true,
+      });
+
+      // End search animation after duration
+      setTimeout(() => {
+        set({ isSearching: false });
+      }, APP_CONFIG.ANIMATION_DURATION);
+    } catch (error) {
+      console.error('Error in search animation:', error);
+      // Fallback to empty animation
+      set({
+        matchProfiles: [],
+        centerProfile: null,
+        isSearching: true,
+      });
+
+      setTimeout(() => {
+        set({ isSearching: false });
+      }, APP_CONFIG.ANIMATION_DURATION);
+    }
   },
 
   // Discovery Actions
@@ -324,17 +344,8 @@ export const useUserStore = create<UserState>((set, get) => ({
 
           if (!existingConversation) {
             console.log('🔴 Creating new conversation for match');
-            const conversation = chatService.createConversationWithMessage(
-              currentUser.id,
-              profileId,
-              userProfile.interests
-            );
-
-            console.log('🔴 Conversation created:', conversation.id);
-            // Add the conversation to the store
-            set((state) => ({
-              conversations: [conversation, ...state.conversations],
-            }));
+            // Use the createConversation method instead
+            await get().createConversation(profileId);
           } else {
             console.log(
               '🔴 Conversation already exists:',
@@ -552,19 +563,44 @@ export const useUserStore = create<UserState>((set, get) => ({
       return; // Don't create duplicate conversation
     }
 
-    // Look for the matched profile in matchedProfilesData instead of discoverProfiles
-    const matchProfile = get().matchedProfilesData.find(
-      (p) => p.id === matchedUserId
-    );
-    const conversation = chatService.createConversationWithMessage(
-      currentUser.id,
-      matchedUserId,
-      matchProfile?.interests
-    );
+    try {
+      // Create a new conversation document in Firebase
+      const { db } = await import('../services/firebase/config');
+      const { collection, addDoc, serverTimestamp } = await import(
+        'firebase/firestore'
+      );
 
-    set((state) => ({
-      conversations: [conversation, ...state.conversations],
-    }));
+      const conversationData = {
+        participants: [currentUser.id, matchedUserId],
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        unreadCount: 0,
+      };
+
+      const conversationRef = await addDoc(
+        collection(db, 'conversations'),
+        conversationData
+      );
+
+      // Create the conversation object for local state
+      const newConversation: Conversation = {
+        id: conversationRef.id,
+        participants: [currentUser.id, matchedUserId],
+        messages: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        unreadCount: 0,
+      };
+
+      set((state) => ({
+        conversations: [newConversation, ...state.conversations],
+      }));
+
+      console.log('🔴 Conversation created:', conversationRef.id);
+    } catch (error) {
+      console.error('Error creating conversation:', error);
+      set({ error: 'Failed to create conversation' });
+    }
   },
 
   sendMessage: async (conversationId, text) => {
@@ -664,15 +700,4 @@ export const useUserStore = create<UserState>((set, get) => ({
       hasMoreProfiles: true,
       currentPage: 1,
     }),
-
-  // Mock data generation (for development only)
-  generateMockProfiles: () => {
-    const mockProfiles = generateMockUsers(20);
-    set({ discoverProfiles: mockProfiles });
-  },
-
-  generateRandomProfile: () => {
-    const mockProfiles = generateMockUsers(1);
-    return mockProfiles[0];
-  },
 }));
