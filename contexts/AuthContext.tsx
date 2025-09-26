@@ -15,6 +15,7 @@ import { auth, db } from '../services/firebase/config';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { services } from '../services';
 import { User } from '../store/types';
+import LocationService from '../services/locationService';
 
 interface AuthContextType {
   user: User | null;
@@ -41,6 +42,12 @@ interface AuthContextType {
   updateProfile: (
     userData: Partial<User>
   ) => Promise<{ success: boolean; message: string }>;
+  updateLocationLive: () => Promise<{
+    success: boolean;
+    message: string;
+    location?: string;
+  }>;
+  requestLocationPermission: () => Promise<boolean>;
   cleanupOrphanedAuth: () => Promise<{ success: boolean; message: string }>;
 }
 
@@ -438,6 +445,78 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const updateLocationLive = async () => {
+    try {
+      if (!firebaseUser) {
+        return {
+          success: false,
+          message: 'No user currently authenticated',
+        };
+      }
+
+      // Get current location using LocationService
+      const locationData = await LocationService.updateUserLocation();
+
+      if (!locationData) {
+        return {
+          success: false,
+          message:
+            'Could not get current location. Please check your location permissions.',
+        };
+      }
+
+      const { coordinates, address } = locationData;
+
+      // Update user document in Firestore with coordinates and address
+      const userRef = doc(db, 'users', firebaseUser.uid);
+      await updateDoc(userRef, {
+        location: address,
+        coordinates: {
+          latitude: coordinates.latitude,
+          longitude: coordinates.longitude,
+          lastUpdated: new Date(),
+        },
+        updatedAt: serverTimestamp(),
+      });
+
+      // Update local user state
+      if (user) {
+        setUser((prev) => ({
+          ...prev!,
+          location: address,
+          coordinates: {
+            latitude: coordinates.latitude,
+            longitude: coordinates.longitude,
+            lastUpdated: new Date(),
+          },
+        }));
+      }
+
+      return {
+        success: true,
+        message: 'Location updated successfully',
+        location: address,
+      };
+    } catch (error) {
+      console.error('Update location error:', error);
+      return {
+        success: false,
+        message:
+          error instanceof Error ? error.message : 'Failed to update location',
+      };
+    }
+  };
+
+  const requestLocationPermission = async () => {
+    try {
+      const permission = await LocationService.requestLocationPermissions();
+      return permission.granted;
+    } catch (error) {
+      console.error('Location permission error:', error);
+      return false;
+    }
+  };
+
   const value: AuthContextType = {
     user,
     firebaseUser,
@@ -451,6 +530,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     resetPassword,
     refreshUserProfile,
     updateProfile,
+    updateLocationLive,
+    requestLocationPermission,
     cleanupOrphanedAuth,
   };
 

@@ -28,6 +28,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import { User } from '../../store/types';
 import { LinearGradient } from 'expo-linear-gradient';
+import LocationSelector from './LocationSelector';
 
 interface EditProfileModalProps {
   visible: boolean;
@@ -50,6 +51,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     name: user?.name || '',
     bio: user?.bio || '',
     location: user?.location || '',
+    coordinates: user?.coordinates || undefined,
     age: user?.age?.toString() || '',
     gender: user?.gender || 'other',
     interests: user?.interests ? [...user.interests] : [],
@@ -77,6 +79,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       name: formData.name.trim(),
       bio: formData.bio.trim(),
       location: formData.location.trim(),
+      coordinates: formData.coordinates,
       age: Number(formData.age),
       gender: formData.gender as 'male' | 'female' | 'other',
       interests: formData.interests,
@@ -306,6 +309,25 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   Location
                 </Text>
               </View>
+
+              {/* Location Selector Component */}
+              <LocationSelector
+                onLocationUpdate={(location, coordinates) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    location,
+                    coordinates: {
+                      latitude: coordinates.latitude,
+                      longitude: coordinates.longitude,
+                      lastUpdated: new Date(),
+                    },
+                  }));
+                }}
+                showCurrentLocation={false}
+                style={styles.locationSelector}
+              />
+
+              {/* Manual Location Input */}
               <TextInput
                 style={[
                   styles.textInput,
@@ -319,7 +341,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 onChangeText={(text) =>
                   setFormData((prev) => ({ ...prev, location: text }))
                 }
-                placeholder="Enter your location"
+                placeholder="Or enter your location manually"
                 placeholderTextColor={theme.textSecondary}
               />
             </View>
@@ -600,6 +622,9 @@ const styles = StyleSheet.create({
   interestText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  locationSelector: {
+    marginVertical: 8,
   },
 });
 

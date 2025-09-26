@@ -2,13 +2,20 @@ export interface User {
   id: string;
   name: string;
   age: number;
+  dateOfBirth: Date | string;
   image: string;
   bio?: string;
   interests?: string[];
   location?: string;
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+    lastUpdated: Date;
+  };
   distance?: number;
   isOnline?: boolean;
   lastSeen?: Date;
+  createdAt: Date | string;
   gender: 'male' | 'female' | 'other';
   preferences?: {
     ageRange: [number, number];

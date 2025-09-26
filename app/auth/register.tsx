@@ -16,6 +16,7 @@ import { Link, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Picker } from '@react-native-picker/picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../../contexts/AuthContext';
 import { THEME } from '../../constants/theme';
 
@@ -25,14 +26,28 @@ const RegisterScreen = () => {
     email: '',
     password: '',
     confirmPassword: '',
-    age: '18',
-    gender: 'other' as 'male' | 'female' | 'other',
+    dateOfBirth: new Date(2000, 0, 1), // Default to Jan 1, 2000
+    gender: 'male' as 'male' | 'female' | 'other',
   });
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const { register, loginWithGoogle } = useAuth();
+
+  const calculateAge = (birthDate: Date): number => {
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (
+      monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birthDate.getDate())
+    ) {
+      age--;
+    }
+    return age;
+  };
 
   const validateForm = () => {
     if (!formData.name.trim()) {
@@ -55,8 +70,13 @@ const RegisterScreen = () => {
       Alert.alert('Error', 'Passwords do not match');
       return false;
     }
-    if (parseInt(formData.age) < 18 || parseInt(formData.age) > 100) {
-      Alert.alert('Error', 'Age must be between 18 and 100');
+    const age = calculateAge(formData.dateOfBirth);
+    if (age < 18) {
+      Alert.alert('Error', 'You must be at least 18 years old');
+      return false;
+    }
+    if (age > 100) {
+      Alert.alert('Error', 'Please enter a valid date of birth');
       return false;
     }
     return true;
@@ -67,15 +87,18 @@ const RegisterScreen = () => {
 
     setIsLoading(true);
     try {
+      const age = calculateAge(formData.dateOfBirth);
       const userData = {
         name: formData.name.trim(),
         email: formData.email.trim(),
         password: formData.password,
-        age: parseInt(formData.age),
+        age,
+        dateOfBirth: formData.dateOfBirth,
         gender: formData.gender,
         bio: '',
         interests: [],
         location: '',
+        createdAt: new Date(),
       };
 
       const result = await register(userData);
@@ -115,6 +138,21 @@ const RegisterScreen = () => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  const formatDate = (date: Date): string => {
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
+
+  const onDateChange = (_: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      setFormData((prev) => ({ ...prev, dateOfBirth: selectedDate }));
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
@@ -135,8 +173,9 @@ const RegisterScreen = () => {
                 </Text>
               </View>
 
-              {/* Registration Form */}
+              {/* Form */}
               <View style={styles.form}>
+                {/* Name */}
                 <View style={styles.inputContainer}>
                   <Ionicons
                     name="person-outline"
@@ -154,6 +193,7 @@ const RegisterScreen = () => {
                   />
                 </View>
 
+                {/* Email */}
                 <View style={styles.inputContainer}>
                   <Ionicons
                     name="mail-outline"
@@ -172,6 +212,7 @@ const RegisterScreen = () => {
                   />
                 </View>
 
+                {/* DOB + Gender */}
                 <View style={styles.row}>
                   <View style={[styles.inputContainer, styles.ageInput]}>
                     <Ionicons
@@ -179,15 +220,31 @@ const RegisterScreen = () => {
                       size={20}
                       color={THEME.colors.textSecondary}
                     />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Age"
-                      placeholderTextColor={THEME.colors.textSecondary}
-                      value={formData.age}
-                      onChangeText={(value) => updateFormData('age', value)}
-                      keyboardType="numeric"
-                      maxLength={2}
-                    />
+                    <TouchableOpacity
+                      style={styles.datePickerButton}
+                      onPress={() => setShowDatePicker(true)}
+                    >
+                      <Text
+                        style={[
+                          styles.datePickerText,
+                          { color: THEME.colors.text },
+                        ]}
+                      >
+                        {formData.dateOfBirth
+                          ? formatDate(formData.dateOfBirth)
+                          : 'Select Date of Birth'}
+                      </Text>
+                    </TouchableOpacity>
+                    {showDatePicker && (
+                      <DateTimePicker
+                        value={formData.dateOfBirth}
+                        mode="date"
+                        display="default"
+                        maximumDate={new Date()}
+                        minimumDate={new Date(1920, 0, 1)}
+                        onChange={onDateChange}
+                      />
+                    )}
                   </View>
 
                   <View style={[styles.inputContainer, styles.genderInput]}>
@@ -205,14 +262,15 @@ const RegisterScreen = () => {
                         style={styles.picker}
                         dropdownIconColor={THEME.colors.textSecondary}
                       >
-                        <Picker.Item label="Other" value="other" />
                         <Picker.Item label="Male" value="male" />
                         <Picker.Item label="Female" value="female" />
+                        <Picker.Item label="Other" value="other" />
                       </Picker>
                     </View>
                   </View>
                 </View>
 
+                {/* Password */}
                 <View style={styles.inputContainer}>
                   <Ionicons
                     name="lock-closed-outline"
@@ -240,6 +298,7 @@ const RegisterScreen = () => {
                   </TouchableOpacity>
                 </View>
 
+                {/* Confirm Password */}
                 <View style={styles.inputContainer}>
                   <Ionicons
                     name="lock-closed-outline"
@@ -271,6 +330,7 @@ const RegisterScreen = () => {
                   </TouchableOpacity>
                 </View>
 
+                {/* Register button */}
                 <TouchableOpacity
                   style={[
                     styles.registerButton,
@@ -288,12 +348,14 @@ const RegisterScreen = () => {
                   )}
                 </TouchableOpacity>
 
+                {/* Divider */}
                 <View style={styles.divider}>
                   <View style={styles.dividerLine} />
                   <Text style={styles.dividerText}>or</Text>
                   <View style={styles.dividerLine} />
                 </View>
 
+                {/* Google */}
                 <TouchableOpacity
                   style={[
                     styles.googleButton,
@@ -388,6 +450,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: THEME.colors.text,
     marginLeft: THEME.spacing.sm,
+  },
+  datePickerButton: {
+    flex: 1,
+    marginLeft: THEME.spacing.sm,
+    paddingVertical: 4,
+    justifyContent: 'center',
+  },
+  datePickerText: {
+    fontSize: 16,
+    color: THEME.colors.text,
   },
   row: {
     flexDirection: 'row',

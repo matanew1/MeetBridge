@@ -198,10 +198,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     >
       <View style={[styles.container, { backgroundColor: theme.background }]}>
         {/* Header */}
-        <LinearGradient
-          colors={[theme.primary]}
-          style={styles.header}
-        >
+        <LinearGradient colors={[theme.primary]} style={styles.header}>
           <TouchableOpacity
             style={[
               styles.closeButton,
@@ -325,6 +322,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 >
                   {user.location}
                 </Text>
+                {user.coordinates && (
+                  <Text
+                    style={[
+                      styles.coordinatesText,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    📍 {user.coordinates.latitude.toFixed(6)},{' '}
+                    {user.coordinates.longitude.toFixed(6)}
+                  </Text>
+                )}
               </View>
             )}
 
@@ -686,6 +694,12 @@ const styles = StyleSheet.create({
   cardContent: {
     fontSize: 16,
     lineHeight: 24,
+  },
+  coordinatesText: {
+    fontSize: 12,
+    fontFamily: 'monospace',
+    marginTop: 4,
+    opacity: 0.8,
   },
   interestsContainer: {
     flexDirection: 'row',
