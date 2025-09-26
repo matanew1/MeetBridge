@@ -38,6 +38,9 @@ interface AuthContextType {
     newPassword: string
   ) => Promise<{ success: boolean; message: string }>;
   refreshUserProfile: () => Promise<void>;
+  updateProfile: (
+    userData: Partial<User>
+  ) => Promise<{ success: boolean; message: string }>;
   cleanupOrphanedAuth: () => Promise<{ success: boolean; message: string }>;
 }
 
@@ -400,6 +403,41 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const updateProfile = async (userData: Partial<User>) => {
+    try {
+      if (!firebaseUser) {
+        return {
+          success: false,
+          message: 'No user currently authenticated',
+        };
+      }
+
+      // Update user document in Firestore
+      const userRef = doc(db, 'users', firebaseUser.uid);
+      await updateDoc(userRef, {
+        ...userData,
+        updatedAt: serverTimestamp(),
+      });
+
+      // Update local user state
+      if (user) {
+        setUser((prev) => ({ ...prev!, ...userData }));
+      }
+
+      return {
+        success: true,
+        message: 'Profile updated successfully',
+      };
+    } catch (error) {
+      console.error('Update profile error:', error);
+      return {
+        success: false,
+        message:
+          error instanceof Error ? error.message : 'Failed to update profile',
+      };
+    }
+  };
+
   const value: AuthContextType = {
     user,
     firebaseUser,
@@ -412,6 +450,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     forgotPassword,
     resetPassword,
     refreshUserProfile,
+    updateProfile,
     cleanupOrphanedAuth,
   };
 

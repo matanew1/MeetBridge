@@ -19,14 +19,27 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
+import { useState } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
+import ProfileModal from '../components/ProfileModal';
 import '../../i18n';
 
 export default function TabLayout() {
   const { t } = useTranslation();
   const { isDarkMode, toggleDarkMode } = useTheme();
+  const { user } = useAuth();
   const theme = isDarkMode ? darkTheme : lightTheme;
+  const [showProfileModal, setShowProfileModal] = useState(false);
+
+  const handleProfilePress = () => {
+    setShowProfileModal(true);
+  };
+
+  const handleCloseProfileModal = () => {
+    setShowProfileModal(false);
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -57,14 +70,19 @@ export default function TabLayout() {
             )}
           </TouchableOpacity>
         </View>
-        <View style={styles.profileButton}>
+        <TouchableOpacity
+          style={styles.profileButton}
+          onPress={handleProfilePress}
+        >
           <Image
             source={{
-              uri: 'https://images.pexels.com/photos/1043474/pexels-photo-1043474.jpeg?auto=compress&cs=tinysrgb&w=100',
+              uri:
+                user?.image ||
+                'https://images.pexels.com/photos/1043474/pexels-photo-1043474.jpeg?auto=compress&cs=tinysrgb&w=100',
             }}
             style={styles.headerProfile}
           />
-        </View>
+        </TouchableOpacity>
       </View>
       <Tabs
         screenOptions={{
@@ -123,6 +141,15 @@ export default function TabLayout() {
           }}
         />
       </Tabs>
+
+      {/* Profile Modal */}
+      {user && (
+        <ProfileModal
+          visible={showProfileModal}
+          onClose={handleCloseProfileModal}
+          user={user}
+        />
+      )}
     </View>
   );
 }
