@@ -10,15 +10,19 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { User, Mail, Lock, Eye, EyeOff, Calendar, Users, Heart } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../../contexts/AuthContext';
-import { THEME } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { lightTheme, darkTheme } from '../../constants/theme';
+
+const { width, height } = Dimensions.get('window');
 
 const RegisterScreen = () => {
   const [formData, setFormData] = useState({
@@ -26,13 +30,15 @@ const RegisterScreen = () => {
     email: '',
     password: '',
     confirmPassword: '',
-    dateOfBirth: new Date(2000, 0, 1), // Default to Jan 1, 2000
+    dateOfBirth: new Date(2000, 0, 1),
     gender: 'male' as 'male' | 'female' | 'other',
   });
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const { isDarkMode } = useTheme();
+  const theme = isDarkMode ? darkTheme : lightTheme;
 
   const { register, loginWithGoogle } = useAuth();
 
@@ -134,7 +140,7 @@ const RegisterScreen = () => {
     }
   };
 
-  const updateFormData = (field: string, value: string) => {
+  const updateFormData = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -154,238 +160,255 @@ const RegisterScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <LinearGradient
-            colors={[THEME.colors.secondary, THEME.colors.primary]}
-            style={styles.gradient}
-          >
-            <View style={styles.content}>
-              {/* Header */}
-              <View style={styles.header}>
-                <Text style={styles.title}>Create Account</Text>
-                <Text style={styles.subtitle}>
-                  Join MeetBridge and find your perfect match
-                </Text>
-              </View>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header Section */}
+          <View style={styles.headerSection}>
+            <LinearGradient
+              colors={[theme.primary, theme.primaryVariant]}
+              style={styles.logoContainer}
+            >
+              <Heart size={32} color="white" fill="white" />
+            </LinearGradient>
+            <Text style={[styles.appTitle, { color: theme.text }]}>
+              Join MeetBridge
+            </Text>
+            <Text style={[styles.welcomeText, { color: theme.textSecondary }]}>
+              Create your account and find your perfect match
+            </Text>
+          </View>
 
-              {/* Form */}
-              <View style={styles.form}>
-                {/* Name */}
-                <View style={styles.inputContainer}>
-                  <Ionicons
-                    name="person-outline"
-                    size={20}
-                    color={THEME.colors.textSecondary}
-                  />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Full Name"
-                    placeholderTextColor={THEME.colors.textSecondary}
-                    value={formData.name}
-                    onChangeText={(value) => updateFormData('name', value)}
-                    autoCapitalize="words"
-                    autoComplete="name"
-                  />
-                </View>
+          {/* Form Section */}
+          <View style={[styles.formSection, { backgroundColor: theme.surface }]}>
+            <Text style={[styles.formTitle, { color: theme.text }]}>
+              Create Account
+            </Text>
 
-                {/* Email */}
-                <View style={styles.inputContainer}>
-                  <Ionicons
-                    name="mail-outline"
-                    size={20}
-                    color={THEME.colors.textSecondary}
-                  />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Email"
-                    placeholderTextColor={THEME.colors.textSecondary}
-                    value={formData.email}
-                    onChangeText={(value) => updateFormData('email', value)}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoComplete="email"
-                  />
-                </View>
-
-                {/* DOB + Gender */}
-                <View style={styles.row}>
-                  <View style={[styles.inputContainer, styles.ageInput]}>
-                    <Ionicons
-                      name="calendar-outline"
-                      size={20}
-                      color={THEME.colors.textSecondary}
-                    />
-                    <TouchableOpacity
-                      style={styles.datePickerButton}
-                      onPress={() => setShowDatePicker(true)}
-                    >
-                      <Text
-                        style={[
-                          styles.datePickerText,
-                          { color: THEME.colors.text },
-                        ]}
-                      >
-                        {formData.dateOfBirth
-                          ? formatDate(formData.dateOfBirth)
-                          : 'Select Date of Birth'}
-                      </Text>
-                    </TouchableOpacity>
-                    {showDatePicker && (
-                      <DateTimePicker
-                        value={formData.dateOfBirth}
-                        mode="date"
-                        display="default"
-                        maximumDate={new Date()}
-                        minimumDate={new Date(1920, 0, 1)}
-                        onChange={onDateChange}
-                      />
-                    )}
-                  </View>
-
-                  <View style={[styles.inputContainer, styles.genderInput]}>
-                    <Ionicons
-                      name="people-outline"
-                      size={20}
-                      color={THEME.colors.textSecondary}
-                    />
-                    <View style={styles.pickerContainer}>
-                      <Picker
-                        selectedValue={formData.gender}
-                        onValueChange={(value) =>
-                          updateFormData('gender', value)
-                        }
-                        style={styles.picker}
-                        dropdownIconColor={THEME.colors.textSecondary}
-                      >
-                        <Picker.Item label="Male" value="male" />
-                        <Picker.Item label="Female" value="female" />
-                        <Picker.Item label="Other" value="other" />
-                      </Picker>
-                    </View>
-                  </View>
-                </View>
-
-                {/* Password */}
-                <View style={styles.inputContainer}>
-                  <Ionicons
-                    name="lock-closed-outline"
-                    size={20}
-                    color={THEME.colors.textSecondary}
-                  />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Password"
-                    placeholderTextColor={THEME.colors.textSecondary}
-                    value={formData.password}
-                    onChangeText={(value) => updateFormData('password', value)}
-                    secureTextEntry={!showPassword}
-                    autoComplete="new-password"
-                  />
-                  <TouchableOpacity
-                    onPress={() => setShowPassword(!showPassword)}
-                    style={styles.eyeIcon}
-                  >
-                    <Ionicons
-                      name={showPassword ? 'eye-outline' : 'eye-off-outline'}
-                      size={20}
-                      color={THEME.colors.textSecondary}
-                    />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Confirm Password */}
-                <View style={styles.inputContainer}>
-                  <Ionicons
-                    name="lock-closed-outline"
-                    size={20}
-                    color={THEME.colors.textSecondary}
-                  />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Confirm Password"
-                    placeholderTextColor={THEME.colors.textSecondary}
-                    value={formData.confirmPassword}
-                    onChangeText={(value) =>
-                      updateFormData('confirmPassword', value)
-                    }
-                    secureTextEntry={!showConfirmPassword}
-                    autoComplete="new-password"
-                  />
-                  <TouchableOpacity
-                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                    style={styles.eyeIcon}
-                  >
-                    <Ionicons
-                      name={
-                        showConfirmPassword ? 'eye-outline' : 'eye-off-outline'
-                      }
-                      size={20}
-                      color={THEME.colors.textSecondary}
-                    />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Register button */}
-                <TouchableOpacity
-                  style={[
-                    styles.registerButton,
-                    isLoading && styles.disabledButton,
-                  ]}
-                  onPress={handleRegister}
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <ActivityIndicator color={THEME.colors.white} />
-                  ) : (
-                    <Text style={styles.registerButtonText}>
-                      Create Account
-                    </Text>
-                  )}
-                </TouchableOpacity>
-
-                {/* Divider */}
-                <View style={styles.divider}>
-                  <View style={styles.dividerLine} />
-                  <Text style={styles.dividerText}>or</Text>
-                  <View style={styles.dividerLine} />
-                </View>
-
-                {/* Google */}
-                <TouchableOpacity
-                  style={[
-                    styles.googleButton,
-                    isLoading && styles.disabledButton,
-                  ]}
-                  onPress={handleGoogleRegister}
-                  disabled={isLoading}
-                >
-                  <Ionicons
-                    name="logo-google"
-                    size={20}
-                    color={THEME.colors.primary}
-                  />
-                  <Text style={styles.googleButtonText}>
-                    Sign up with Google
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Footer */}
-              <View style={styles.footer}>
-                <Text style={styles.footerText}>
-                  Already have an account?{' '}
-                  <Link href="/auth/login" asChild>
-                    <Text style={styles.linkText}>Sign In</Text>
-                  </Link>
-                </Text>
+            {/* Name Input */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: theme.text }]}>
+                Full Name
+              </Text>
+              <View style={[styles.inputContainer, { 
+                backgroundColor: theme.background,
+                borderColor: theme.border 
+              }]}>
+                <User size={20} color={theme.textSecondary} />
+                <TextInput
+                  style={[styles.input, { color: theme.text }]}
+                  placeholder="Enter your full name"
+                  placeholderTextColor={theme.textSecondary}
+                  value={formData.name}
+                  onChangeText={(value) => updateFormData('name', value)}
+                  autoCapitalize="words"
+                  autoComplete="name"
+                />
               </View>
             </View>
-          </LinearGradient>
+
+            {/* Email Input */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: theme.text }]}>
+                Email Address
+              </Text>
+              <View style={[styles.inputContainer, { 
+                backgroundColor: theme.background,
+                borderColor: theme.border 
+              }]}>
+                <Mail size={20} color={theme.textSecondary} />
+                <TextInput
+                  style={[styles.input, { color: theme.text }]}
+                  placeholder="Enter your email"
+                  placeholderTextColor={theme.textSecondary}
+                  value={formData.email}
+                  onChangeText={(value) => updateFormData('email', value)}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                />
+              </View>
+            </View>
+
+            {/* Date of Birth & Gender Row */}
+            <View style={styles.rowContainer}>
+              <View style={[styles.inputGroup, styles.halfWidth]}>
+                <Text style={[styles.inputLabel, { color: theme.text }]}>
+                  Date of Birth
+                </Text>
+                <TouchableOpacity
+                  style={[styles.inputContainer, { 
+                    backgroundColor: theme.background,
+                    borderColor: theme.border 
+                  }]}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Calendar size={20} color={theme.textSecondary} />
+                  <Text style={[styles.dateText, { color: theme.text }]}>
+                    {formatDate(formData.dateOfBirth)}
+                  </Text>
+                </TouchableOpacity>
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={formData.dateOfBirth}
+                    mode="date"
+                    display="default"
+                    maximumDate={new Date()}
+                    minimumDate={new Date(1920, 0, 1)}
+                    onChange={onDateChange}
+                  />
+                )}
+              </View>
+
+              <View style={[styles.inputGroup, styles.halfWidth]}>
+                <Text style={[styles.inputLabel, { color: theme.text }]}>
+                  Gender
+                </Text>
+                <View style={[styles.inputContainer, { 
+                  backgroundColor: theme.background,
+                  borderColor: theme.border 
+                }]}>
+                  <Users size={20} color={theme.textSecondary} />
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={formData.gender}
+                      onValueChange={(value) => updateFormData('gender', value)}
+                      style={[styles.picker, { color: theme.text }]}
+                      dropdownIconColor={theme.textSecondary}
+                    >
+                      <Picker.Item label="Male" value="male" />
+                      <Picker.Item label="Female" value="female" />
+                      <Picker.Item label="Other" value="other" />
+                    </Picker>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* Password Input */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: theme.text }]}>
+                Password
+              </Text>
+              <View style={[styles.inputContainer, { 
+                backgroundColor: theme.background,
+                borderColor: theme.border 
+              }]}>
+                <Lock size={20} color={theme.textSecondary} />
+                <TextInput
+                  style={[styles.input, { color: theme.text }]}
+                  placeholder="Create a password"
+                  placeholderTextColor={theme.textSecondary}
+                  value={formData.password}
+                  onChangeText={(value) => updateFormData('password', value)}
+                  secureTextEntry={!showPassword}
+                  autoComplete="new-password"
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.eyeButton}
+                >
+                  {showPassword ? (
+                    <EyeOff size={20} color={theme.textSecondary} />
+                  ) : (
+                    <Eye size={20} color={theme.textSecondary} />
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Confirm Password Input */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: theme.text }]}>
+                Confirm Password
+              </Text>
+              <View style={[styles.inputContainer, { 
+                backgroundColor: theme.background,
+                borderColor: theme.border 
+              }]}>
+                <Lock size={20} color={theme.textSecondary} />
+                <TextInput
+                  style={[styles.input, { color: theme.text }]}
+                  placeholder="Confirm your password"
+                  placeholderTextColor={theme.textSecondary}
+                  value={formData.confirmPassword}
+                  onChangeText={(value) => updateFormData('confirmPassword', value)}
+                  secureTextEntry={!showConfirmPassword}
+                  autoComplete="new-password"
+                />
+                <TouchableOpacity
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  style={styles.eyeButton}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff size={20} color={theme.textSecondary} />
+                  ) : (
+                    <Eye size={20} color={theme.textSecondary} />
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Create Account Button */}
+            <TouchableOpacity
+              style={[styles.createButton, isLoading && styles.disabledButton]}
+              onPress={handleRegister}
+              disabled={isLoading}
+            >
+              <LinearGradient
+                colors={[theme.primary, theme.primaryVariant]}
+                style={styles.buttonGradient}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={styles.createButtonText}>Create Account</Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+
+            {/* Divider */}
+            <View style={styles.divider}>
+              <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+              <Text style={[styles.dividerText, { color: theme.textSecondary }]}>
+                or continue with
+              </Text>
+              <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+            </View>
+
+            {/* Google Sign Up */}
+            <TouchableOpacity
+              style={[styles.googleButton, { 
+                backgroundColor: theme.background,
+                borderColor: theme.border 
+              }]}
+              onPress={handleGoogleRegister}
+              disabled={isLoading}
+            >
+              <Text style={styles.googleIcon}>G</Text>
+              <Text style={[styles.googleButtonText, { color: theme.text }]}>
+                Continue with Google
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Footer */}
+          <View style={styles.footer}>
+            <Text style={[styles.footerText, { color: theme.textSecondary }]}>
+              Already have an account?{' '}
+              <Link href="/auth/login" asChild>
+                <Text style={[styles.linkText, { color: theme.primary }]}>
+                  Sign In
+                </Text>
+              </Link>
+            </Text>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -401,104 +424,117 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
   },
-  gradient: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    padding: THEME.spacing.lg,
-    justifyContent: 'center',
-  },
-  header: {
+  headerSection: {
     alignItems: 'center',
-    marginBottom: THEME.spacing.xl,
+    marginBottom: 32,
+    paddingTop: 20,
   },
-  title: {
+  logoContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  appTitle: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: THEME.colors.white,
-    marginBottom: THEME.spacing.sm,
+    marginBottom: 8,
   },
-  subtitle: {
+  welcomeText: {
     fontSize: 16,
-    color: THEME.colors.white,
-    opacity: 0.9,
     textAlign: 'center',
+    lineHeight: 24,
+    paddingHorizontal: 20,
   },
-  form: {
-    width: '100%',
-    marginBottom: THEME.spacing.xl,
+  formSection: {
+    borderRadius: 24,
+    padding: 32,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  formTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: THEME.colors.white,
-    borderRadius: THEME.borderRadius.md,
-    paddingHorizontal: THEME.spacing.md,
-    paddingVertical:
-      Platform.OS === 'ios' ? THEME.spacing.md : THEME.spacing.sm,
-    marginBottom: THEME.spacing.md,
-    shadowColor: THEME.colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1.5,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: Platform.OS === 'ios' ? 16 : 12,
+    gap: 12,
   },
   input: {
     flex: 1,
     fontSize: 16,
-    color: THEME.colors.text,
-    marginLeft: THEME.spacing.sm,
+    minHeight: 24,
   },
-  datePickerButton: {
-    flex: 1,
-    marginLeft: THEME.spacing.sm,
-    paddingVertical: 4,
-    justifyContent: 'center',
+  eyeButton: {
+    padding: 4,
   },
-  datePickerText: {
-    fontSize: 16,
-    color: THEME.colors.text,
-  },
-  row: {
+  rowContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 12,
   },
-  ageInput: {
-    flex: 0.4,
-    marginRight: THEME.spacing.sm,
+  halfWidth: {
+    flex: 1,
   },
-  genderInput: {
-    flex: 0.6,
+  dateText: {
+    flex: 1,
+    fontSize: 16,
+    paddingVertical: 2,
   },
   pickerContainer: {
     flex: 1,
-    marginLeft: THEME.spacing.sm,
   },
   picker: {
     flex: 1,
-    color: THEME.colors.text,
-  },
-  eyeIcon: {
-    padding: THEME.spacing.xs,
-  },
-  registerButton: {
-    backgroundColor: THEME.colors.white,
-    paddingVertical: THEME.spacing.md,
-    borderRadius: THEME.borderRadius.md,
-    alignItems: 'center',
-    marginTop: THEME.spacing.md,
-    marginBottom: THEME.spacing.lg,
-    shadowColor: THEME.colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  registerButtonText: {
-    color: THEME.colors.primary,
     fontSize: 16,
+  },
+  createButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginTop: 8,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  buttonGradient: {
+    paddingVertical: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  createButtonText: {
+    color: 'white',
+    fontSize: 18,
     fontWeight: '600',
   },
   disabledButton: {
@@ -507,49 +543,46 @@ const styles = StyleSheet.create({
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: THEME.spacing.lg,
+    marginBottom: 24,
+    gap: 16,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: THEME.colors.white,
-    opacity: 0.3,
   },
   dividerText: {
-    color: THEME.colors.white,
-    paddingHorizontal: THEME.spacing.md,
-    opacity: 0.7,
+    fontSize: 14,
+    fontWeight: '500',
   },
   googleButton: {
-    backgroundColor: THEME.colors.white,
-    paddingVertical: THEME.spacing.md,
-    borderRadius: THEME.borderRadius.md,
-    alignItems: 'center',
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: THEME.colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1.5,
+    borderRadius: 16,
+    paddingVertical: 16,
+    gap: 12,
+  },
+  googleIcon: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#4285F4',
   },
   googleButtonText: {
-    color: THEME.colors.text,
     fontSize: 16,
-    fontWeight: '500',
-    marginLeft: THEME.spacing.sm,
+    fontWeight: '600',
   },
   footer: {
     alignItems: 'center',
+    paddingVertical: 20,
+    paddingBottom: 40,
   },
   footerText: {
-    color: THEME.colors.white,
-    fontSize: 14,
-    opacity: 0.9,
+    fontSize: 16,
+    textAlign: 'center',
   },
   linkText: {
     fontWeight: '600',
-    textDecorationLine: 'underline',
   },
 });
 

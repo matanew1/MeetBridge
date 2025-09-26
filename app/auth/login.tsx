@@ -10,19 +10,25 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Mail, Lock, Eye, EyeOff, Heart } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
-import { THEME } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { lightTheme, darkTheme } from '../../constants/theme';
+
+const { width, height } = Dimensions.get('window');
 
 const LoginScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const { isDarkMode } = useTheme();
+  const theme = isDarkMode ? darkTheme : lightTheme;
 
   const { login, loginWithGoogle } = useAuth();
 
@@ -64,131 +70,155 @@ const LoginScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <LinearGradient
-            colors={[THEME.colors.primary, THEME.colors.secondary]}
-            style={styles.gradient}
-          >
-            <View style={styles.content}>
-              {/* Header */}
-              <View style={styles.header}>
-                <Text style={styles.title}>Welcome Back</Text>
-                <Text style={styles.subtitle}>
-                  Sign in to continue your journey
-                </Text>
-              </View>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header Section */}
+          <View style={styles.headerSection}>
+            <LinearGradient
+              colors={[theme.primary, theme.primaryVariant]}
+              style={styles.logoContainer}
+            >
+              <Heart size={32} color="white" fill="white" />
+            </LinearGradient>
+            <Text style={[styles.appTitle, { color: theme.text }]}>
+              MeetBridge
+            </Text>
+            <Text style={[styles.welcomeText, { color: theme.textSecondary }]}>
+              Welcome back! Sign in to continue your journey
+            </Text>
+          </View>
 
-              {/* Login Form */}
-              <View style={styles.form}>
-                <View style={styles.inputContainer}>
-                  <Ionicons
-                    name="mail-outline"
-                    size={20}
-                    color={THEME.colors.textSecondary}
-                  />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Email"
-                    placeholderTextColor={THEME.colors.textSecondary}
-                    value={email}
-                    onChangeText={setEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoComplete="email"
-                  />
-                </View>
+          {/* Form Section */}
+          <View style={[styles.formSection, { backgroundColor: theme.surface }]}>
+            <Text style={[styles.formTitle, { color: theme.text }]}>
+              Sign In
+            </Text>
 
-                <View style={styles.inputContainer}>
-                  <Ionicons
-                    name="lock-closed-outline"
-                    size={20}
-                    color={THEME.colors.textSecondary}
-                  />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Password"
-                    placeholderTextColor={THEME.colors.textSecondary}
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry={!showPassword}
-                    autoComplete="password"
-                  />
-                  <TouchableOpacity
-                    onPress={() => setShowPassword(!showPassword)}
-                    style={styles.eyeIcon}
-                  >
-                    <Ionicons
-                      name={showPassword ? 'eye-outline' : 'eye-off-outline'}
-                      size={20}
-                      color={THEME.colors.textSecondary}
-                    />
-                  </TouchableOpacity>
-                </View>
-
-                <TouchableOpacity style={styles.forgotPassword}>
-                  <Link href="/auth/forgot-password" asChild>
-                    <Text style={styles.forgotPasswordText}>
-                      Forgot Password?
-                    </Text>
-                  </Link>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.loginButton,
-                    isLoading && styles.disabledButton,
-                  ]}
-                  onPress={handleLogin}
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <ActivityIndicator color={THEME.colors.white} />
-                  ) : (
-                    <Text style={styles.loginButtonText}>Sign In</Text>
-                  )}
-                </TouchableOpacity>
-
-                <View style={styles.divider}>
-                  <View style={styles.dividerLine} />
-                  <Text style={styles.dividerText}>or</Text>
-                  <View style={styles.dividerLine} />
-                </View>
-
-                <TouchableOpacity
-                  style={[
-                    styles.googleButton,
-                    isLoading && styles.disabledButton,
-                  ]}
-                  onPress={handleGoogleLogin}
-                  disabled={isLoading}
-                >
-                  <Ionicons
-                    name="logo-google"
-                    size={20}
-                    color={THEME.colors.primary}
-                  />
-                  <Text style={styles.googleButtonText}>
-                    Continue with Google
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Footer */}
-              <View style={styles.footer}>
-                <Text style={styles.footerText}>
-                  Don't have an account?{' '}
-                  <Link href="/auth/register" asChild>
-                    <Text style={styles.linkText}>Sign Up</Text>
-                  </Link>
-                </Text>
+            {/* Email Input */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: theme.text }]}>
+                Email Address
+              </Text>
+              <View style={[styles.inputContainer, { 
+                backgroundColor: theme.background,
+                borderColor: theme.border 
+              }]}>
+                <Mail size={20} color={theme.textSecondary} />
+                <TextInput
+                  style={[styles.input, { color: theme.text }]}
+                  placeholder="Enter your email"
+                  placeholderTextColor={theme.textSecondary}
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                />
               </View>
             </View>
-          </LinearGradient>
+
+            {/* Password Input */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: theme.text }]}>
+                Password
+              </Text>
+              <View style={[styles.inputContainer, { 
+                backgroundColor: theme.background,
+                borderColor: theme.border 
+              }]}>
+                <Lock size={20} color={theme.textSecondary} />
+                <TextInput
+                  style={[styles.input, { color: theme.text }]}
+                  placeholder="Enter your password"
+                  placeholderTextColor={theme.textSecondary}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  autoComplete="password"
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.eyeButton}
+                >
+                  {showPassword ? (
+                    <EyeOff size={20} color={theme.textSecondary} />
+                  ) : (
+                    <Eye size={20} color={theme.textSecondary} />
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Forgot Password */}
+            <TouchableOpacity style={styles.forgotPassword}>
+              <Link href="/auth/forgot-password" asChild>
+                <Text style={[styles.forgotPasswordText, { color: theme.primary }]}>
+                  Forgot Password?
+                </Text>
+              </Link>
+            </TouchableOpacity>
+
+            {/* Sign In Button */}
+            <TouchableOpacity
+              style={[styles.signInButton, isLoading && styles.disabledButton]}
+              onPress={handleLogin}
+              disabled={isLoading}
+            >
+              <LinearGradient
+                colors={[theme.primary, theme.primaryVariant]}
+                style={styles.buttonGradient}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={styles.signInButtonText}>Sign In</Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+
+            {/* Divider */}
+            <View style={styles.divider}>
+              <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+              <Text style={[styles.dividerText, { color: theme.textSecondary }]}>
+                or continue with
+              </Text>
+              <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+            </View>
+
+            {/* Google Sign In */}
+            <TouchableOpacity
+              style={[styles.googleButton, { 
+                backgroundColor: theme.background,
+                borderColor: theme.border 
+              }]}
+              onPress={handleGoogleLogin}
+              disabled={isLoading}
+            >
+              <Text style={styles.googleIcon}>G</Text>
+              <Text style={[styles.googleButtonText, { color: theme.text }]}>
+                Continue with Google
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Footer */}
+          <View style={styles.footer}>
+            <Text style={[styles.footerText, { color: theme.textSecondary }]}>
+              Don't have an account?{' '}
+              <Link href="/auth/register" asChild>
+                <Text style={[styles.linkText, { color: theme.primary }]}>
+                  Sign Up
+                </Text>
+              </Link>
+            </Text>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -204,83 +234,105 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
   },
-  gradient: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    padding: THEME.spacing.lg,
-    justifyContent: 'center',
-  },
-  header: {
+  headerSection: {
     alignItems: 'center',
-    marginBottom: THEME.spacing.xl,
+    marginBottom: 40,
+    paddingTop: 20,
   },
-  title: {
+  logoContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  appTitle: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: THEME.colors.white,
-    marginBottom: THEME.spacing.sm,
+    marginBottom: 8,
   },
-  subtitle: {
+  welcomeText: {
     fontSize: 16,
-    color: THEME.colors.white,
-    opacity: 0.9,
     textAlign: 'center',
+    lineHeight: 24,
+    paddingHorizontal: 20,
   },
-  form: {
-    width: '100%',
-    marginBottom: THEME.spacing.xl,
+  formSection: {
+    borderRadius: 24,
+    padding: 32,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  formTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  inputGroup: {
+    marginBottom: 24,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: THEME.colors.white,
-    borderRadius: THEME.borderRadius.md,
-    paddingHorizontal: THEME.spacing.md,
-    paddingVertical:
-      Platform.OS === 'ios' ? THEME.spacing.md : THEME.spacing.sm,
-    marginBottom: THEME.spacing.md,
-    shadowColor: THEME.colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1.5,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: Platform.OS === 'ios' ? 16 : 12,
+    gap: 12,
   },
   input: {
     flex: 1,
     fontSize: 16,
-    color: THEME.colors.text,
-    marginLeft: THEME.spacing.sm,
+    minHeight: 24,
   },
-  eyeIcon: {
-    padding: THEME.spacing.xs,
+  eyeButton: {
+    padding: 4,
   },
   forgotPassword: {
     alignSelf: 'flex-end',
-    marginBottom: THEME.spacing.lg,
+    marginBottom: 32,
   },
   forgotPasswordText: {
-    color: THEME.colors.white,
     fontSize: 14,
-    opacity: 0.9,
+    fontWeight: '600',
   },
-  loginButton: {
-    backgroundColor: THEME.colors.white,
-    paddingVertical: THEME.spacing.md,
-    borderRadius: THEME.borderRadius.md,
+  signInButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  buttonGradient: {
+    paddingVertical: 18,
     alignItems: 'center',
-    marginBottom: THEME.spacing.lg,
-    shadowColor: THEME.colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    justifyContent: 'center',
   },
-  loginButtonText: {
-    color: THEME.colors.primary,
-    fontSize: 16,
+  signInButtonText: {
+    color: 'white',
+    fontSize: 18,
     fontWeight: '600',
   },
   disabledButton: {
@@ -289,49 +341,45 @@ const styles = StyleSheet.create({
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: THEME.spacing.lg,
+    marginBottom: 24,
+    gap: 16,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: THEME.colors.white,
-    opacity: 0.3,
   },
   dividerText: {
-    color: THEME.colors.white,
-    paddingHorizontal: THEME.spacing.md,
-    opacity: 0.7,
+    fontSize: 14,
+    fontWeight: '500',
   },
   googleButton: {
-    backgroundColor: THEME.colors.white,
-    paddingVertical: THEME.spacing.md,
-    borderRadius: THEME.borderRadius.md,
-    alignItems: 'center',
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: THEME.colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1.5,
+    borderRadius: 16,
+    paddingVertical: 16,
+    gap: 12,
+  },
+  googleIcon: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#4285F4',
   },
   googleButtonText: {
-    color: THEME.colors.text,
     fontSize: 16,
-    fontWeight: '500',
-    marginLeft: THEME.spacing.sm,
+    fontWeight: '600',
   },
   footer: {
     alignItems: 'center',
+    paddingVertical: 20,
   },
   footerText: {
-    color: THEME.colors.white,
-    fontSize: 14,
-    opacity: 0.9,
+    fontSize: 16,
+    textAlign: 'center',
   },
   linkText: {
     fontWeight: '600',
-    textDecorationLine: 'underline',
   },
 });
 

@@ -10,18 +10,24 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { ArrowLeft, Mail, CheckCircle, Heart } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
-import { THEME } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { lightTheme, darkTheme } from '../../constants/theme';
+
+const { width, height } = Dimensions.get('window');
 
 const ForgotPasswordScreen = () => {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const { isDarkMode } = useTheme();
+  const theme = isDarkMode ? darkTheme : lightTheme;
 
   const { forgotPassword } = useAuth();
 
@@ -57,55 +63,58 @@ const ForgotPasswordScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <LinearGradient
-            colors={[THEME.colors.primary, THEME.colors.secondary]}
-            style={styles.gradient}
-          >
-            <View style={styles.content}>
-              {/* Header */}
-              <TouchableOpacity
-                style={styles.backButton}
-                onPress={handleBackToLogin}
-              >
-                <Ionicons
-                  name="arrow-back"
-                  size={24}
-                  color={THEME.colors.white}
-                />
-              </TouchableOpacity>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header */}
+          <View style={styles.headerSection}>
+            <TouchableOpacity
+              style={[styles.backButton, { backgroundColor: theme.surface }]}
+              onPress={handleBackToLogin}
+            >
+              <ArrowLeft size={24} color={theme.text} />
+            </TouchableOpacity>
 
-              <View style={styles.header}>
-                <Ionicons
-                  name="lock-closed"
-                  size={64}
-                  color={THEME.colors.white}
-                />
-                <Text style={styles.title}>Forgot Password?</Text>
-                <Text style={styles.subtitle}>
-                  {emailSent
-                    ? "We've sent a password reset link to your email"
-                    : "No worries! Enter your email and we'll send you a reset link"}
-                </Text>
-              </View>
+            <LinearGradient
+              colors={[theme.primary, theme.primaryVariant]}
+              style={styles.logoContainer}
+            >
+              <Heart size={32} color="white" fill="white" />
+            </LinearGradient>
+            
+            <Text style={[styles.title, { color: theme.text }]}>
+              Forgot Password?
+            </Text>
+            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+              {emailSent
+                ? "We've sent a password reset link to your email"
+                : "No worries! Enter your email and we'll send you a reset link"}
+            </Text>
+          </View>
 
-              {!emailSent && (
-                <View style={styles.form}>
-                  <View style={styles.inputContainer}>
-                    <Ionicons
-                      name="mail-outline"
-                      size={20}
-                      color={THEME.colors.textSecondary}
-                    />
+          {/* Form Section */}
+          <View style={[styles.formSection, { backgroundColor: theme.surface }]}>
+            {!emailSent ? (
+              <>
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.inputLabel, { color: theme.text }]}>
+                    Email Address
+                  </Text>
+                  <View style={[styles.inputContainer, { 
+                    backgroundColor: theme.background,
+                    borderColor: theme.border 
+                  }]}>
+                    <Mail size={20} color={theme.textSecondary} />
                     <TextInput
-                      style={styles.input}
-                      placeholder="Email"
-                      placeholderTextColor={THEME.colors.textSecondary}
+                      style={[styles.input, { color: theme.text }]}
+                      placeholder="Enter your email"
+                      placeholderTextColor={theme.textSecondary}
                       value={email}
                       onChangeText={setEmail}
                       keyboardType="email-address"
@@ -113,60 +122,66 @@ const ForgotPasswordScreen = () => {
                       autoComplete="email"
                     />
                   </View>
+                </View>
 
-                  <TouchableOpacity
-                    style={[
-                      styles.resetButton,
-                      isLoading && styles.disabledButton,
-                    ]}
-                    onPress={handleForgotPassword}
-                    disabled={isLoading}
+                <TouchableOpacity
+                  style={[styles.resetButton, isLoading && styles.disabledButton]}
+                  onPress={handleForgotPassword}
+                  disabled={isLoading}
+                >
+                  <LinearGradient
+                    colors={[theme.primary, theme.primaryVariant]}
+                    style={styles.buttonGradient}
                   >
                     {isLoading ? (
-                      <ActivityIndicator color={THEME.colors.white} />
+                      <ActivityIndicator color="white" />
                     ) : (
                       <Text style={styles.resetButtonText}>
                         Send Reset Link
                       </Text>
                     )}
-                  </TouchableOpacity>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <View style={styles.successContainer}>
+                <View style={[styles.successIcon, { backgroundColor: theme.success + '20' }]}>
+                  <CheckCircle size={60} color={theme.success} />
                 </View>
-              )}
-
-              {emailSent && (
-                <View style={styles.successContainer}>
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={80}
-                    color={THEME.colors.white}
-                  />
-                  <Text style={styles.successTitle}>Email Sent!</Text>
-                  <Text style={styles.successText}>
-                    Check your inbox and follow the instructions to reset your
-                    password.
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.resetButton}
-                    onPress={() => setEmailSent(false)}
+                <Text style={[styles.successTitle, { color: theme.text }]}>
+                  Email Sent!
+                </Text>
+                <Text style={[styles.successText, { color: theme.textSecondary }]}>
+                  Check your inbox and follow the instructions to reset your password.
+                </Text>
+                <TouchableOpacity
+                  style={styles.resetButton}
+                  onPress={() => setEmailSent(false)}
+                >
+                  <LinearGradient
+                    colors={[theme.primary, theme.primaryVariant]}
+                    style={styles.buttonGradient}
                   >
                     <Text style={styles.resetButtonText}>
                       Send Another Email
                     </Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* Footer */}
-              <View style={styles.footer}>
-                <Text style={styles.footerText}>
-                  Remember your password?{' '}
-                  <Link href="/auth/login" asChild>
-                    <Text style={styles.linkText}>Back to Sign In</Text>
-                  </Link>
-                </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
               </View>
-            </View>
-          </LinearGradient>
+            )}
+          </View>
+
+          {/* Footer */}
+          <View style={styles.footer}>
+            <Text style={[styles.footerText, { color: theme.textSecondary }]}>
+              Remember your password?{' '}
+              <Link href="/auth/login" asChild>
+                <Text style={[styles.linkText, { color: theme.primary }]}>
+                  Back to Sign In
+                </Text>
+              </Link>
+            </Text>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -182,84 +197,104 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
   },
-  gradient: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    padding: THEME.spacing.lg,
-    justifyContent: 'center',
+  headerSection: {
+    alignItems: 'center',
+    marginBottom: 40,
+    paddingTop: 20,
   },
   backButton: {
     position: 'absolute',
-    top: THEME.spacing.lg,
-    left: THEME.spacing.lg,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
+    top: 0,
+    left: 0,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
-    zIndex: 1,
-  },
-  header: {
     alignItems: 'center',
-    marginBottom: THEME.spacing.xl,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  logoContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+    marginTop: 40,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: THEME.colors.white,
-    marginTop: THEME.spacing.lg,
-    marginBottom: THEME.spacing.sm,
+    marginBottom: 12,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
-    color: THEME.colors.white,
-    opacity: 0.9,
     textAlign: 'center',
     lineHeight: 24,
+    paddingHorizontal: 20,
   },
-  form: {
-    width: '100%',
-    marginBottom: THEME.spacing.xl,
+  formSection: {
+    borderRadius: 24,
+    padding: 32,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  inputGroup: {
+    marginBottom: 32,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: THEME.colors.white,
-    borderRadius: THEME.borderRadius.md,
-    paddingHorizontal: THEME.spacing.md,
-    paddingVertical:
-      Platform.OS === 'ios' ? THEME.spacing.md : THEME.spacing.sm,
-    marginBottom: THEME.spacing.lg,
-    shadowColor: THEME.colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1.5,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: Platform.OS === 'ios' ? 16 : 12,
+    gap: 12,
   },
   input: {
     flex: 1,
     fontSize: 16,
-    color: THEME.colors.text,
-    marginLeft: THEME.spacing.sm,
+    minHeight: 24,
   },
   resetButton: {
-    backgroundColor: THEME.colors.white,
-    paddingVertical: THEME.spacing.md,
-    borderRadius: THEME.borderRadius.md,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  buttonGradient: {
+    paddingVertical: 18,
     alignItems: 'center',
-    shadowColor: THEME.colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    justifyContent: 'center',
   },
   resetButtonText: {
-    color: THEME.colors.primary,
-    fontSize: 16,
+    color: 'white',
+    fontSize: 18,
     fontWeight: '600',
   },
   disabledButton: {
@@ -267,34 +302,38 @@ const styles = StyleSheet.create({
   },
   successContainer: {
     alignItems: 'center',
-    marginBottom: THEME.spacing.xl,
+  },
+  successIcon: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
   },
   successTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: THEME.colors.white,
-    marginTop: THEME.spacing.lg,
-    marginBottom: THEME.spacing.sm,
+    marginBottom: 12,
+    textAlign: 'center',
   },
   successText: {
     fontSize: 16,
-    color: THEME.colors.white,
-    opacity: 0.9,
     textAlign: 'center',
     lineHeight: 24,
-    marginBottom: THEME.spacing.xl,
+    marginBottom: 32,
+    paddingHorizontal: 20,
   },
   footer: {
     alignItems: 'center',
+    paddingVertical: 20,
   },
   footerText: {
-    color: THEME.colors.white,
-    fontSize: 14,
-    opacity: 0.9,
+    fontSize: 16,
+    textAlign: 'center',
   },
   linkText: {
     fontWeight: '600',
-    textDecorationLine: 'underline',
   },
 });
 
