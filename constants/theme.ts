@@ -83,3 +83,56 @@ export const darkTheme = {
 };
 
 export type Theme = typeof lightTheme;
+
+// Main THEME constant with spacing and other design tokens
+export const THEME = {
+  colors: {
+    ...lightTheme,
+    white: '#FFFFFF',
+    black: '#000000',
+  },
+  spacing: {
+    xs: 4,
+    sm: 8,
+    md: 16,
+    lg: 24,
+    xl: 32,
+    xxl: 48,
+  },
+  borderRadius: {
+    sm: 4,
+    md: 8,
+    lg: 16,
+    xl: 24,
+  },
+  fonts: {
+    small: 12,
+    regular: 16,
+    medium: 18,
+    large: 24,
+    xlarge: 32,
+  },
+  shadows: {
+    small: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+    medium: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 4,
+    },
+    large: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 8,
+    },
+  },
+} as const;

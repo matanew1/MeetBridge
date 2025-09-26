@@ -1,5 +1,6 @@
 import { User, SearchFilters, Conversation, ChatMessage } from '../store/types';
 import { APP_CONFIG } from '../constants';
+import { User as FirebaseUser } from 'firebase/auth';
 
 // Base API service interface - ready for backend integration
 export interface ApiResponse<T> {
@@ -159,8 +160,9 @@ export interface IAuthService {
     email: string,
     password: string
   ): Promise<ApiResponse<{ user: User; token: string }>>;
+  loginWithGoogle(): Promise<ApiResponse<{ user: User; token: string }>>;
   register(
-    userData: Partial<User>
+    userData: Partial<User> & { email: string; password: string }
   ): Promise<ApiResponse<{ user: User; token: string }>>;
   logout(): Promise<ApiResponse<boolean>>;
   refreshToken(): Promise<ApiResponse<{ token: string }>>;
@@ -170,6 +172,9 @@ export interface IAuthService {
     newPassword: string
   ): Promise<ApiResponse<boolean>>;
   verifyEmail(token: string): Promise<ApiResponse<boolean>>;
+  cleanupOrphanedAuth(
+    firebaseUser: FirebaseUser
+  ): Promise<ApiResponse<boolean>>;
 }
 
 // Storage service for local data persistence

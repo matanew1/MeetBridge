@@ -26,8 +26,19 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
+  GoogleAuthProvider,
+  signInWithCredential,
+  sendPasswordResetEmail,
+  sendEmailVerification,
+  updatePassword,
+  onAuthStateChanged,
+  deleteUser,
   User as FirebaseUser,
 } from 'firebase/auth';
+import * as AuthSession from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
+import * as Crypto from 'expo-crypto';
+import { Platform } from 'react-native';
 import { db, auth, storage } from './config';
 import {
   IUserProfileService,
@@ -625,10 +636,12 @@ export class FirebaseChatService implements IChatService {
   ): Promise<ApiResponse<Conversation[]>> {
     try {
       const pageSize = 20;
+
+      // Temporary solution: Query without orderBy to avoid index requirement
+      // TODO: Remove this workaround after creating the composite index
       const conversationsQuery = query(
         collection(db, 'conversations'),
         where('participants', 'array-contains', userId),
-        orderBy('updatedAt', 'desc'),
         limit(pageSize)
       );
 
@@ -663,6 +676,14 @@ export class FirebaseChatService implements IChatService {
           unreadCount: convData.unreadCount || 0,
         });
       }
+
+      // Sort conversations by updatedAt in descending order (client-side)
+      // TODO: Remove this after creating the composite index
+      conversations.sort((a, b) => {
+        const aTime = a.updatedAt instanceof Date ? a.updatedAt.getTime() : 0;
+        const bTime = b.updatedAt instanceof Date ? b.updatedAt.getTime() : 0;
+        return bTime - aTime;
+      });
 
       return {
         data: conversations,
@@ -877,6 +898,149 @@ export class FirebaseChatService implements IChatService {
 
 // Firebase Auth Service
 export class FirebaseAuthService implements IAuthService {
+  // Configure WebBrowser for better UX on mobile
+  constructor() {
+    WebBrowser.maybeCompleteAuthSession();
+  }
+
+  async loginWithGoogle(): Promise<ApiResponse<{ user: User; token: string }>> {
+    try {
+      // Check if Google Client ID is configured
+      const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
+      if (
+        !googleClientId ||
+        googleClientId === 'your-google-client-id-here.googleusercontent.com'
+      ) {
+        return {
+          success: false,
+          data: null,
+          message:
+            'Google OAuth is not configured. Please set up EXPO_PUBLIC_GOOGLE_CLIENT_ID in your .env file.',
+        };
+      }
+
+      // Generate random state and nonce for security
+      const state = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        Math.random().toString(),
+        { encoding: Crypto.CryptoEncoding.HEX }
+      );
+
+      const nonce = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        Math.random().toString(),
+        { encoding: Crypto.CryptoEncoding.HEX }
+      );
+
+      // Create Google OAuth request with proper configuration for web
+      let redirectUri;
+      if (Platform.OS === 'web') {
+        // For web development, use current host and port with auth path
+        const port =
+          window.location.port ||
+          (window.location.protocol === 'https:' ? '443' : '80');
+        redirectUri = `${window.location.protocol}//${window.location.hostname}:${port}/auth`;
+      } else {
+        // For mobile, explicitly use Expo's auth.expo.io proxy to get HTTPS URL
+        redirectUri = 'https://auth.expo.io/@anonymous/meetbridge';
+      }
+
+      // Debug: Log the redirect URI being used
+      console.log('🔥 Google OAuth Redirect URI:', redirectUri);
+      console.log('🔥 Google OAuth Nonce:', nonce);
+
+      const request = new AuthSession.AuthRequest({
+        clientId: googleClientId,
+        scopes: ['openid', 'profile', 'email'],
+        responseType: AuthSession.ResponseType.IdToken,
+        redirectUri,
+        state,
+        extraParams: {
+          nonce, // Pass nonce in extraParams
+        },
+        additionalParameters: {
+          nonce, // Also pass in additionalParameters for compatibility
+        },
+        usePKCE: false, // Disable PKCE for Google OAuth
+      });
+
+      const discovery = {
+        authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+        tokenEndpoint: 'https://www.googleapis.com/oauth2/v4/token',
+        revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
+      };
+
+      const result = await request.promptAsync(discovery);
+
+      if (result.type === 'success') {
+        const { id_token } = result.params;
+
+        // Create Firebase credential with Google ID token
+        const credential = GoogleAuthProvider.credential(id_token);
+        const userCredential = await signInWithCredential(auth, credential);
+        const firebaseUser = userCredential.user;
+
+        // Check if user profile exists in Firestore
+        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+        let userData: User;
+
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          userData = {
+            id: userDoc.id,
+            ...data,
+            lastSeen: convertTimestamp(data.lastSeen),
+          } as User;
+        } else {
+          // Create new user profile from Google data
+          userData = {
+            id: firebaseUser.uid,
+            name: firebaseUser.displayName || 'Unknown User',
+            age: 25,
+            image: firebaseUser.photoURL || '',
+            gender: 'other' as const,
+            bio: '',
+            interests: [],
+            location: '',
+            preferences: {
+              ageRange: [20, 35] as [number, number],
+              maxDistance: 50,
+              interestedIn: 'both' as const,
+            },
+          };
+
+          await setDoc(doc(db, 'users', firebaseUser.uid), {
+            ...userData,
+            email: firebaseUser.email,
+            createdAt: serverTimestamp(),
+            lastSeen: serverTimestamp(),
+          });
+        }
+
+        const token = await firebaseUser.getIdToken();
+
+        return {
+          data: { user: userData, token },
+          success: true,
+          message: 'Google login successful',
+        };
+      } else {
+        return {
+          data: { user: {} as User, token: '' },
+          success: false,
+          message: 'Google login was cancelled or failed',
+        };
+      }
+    } catch (error) {
+      console.error('Error during Google login:', error);
+      return {
+        data: { user: {} as User, token: '' },
+        success: false,
+        message: error instanceof Error ? error.message : 'Google login failed',
+      };
+    }
+  }
+
   async login(
     email: string,
     password: string
@@ -900,20 +1064,36 @@ export class FirebaseAuthService implements IAuthService {
           ...data,
           lastSeen: convertTimestamp(data.lastSeen),
         } as User;
+
+        // Update last seen
+        await updateDoc(doc(db, 'users', firebaseUser.uid), {
+          lastSeen: serverTimestamp(),
+          isOnline: true,
+        });
       } else {
         // Create basic user profile if it doesn't exist
         userData = {
           id: firebaseUser.uid,
           name: firebaseUser.displayName || 'Unknown User',
-          age: 18,
+          age: 25,
           image: firebaseUser.photoURL || '',
-          gender: 'other',
+          gender: 'other' as const,
+          bio: '',
+          interests: [],
+          location: '',
+          preferences: {
+            ageRange: [20, 35] as [number, number],
+            maxDistance: 50,
+            interestedIn: 'both' as const,
+          },
         };
 
         await setDoc(doc(db, 'users', firebaseUser.uid), {
           ...userData,
+          email: firebaseUser.email,
           createdAt: serverTimestamp(),
           lastSeen: serverTimestamp(),
+          isOnline: true,
         });
       }
 
@@ -926,10 +1106,31 @@ export class FirebaseAuthService implements IAuthService {
       };
     } catch (error) {
       console.error('Error during login:', error);
+      let errorMessage = 'Login failed';
+
+      if (error instanceof Error) {
+        switch (error.message) {
+          case 'auth/user-not-found':
+            errorMessage = 'No account found with this email';
+            break;
+          case 'auth/wrong-password':
+            errorMessage = 'Incorrect password';
+            break;
+          case 'auth/invalid-email':
+            errorMessage = 'Invalid email address';
+            break;
+          case 'auth/too-many-requests':
+            errorMessage = 'Too many failed attempts. Please try again later';
+            break;
+          default:
+            errorMessage = error.message;
+        }
+      }
+
       return {
         data: { user: {} as User, token: '' },
         success: false,
-        message: error instanceof Error ? error.message : 'Login failed',
+        message: errorMessage,
       };
     }
   }
@@ -950,13 +1151,17 @@ export class FirebaseAuthService implements IAuthService {
       const newUser: User = {
         id: firebaseUser.uid,
         name: profileData.name || 'Unknown User',
-        age: profileData.age || 18,
+        age: profileData.age || 25,
         image: profileData.image || '',
         gender: profileData.gender || 'other',
         bio: profileData.bio || '',
         interests: profileData.interests || [],
         location: profileData.location || '',
-        preferences: profileData.preferences,
+        preferences: profileData.preferences || {
+          ageRange: [20, 35] as [number, number],
+          maxDistance: 50,
+          interestedIn: 'both' as const,
+        },
       };
 
       await setDoc(doc(db, 'users', firebaseUser.uid), {
@@ -964,27 +1169,68 @@ export class FirebaseAuthService implements IAuthService {
         email,
         createdAt: serverTimestamp(),
         lastSeen: serverTimestamp(),
+        isOnline: true,
       });
+
+      // Send email verification
+      try {
+        await sendEmailVerification(firebaseUser);
+      } catch (emailError) {
+        console.warn('Failed to send email verification:', emailError);
+      }
 
       const token = await firebaseUser.getIdToken();
 
       return {
         data: { user: newUser, token },
         success: true,
-        message: 'Registration successful',
+        message:
+          'Registration successful. Please check your email to verify your account.',
       };
     } catch (error) {
       console.error('Error during registration:', error);
+      let errorMessage = 'Registration failed';
+
+      if (error instanceof Error) {
+        switch (error.message) {
+          case 'auth/email-already-in-use':
+            errorMessage = 'An account with this email already exists';
+            break;
+          case 'auth/weak-password':
+            errorMessage = 'Password should be at least 6 characters';
+            break;
+          case 'auth/invalid-email':
+            errorMessage = 'Invalid email address';
+            break;
+          default:
+            errorMessage = error.message;
+        }
+      }
+
       return {
         data: { user: {} as User, token: '' },
         success: false,
-        message: error instanceof Error ? error.message : 'Registration failed',
+        message: errorMessage,
       };
     }
   }
 
   async logout(): Promise<ApiResponse<boolean>> {
     try {
+      const user = auth.currentUser;
+
+      // Update user's online status before logging out
+      if (user) {
+        try {
+          await updateDoc(doc(db, 'users', user.uid), {
+            lastSeen: serverTimestamp(),
+            isOnline: false,
+          });
+        } catch (updateError) {
+          console.warn('Failed to update user status on logout:', updateError);
+        }
+      }
+
       await signOut(auth);
       return {
         data: true,
@@ -1028,22 +1274,34 @@ export class FirebaseAuthService implements IAuthService {
 
   async forgotPassword(email: string): Promise<ApiResponse<boolean>> {
     try {
-      // Firebase auth provides this functionality
-      // For now, we'll simulate it
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await sendPasswordResetEmail(auth, email);
 
       return {
         data: true,
         success: true,
-        message: 'Password reset email sent',
+        message: 'Password reset email sent. Please check your inbox.',
       };
     } catch (error) {
       console.error('Error sending reset email:', error);
+      let errorMessage = 'Failed to send reset email';
+
+      if (error instanceof Error) {
+        switch (error.message) {
+          case 'auth/user-not-found':
+            errorMessage = 'No account found with this email address';
+            break;
+          case 'auth/invalid-email':
+            errorMessage = 'Invalid email address';
+            break;
+          default:
+            errorMessage = error.message;
+        }
+      }
+
       return {
         data: false,
         success: false,
-        message:
-          error instanceof Error ? error.message : 'Failed to send reset email',
+        message: errorMessage,
       };
     }
   }
@@ -1053,22 +1311,40 @@ export class FirebaseAuthService implements IAuthService {
     newPassword: string
   ): Promise<ApiResponse<boolean>> {
     try {
-      // Firebase auth provides this functionality
-      // For now, we'll simulate it
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error('No user logged in');
+      }
+
+      await updatePassword(user, newPassword);
 
       return {
         data: true,
         success: true,
-        message: 'Password reset successful',
+        message: 'Password updated successfully',
       };
     } catch (error) {
       console.error('Error resetting password:', error);
+      let errorMessage = 'Failed to reset password';
+
+      if (error instanceof Error) {
+        switch (error.message) {
+          case 'auth/requires-recent-login':
+            errorMessage =
+              'Please log out and log back in before changing your password';
+            break;
+          case 'auth/weak-password':
+            errorMessage = 'Password should be at least 6 characters';
+            break;
+          default:
+            errorMessage = error.message;
+        }
+      }
+
       return {
         data: false,
         success: false,
-        message:
-          error instanceof Error ? error.message : 'Failed to reset password',
+        message: errorMessage,
       };
     }
   }
@@ -1091,6 +1367,79 @@ export class FirebaseAuthService implements IAuthService {
         success: false,
         message:
           error instanceof Error ? error.message : 'Failed to verify email',
+      };
+    }
+  }
+
+  /**
+   * Check if user exists in Firestore and clean up orphaned auth records
+   * This method should be called when a user is authenticated but their profile doesn't exist in Firestore
+   */
+  async cleanupOrphanedAuth(
+    firebaseUser: FirebaseUser
+  ): Promise<ApiResponse<boolean>> {
+    try {
+      console.log(
+        '🧹 Checking for orphaned auth record for user:',
+        firebaseUser.uid
+      );
+
+      // Check if user document exists in Firestore
+      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+
+      if (!userDoc.exists()) {
+        console.log(
+          '⚠️ User exists in Auth but not in Firestore. Cleaning up...'
+        );
+
+        try {
+          // Delete the user from Firebase Auth
+          await deleteUser(firebaseUser);
+          console.log('✅ Orphaned auth record deleted successfully');
+
+          return {
+            data: true,
+            success: true,
+            message:
+              'Orphaned authentication record has been cleaned up. Please register again.',
+          };
+        } catch (deleteError) {
+          console.error(
+            '❌ Failed to delete orphaned auth record:',
+            deleteError
+          );
+
+          // If we can't delete the auth record, at least sign them out
+          await signOut(auth);
+
+          return {
+            data: false,
+            success: false,
+            message: 'Authentication mismatch detected. Please log in again.',
+          };
+        }
+      }
+
+      // User exists in both Auth and Firestore, all good
+      return {
+        data: true,
+        success: true,
+        message: 'User authentication is valid',
+      };
+    } catch (error) {
+      console.error('Error during orphaned auth cleanup:', error);
+
+      // On any error, sign out the user for security
+      try {
+        await signOut(auth);
+      } catch (signOutError) {
+        console.error('Failed to sign out during cleanup:', signOutError);
+      }
+
+      return {
+        data: false,
+        success: false,
+        message: 'Authentication error. Please log in again.',
       };
     }
   }
