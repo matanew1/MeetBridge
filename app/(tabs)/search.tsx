@@ -166,7 +166,7 @@ export default function SearchScreen() {
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [matchedUser, setMatchedUser] = useState<any>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [maxDistance, setMaxDistance] = useState(50);
+  const [maxDistance, setMaxDistance] = useState(5);
 
   // Local state to track cards being animated out
   const [animatingOutCards, setAnimatingOutCards] = useState<Set<string>>(
@@ -210,11 +210,24 @@ export default function SearchScreen() {
   // Animation values
   const pulseAnimation = useSharedValue(0);
 
+  const updateUserPreferences = () => {
+    // Update search filters based on user preferences
+    if (currentUser) {
+      setMaxDistance(currentUser.preferences.maxDistance || 5);
+      updateSearchFilters({
+        gender: currentUser.gender,
+        ageRange: currentUser.ageRange,
+        location: currentUser.location,
+      });
+    }
+  };
+
   useEffect(() => {
     // Load current user and discover profiles on component mount
     loadCurrentUser(); // Ensure we have a current user for like/dislike functionality
     loadConversations(); // Load existing conversations
     loadDiscoverProfiles(true);
+    updateUserPreferences();
 
     // Small delay to ensure profiles are loaded before starting animation
     setTimeout(() => {
