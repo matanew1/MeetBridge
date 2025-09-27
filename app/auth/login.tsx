@@ -30,7 +30,7 @@ const LoginScreen = () => {
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
 
-  const { login, loginWithGoogle } = useAuth();
+  const { login } = useAuth();
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -48,22 +48,6 @@ const LoginScreen = () => {
       }
     } catch (error) {
       Alert.alert('Error', 'An unexpected error occurred');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    setIsLoading(true);
-    try {
-      const result = await loginWithGoogle();
-      if (result.success) {
-        router.replace('/search');
-      } else {
-        Alert.alert('Google Login Failed', result.message);
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Google login failed');
     } finally {
       setIsLoading(false);
     }
@@ -181,30 +165,6 @@ const LoginScreen = () => {
                   <Text style={styles.signInButtonText}>Sign In</Text>
                 )}
               </LinearGradient>
-            </TouchableOpacity>
-
-            {/* Divider */}
-            <View style={styles.divider}>
-              <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
-              <Text style={[styles.dividerText, { color: theme.textSecondary }]}>
-                or continue with
-              </Text>
-              <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
-            </View>
-
-            {/* Google Sign In */}
-            <TouchableOpacity
-              style={[styles.googleButton, { 
-                backgroundColor: theme.background,
-                borderColor: theme.border 
-              }]}
-              onPress={handleGoogleLogin}
-              disabled={isLoading}
-            >
-              <Text style={styles.googleIcon}>G</Text>
-              <Text style={[styles.googleButtonText, { color: theme.text }]}>
-                Continue with Google
-              </Text>
             </TouchableOpacity>
           </View>
 
@@ -351,24 +311,6 @@ const styles = StyleSheet.create({
   dividerText: {
     fontSize: 14,
     fontWeight: '500',
-  },
-  googleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderRadius: 16,
-    paddingVertical: 16,
-    gap: 12,
-  },
-  googleIcon: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#4285F4',
-  },
-  googleButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
   },
   footer: {
     alignItems: 'center',
