@@ -122,74 +122,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               console.warn('Failed to update user online status:', updateError);
             }
           } else {
-            // User exists in Auth but not in Firestore - this could be:
-            // 1. A race condition during Google OAuth signup (document creation in progress)
-            // 2. A genuinely orphaned auth record
             console.warn(
               '⚠️ User exists in Firebase Auth but not in Firestore database'
             );
-
-            // Wait a moment to allow for document creation during OAuth signup
-            console.log('⏳ Waiting for potential user document creation...');
-            setTimeout(async () => {
-              // Check again after a short delay
-              try {
-                const retryUserDoc = await getDoc(
-                  doc(db, 'users', firebaseUser.uid)
-                );
-
-                if (retryUserDoc.exists()) {
-                  // Document was created during OAuth signup, load the user
-                  console.log(
-                    '✅ User document found after delay - loading user'
-                  );
-                  const userData = retryUserDoc.data();
-                  const fullUser: User = {
-                    id: retryUserDoc.id,
-                    ...userData,
-                    lastSeen: convertTimestamp(userData.lastSeen),
-                  } as User;
-
-                  setUser(fullUser);
-
-                  // Update user's online status
-                  try {
-                    await updateDoc(doc(db, 'users', firebaseUser.uid), {
-                      lastSeen: serverTimestamp(),
-                      isOnline: true,
-                    });
-                  } catch (updateError) {
-                    console.warn(
-                      'Failed to update user online status:',
-                      updateError
-                    );
-                  }
-                } else {
-                  // Still no document - this is a genuine orphaned auth record
-                  console.log(
-                    '🔄 Signing out user to maintain data consistency'
-                  );
-                  try {
-                    await signOut(auth);
-                    setFirebaseUser(null);
-                    setUser(null);
-                  } catch (signOutError) {
-                    console.error(
-                      'Error signing out orphaned user:',
-                      signOutError
-                    );
-                    // Fallback: just clear local state
-                    setFirebaseUser(null);
-                    setUser(null);
-                  }
-                }
-              } catch (retryError) {
-                console.error('Error during retry check:', retryError);
-                // On error, sign out for safety
-                setFirebaseUser(null);
-                setUser(null);
-              }
-            }, 2000); // Wait 2 seconds for document creation
+            setUser(null);
           }
         } catch (error) {
           console.error('Error loading user profile:', error);
@@ -221,16 +157,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     };
 
-    // Handle app state changes for both web and mobile
     let subscription: any = null;
 
     if (Platform.OS === 'web') {
-      // Web platform - use window events
       if (typeof window !== 'undefined') {
         window.addEventListener('beforeunload', handleAppStateChange);
       }
     } else {
-      // Mobile platform - use AppState
       subscription = AppState.addEventListener(
         'change',
         (nextAppState: AppStateStatus) => {
@@ -247,7 +180,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } else if (subscription) {
         subscription.remove();
       }
-      handleAppStateChange(); // Update offline status when component unmounts
+      handleAppStateChange();
     };
   }, [firebaseUser, user]);
 
@@ -313,7 +246,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async () => {
     try {
-      // Update offline status before logging out
       if (firebaseUser) {
         try {
           await updateDoc(doc(db, 'users', firebaseUser.uid), {
@@ -390,7 +322,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await services.auth.cleanupOrphanedAuth(firebaseUser);
 
       if (response.success) {
-        // If cleanup was successful, the user was signed out
         setUser(null);
         setFirebaseUser(null);
       }
@@ -410,6 +341,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // ✅ PATCHED
   const updateProfile = async (userData: Partial<User>) => {
     try {
       if (!firebaseUser) {
@@ -419,22 +351,43 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         };
       }
 
-      // Update user document in Firestore
+      const dataToSave: Record<string, any> = { ...userData };
+
+      // Upload image if it's local
+      if (
+        typeof dataToSave.image === 'string' &&
+        (dataToSave.image.startsWith('file://') ||
+          dataToSave.image.startsWith('content://') ||
+          dataToSave.image.startsWith('/'))
+      ) {
+        if (!services.storage?.uploadImage) {
+          return { success: false, message: 'Image upload service not available' };
+        }
+        const resp = await services.storage.uploadImage(dataToSave.image);
+        if (resp?.success && (resp.secureUrl || resp.url)) {
+          dataToSave.image = resp.secureUrl || resp.url;
+        } else {
+          return { success: false, message: resp?.message || 'Image upload failed' };
+        }
+      }
+
+      // Remove undefined fields
+      const sanitized: Record<string, any> = {};
+      Object.entries(dataToSave).forEach(([k, v]) => {
+        if (v !== undefined) sanitized[k] = v;
+      });
+
       const userRef = doc(db, 'users', firebaseUser.uid);
       await updateDoc(userRef, {
-        ...userData,
+        ...sanitized,
         updatedAt: serverTimestamp(),
       });
 
-      // Update local user state
       if (user) {
-        setUser((prev) => ({ ...prev!, ...userData }));
+        setUser((prev) => ({ ...prev!, ...sanitized }));
       }
 
-      return {
-        success: true,
-        message: 'Profile updated successfully',
-      };
+      return { success: true, message: 'Profile updated successfully' };
     } catch (error) {
       console.error('Update profile error:', error);
       return {
@@ -448,26 +401,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const updateLocationLive = async () => {
     try {
       if (!firebaseUser) {
-        return {
-          success: false,
-          message: 'No user currently authenticated',
-        };
+        return { success: false, message: 'No user authenticated' };
       }
 
-      // Get current location using LocationService
       const locationData = await LocationService.updateUserLocation();
-
       if (!locationData) {
-        return {
-          success: false,
-          message:
-            'Could not get current location. Please check your location permissions.',
-        };
+        return { success: false, message: 'Could not get current location' };
       }
 
       const { coordinates, address } = locationData;
-
-      // Update user document in Firestore with coordinates and address
       const userRef = doc(db, 'users', firebaseUser.uid);
       await updateDoc(userRef, {
         location: address,
@@ -479,7 +421,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         updatedAt: serverTimestamp(),
       });
 
-      // Update local user state
       if (user) {
         setUser((prev) => ({
           ...prev!,
@@ -492,18 +433,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }));
       }
 
-      return {
-        success: true,
-        message: 'Location updated successfully',
-        location: address,
-      };
+      return { success: true, message: 'Location updated successfully', location: address };
     } catch (error) {
       console.error('Update location error:', error);
-      return {
-        success: false,
-        message:
-          error instanceof Error ? error.message : 'Failed to update location',
-      };
+      return { success: false, message: 'Failed to update location' };
     }
   };
 

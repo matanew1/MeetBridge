@@ -6,6 +6,7 @@ import {
   getReactNativePersistence,
   browserLocalPersistence,
   browserSessionPersistence,
+  Auth,
 } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 import { Platform } from 'react-native';
@@ -29,15 +30,25 @@ const app =
 export const db = getFirestore(app);
 
 // Initialize auth with platform-appropriate persistence
-let auth;
+let auth: Auth;
 if (Platform.OS === 'web') {
   // For web, use getAuth() which automatically uses browser persistence
   auth = getAuth(app);
 } else {
   // For React Native, use initializeAuth with AsyncStorage persistence
-  auth = initializeAuth(app, {
-    persistence: getReactNativePersistence(AsyncStorage),
-  });
+  // Handle case where auth might already be initialized (e.g., during hot reload)
+  try {
+    auth = initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage),
+    });
+  } catch (error: any) {
+    // If auth is already initialized, get the existing instance
+    if (error.code === 'auth/already-initialized') {
+      auth = getAuth(app);
+    } else {
+      throw error;
+    }
+  }
 }
 
 export { auth };

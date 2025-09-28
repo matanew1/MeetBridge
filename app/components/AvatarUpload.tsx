@@ -49,7 +49,7 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({
 
     try {
       setIsUploading(true);
-      
+
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -83,7 +83,7 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({
 
     try {
       setIsUploading(true);
-      
+
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
         aspect: [1, 1],
