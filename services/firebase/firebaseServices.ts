@@ -260,20 +260,28 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
 
       snapshot.forEach((doc) => {
         const data = doc.data();
+        // Add mock location data with distance calculation
+        const mockDistance = this.generateMockDistance();
         profiles.push({
           id: doc.id,
           ...data,
           lastSeen: convertTimestamp(data.lastSeen),
+          distance: mockDistance,
+          coordinates: this.generateMockCoordinates(),
         } as User);
       });
 
-      // Filter by age and other criteria in client-side (for simplicity)
+      // Filter by age, distance and other criteria
       const filteredProfiles = profiles.filter((profile) => {
         return (
           profile.age >= filters.ageRange[0] &&
-          profile.age <= filters.ageRange[1]
+          profile.age <= filters.ageRange[1] &&
+          (profile.distance || 0) <= filters.maxDistance
         );
       });
+
+      // Sort by distance (closest first)
+      filteredProfiles.sort((a, b) => (a.distance || 0) - (b.distance || 0));
 
       return {
         data: filteredProfiles,
@@ -297,11 +305,45 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
     }
   }
 
+  private generateMockDistance(): number {
+    // Generate random distance between 10m and 5000m
+    const distances = [10, 25, 50, 100, 200, 500, 1000, 2000, 5000];
+    return distances[Math.floor(Math.random() * distances.length)];
+  }
+
+  private generateMockCoordinates() {
+    // Generate mock coordinates around a central point
+    const baseLat = 32.0853; // Tel Aviv coordinates
+    const baseLng = 34.7818;
+    
+    return {
+      latitude: baseLat + (Math.random() - 0.5) * 0.1,
+      longitude: baseLng + (Math.random() - 0.5) * 0.1,
+      lastUpdated: new Date(),
+    };
+  }
+
   async likeProfile(
     userId: string,
     targetUserId: string
   ): Promise<ApiResponse<boolean>> {
     try {
+      // Check if user already liked this profile
+      const existingLikeQuery = query(
+        collection(db, 'likes'),
+        where('userId', '==', userId),
+        where('targetUserId', '==', targetUserId)
+      );
+      const existingLikeSnapshot = await getDocs(existingLikeQuery);
+      
+      if (!existingLikeSnapshot.empty) {
+        return {
+          data: false,
+          success: true,
+          message: 'Profile already liked',
+        };
+      }
+
       const likeData = {
         userId,
         targetUserId,
@@ -322,16 +364,49 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
       const matchSnapshot = await getDocs(matchQuery);
 
       if (!matchSnapshot.empty) {
-        // Create match record
-        const matchData = {
-          users: [userId, targetUserId],
-          createdAt: serverTimestamp(),
-        };
-        await addDoc(collection(db, 'matches'), matchData);
+        // Check if match already exists
+        const existingMatchQuery = query(
+          collection(db, 'matches'),
+          where('users', 'array-contains-any', [userId, targetUserId])
+        );
+        const existingMatchSnapshot = await getDocs(existingMatchQuery);
+        
+        let isNewMatch = true;
+        for (const matchDoc of existingMatchSnapshot.docs) {
+          const matchData = matchDoc.data();
+          if (matchData.users.includes(userId) && matchData.users.includes(targetUserId)) {
+            isNewMatch = false;
+            break;
+          }
+        }
+
+        if (isNewMatch) {
+          // Create match record
+          const matchData = {
+            users: [userId, targetUserId],
+            createdAt: serverTimestamp(),
+          };
+          await addDoc(collection(db, 'matches'), matchData);
+
+          // Create conversation for the match
+          const conversationData = {
+            participants: [userId, targetUserId],
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            unreadCount: 0,
+          };
+          await addDoc(collection(db, 'conversations'), conversationData);
+
+          return {
+            data: true,
+            success: true,
+            message: 'Match created successfully',
+          };
+        }
       }
 
       return {
-        data: true,
+        data: false,
         success: true,
         message: 'Profile liked successfully',
       };

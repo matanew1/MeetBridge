@@ -29,6 +29,7 @@ import { lightTheme, darkTheme } from '../../constants/theme';
 import { User } from '../../store/types';
 import { LinearGradient } from 'expo-linear-gradient';
 import LocationSelector from './LocationSelector';
+import AvatarUpload from './AvatarUpload';
 
 interface EditProfileModalProps {
   visible: boolean;
@@ -54,6 +55,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     coordinates: user?.coordinates || undefined,
     age: user?.age?.toString() || '',
     gender: user?.gender || 'other',
+    image: user?.image || '',
     interests: user?.interests ? [...user.interests] : [],
     preferences: user?.preferences || {
       ageRange: [18, 35] as [number, number],
@@ -82,6 +84,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       coordinates: formData.coordinates,
       age: Number(formData.age),
       gender: formData.gender as 'male' | 'female' | 'other',
+      image: formData.image,
       interests: formData.interests,
       preferences: formData.preferences,
     };
@@ -108,6 +111,10 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       ...prev,
       interests: prev.interests.filter((i) => i !== interest),
     }));
+  };
+
+  const handleImageSelected = (imageUri: string) => {
+    setFormData((prev) => ({ ...prev, image: imageUri }));
   };
 
   return (
@@ -151,24 +158,12 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           {/* Profile Picture Section */}
           <View style={styles.profileSection}>
-            <TouchableOpacity style={styles.profileImageContainer}>
-              <Image
-                source={{
-                  uri:
-                    user?.image ||
-                    'https://images.pexels.com/photos/1043474/pexels-photo-1043474.jpeg?auto=compress&cs=tinysrgb&w=300',
-                }}
-                style={styles.profileImage}
-              />
-              <View
-                style={[styles.cameraIcon, { backgroundColor: theme.primary }]}
-              >
-                <Camera size={16} color="white" />
-              </View>
-            </TouchableOpacity>
-            <Text style={[styles.changePhotoText, { color: theme.primary }]}>
-              Change Photo
-            </Text>
+            <AvatarUpload
+              currentImage={formData.image}
+              onImageSelected={handleImageSelected}
+              size={120}
+              showUploadButton={true}
+            />
           </View>
 
           {/* Basic Information */}

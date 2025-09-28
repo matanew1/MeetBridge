@@ -327,32 +327,20 @@ export const useUserStore = create<UserState>((set, get) => ({
           discoverProfiles: state.discoverProfiles.filter(
             (profile) => profile.id !== profileId
           ),
-          ...(response.data && {
+        }));
+
+        // If it's a match, update matched profiles and reload conversations
+        if (response.data) {
+          console.log('🎉 Match detected!');
+          set((state) => ({
             matchedProfiles: [...state.matchedProfiles, profileId],
             matchedProfilesData: userProfile
               ? [...state.matchedProfilesData, userProfile]
               : state.matchedProfilesData,
-          }),
-        }));
-
-        // If it's a match, create a conversation
-        if (response.data && userProfile) {
-          console.log('🔴 Match detected! Creating conversation...');
-          // Check if conversation already exists
-          const existingConversation = get().conversations.find((conv) =>
-            conv.participants.includes(profileId)
-          );
-
-          if (!existingConversation) {
-            console.log('🔴 Creating new conversation for match');
-            // Use the createConversation method instead
-            await get().createConversation(profileId);
-          } else {
-            console.log(
-              '🔴 Conversation already exists:',
-              existingConversation.id
-            );
-          }
+          }));
+          
+          // Reload conversations to get the newly created one
+          await get().loadConversations();
         }
 
         return response.data; // Returns true if it's a match

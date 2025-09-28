@@ -21,7 +21,15 @@ interface FilterModalProps {
   onDistanceChange: (distance: number) => void;
 }
 
-const DISTANCE_OPTIONS = [5, 10, 25, 50, 100, 200, 500];
+const DISTANCE_OPTIONS = [
+  { value: 50, label: '50m' },
+  { value: 100, label: '100m' },
+  { value: 200, label: '200m' },
+  { value: 500, label: '500m' },
+  { value: 1000, label: '1km' },
+  { value: 2000, label: '2km' },
+  { value: 5000, label: '5km' },
+];
 
 const FilterModal: React.FC<FilterModalProps> = React.memo(
   ({ visible, onClose, currentDistance, onDistanceChange }) => {
@@ -69,23 +77,23 @@ const FilterModal: React.FC<FilterModalProps> = React.memo(
 
             {/* Distance Options */}
             <View style={styles.optionsContainer}>
-              {DISTANCE_OPTIONS.map((distance) => (
+              {DISTANCE_OPTIONS.map((option) => (
                 <TouchableOpacity
-                  key={distance}
+                  key={option.value}
                   style={[
                     styles.optionItem,
                     {
                       backgroundColor:
-                        currentDistance === distance
+                        currentDistance === option.value
                           ? theme.primaryVariant
                           : theme.background,
                       borderColor:
-                        currentDistance === distance
+                        currentDistance === option.value
                           ? theme.primary
                           : theme.border,
                     },
                   ]}
-                  onPress={() => handleDistanceSelect(distance)}
+                  onPress={() => handleDistanceSelect(option.value)}
                   activeOpacity={0.7}
                 >
                   <View style={styles.optionContent}>
@@ -94,17 +102,17 @@ const FilterModal: React.FC<FilterModalProps> = React.memo(
                         styles.optionText,
                         {
                           color:
-                            currentDistance === distance
+                            currentDistance === option.value
                               ? theme.primary
                               : theme.text,
                           fontWeight:
-                            currentDistance === distance ? '600' : '400',
+                            currentDistance === option.value ? '600' : '400',
                         },
                       ]}
                     >
-                      {t('filter.upTo')} {distance} {t('filter.meters')}
+                      Up to {option.label}
                     </Text>
-                    {currentDistance === distance && (
+                    {currentDistance === option.value && (
                       <Check size={20} color={theme.primary} />
                     )}
                   </View>

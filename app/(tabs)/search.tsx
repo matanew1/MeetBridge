@@ -136,8 +136,7 @@ const ProfileCard = ({
       {user.distance && (
         <View style={styles.distanceContainer}>
           <Text style={styles.distanceText}>
-            {user.distance}
-            {t('search.distance')}
+            {user.distance}m
           </Text>
         </View>
       )}
@@ -195,9 +194,9 @@ export default function SearchScreen() {
   } = useUserStore();
 
   // Sort profiles by distance
-  const sortedDiscoverProfiles = [...discoverProfiles]
-    .filter((profile) => !profile.distance || profile.distance <= maxDistance)
-    .sort((a, b) => (a.distance || 0) - (b.distance || 0));
+  const sortedDiscoverProfiles = [...discoverProfiles].sort(
+    (a, b) => (a.distance || 0) - (b.distance || 0)
+  );
 
   // Animation values
   const pulseAnimation = useSharedValue(0);
