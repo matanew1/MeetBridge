@@ -10,14 +10,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import {
-  Heart,
-  Check,
-  ShoppingCart,
-  X,
-  Filter,
-  RefreshCw,
-} from 'lucide-react-native';
+import { Heart, X, Filter, RefreshCw } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import Animated, {
@@ -25,7 +18,6 @@ import Animated, {
   useAnimatedStyle,
   withRepeat,
   withTiming,
-  withSequence,
   interpolate,
   Easing,
 } from 'react-native-reanimated';
@@ -213,11 +205,12 @@ export default function SearchScreen() {
   const updateUserPreferences = () => {
     // Update search filters based on user preferences
     if (currentUser) {
-      setMaxDistance(currentUser.preferences.maxDistance || 5);
+      setMaxDistance(currentUser.preferences.maxDistance);
       updateSearchFilters({
         gender: currentUser.gender,
         ageRange: currentUser.ageRange,
         location: currentUser.location,
+        maxDistance: currentUser.preferences.maxDistance,
       });
     }
   };
@@ -227,7 +220,6 @@ export default function SearchScreen() {
     loadCurrentUser(); // Ensure we have a current user for like/dislike functionality
     loadConversations(); // Load existing conversations
     loadDiscoverProfiles(true);
-    updateUserPreferences();
 
     // Small delay to ensure profiles are loaded before starting animation
     setTimeout(() => {
@@ -238,11 +230,12 @@ export default function SearchScreen() {
 
   // Handle when isSearching changes (from button trigger or auto-trigger)
   useEffect(() => {
+    updateUserPreferences();
     if (!isSearching && showAnimation) {
       // Animation ended via trigger
       setShowAnimation(false);
     }
-  }, [isSearching]);
+  }, [isSearching, currentUser]);
 
   useEffect(() => {
     // Strong, noticeable infinite pulse animation
@@ -255,12 +248,6 @@ export default function SearchScreen() {
       true // reverse=true creates seamless back-and-forth motion
     );
   }, []);
-
-  // Handle gender selection
-  const handleGenderChange = (gender: 'male' | 'female') => {
-    updateSearchFilters({ gender });
-    startSearch(); // Start new search with updated filters
-  };
 
   const handleLike = (profileId: string) => {
     console.log('handleLike called for profile:', profileId);
@@ -327,12 +314,6 @@ export default function SearchScreen() {
     setSelectedProfile(null);
   };
 
-  const handleMessage = (profileId: string) => {
-    // TODO: Navigate to chat with this profile
-    console.log('Message profile:', profileId);
-    handleCloseProfile();
-  };
-
   const handleUnmatch = (profileId: string) => {
     console.log('handleUnmatch called with profileId:', profileId);
 
@@ -379,7 +360,6 @@ export default function SearchScreen() {
   const handleDistanceChange = (distance: number) => {
     setMaxDistance(distance);
     updateSearchFilters({ maxDistance: distance });
-    // Refresh profiles with new filter
     loadDiscoverProfiles(true);
   };
 

@@ -61,136 +61,7 @@ class AsyncStorageService {
   }
 }
 
-// Location service implementation
-class LocationService {
-  async getCurrentLocation(): Promise<{
-    data: { latitude: number; longitude: number };
-    success: boolean;
-    message?: string;
-  }> {
-    try {
-      // This would use expo-location in a real implementation
-      // For now, we'll return a default location
-      return {
-        data: { latitude: 40.7128, longitude: -74.006 }, // NYC
-        success: true,
-        message: 'Location retrieved successfully',
-      };
-    } catch (error) {
-      return {
-        data: { latitude: 0, longitude: 0 },
-        success: false,
-        message: 'Failed to get location',
-      };
-    }
-  }
-
-  async updateLocation(
-    userId: string,
-    location: { latitude: number; longitude: number }
-  ): Promise<{ data: boolean; success: boolean; message?: string }> {
-    try {
-      // Update user's location in Firebase
-      // This would be implemented with the user profile service
-      return {
-        data: true,
-        success: true,
-        message: 'Location updated successfully',
-      };
-    } catch (error) {
-      return {
-        data: false,
-        success: false,
-        message: 'Failed to update location',
-      };
-    }
-  }
-
-  calculateDistance(
-    lat1: number,
-    lon1: number,
-    lat2: number,
-    lon2: number
-  ): number {
-    const R = 6371; // Radius of the Earth in kilometers
-    const dLat = (lat2 - lat1) * (Math.PI / 180);
-    const dLon = (lon2 - lon1) * (Math.PI / 180);
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1 * (Math.PI / 180)) *
-        Math.cos(lat2 * (Math.PI / 180)) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // Distance in kilometers
-  }
-}
-
-// Notification service stub
-class NotificationService {
-  async registerForPushNotifications(): Promise<{
-    data: boolean;
-    success: boolean;
-    message?: string;
-  }> {
-    return {
-      data: true,
-      success: true,
-      message: 'Push notifications registered',
-    };
-  }
-
-  async unregisterFromPushNotifications(): Promise<{
-    data: boolean;
-    success: boolean;
-    message?: string;
-  }> {
-    return {
-      data: true,
-      success: true,
-      message: 'Push notifications unregistered',
-    };
-  }
-
-  async getNotifications(): Promise<{
-    data: any[];
-    success: boolean;
-    message?: string;
-  }> {
-    return { data: [], success: true, message: 'Notifications retrieved' };
-  }
-
-  async markNotificationAsRead(): Promise<{
-    data: boolean;
-    success: boolean;
-    message?: string;
-  }> {
-    return {
-      data: true,
-      success: true,
-      message: 'Notification marked as read',
-    };
-  }
-}
-
-// Analytics service stub
-class AnalyticsService {
-  async trackEvent(): Promise<void> {
-    // Implement analytics tracking
-  }
-
-  async trackScreenView(): Promise<void> {
-    // Implement screen view tracking
-  }
-
-  async setUserProperties(): Promise<void> {
-    // Implement user properties
-  }
-
-  async identifyUser(): Promise<void> {
-    // Implement user identification
-  }
-}
+// ...location service removed as requested...
 
 // API client implementation
 class ApiClient {
@@ -226,11 +97,9 @@ export const services: IServiceContainer = {
   discovery: new FirebaseDiscoveryService(),
   matching: new FirebaseMatchingService(),
   chat: new FirebaseChatService(),
-  location: new LocationService(),
-  notification: new NotificationService(),
+  // location service removed
   auth: new FirebaseAuthService(),
   storage: new AsyncStorageService(),
-  analytics: new AnalyticsService(),
   apiClient: new ApiClient(),
 };
 

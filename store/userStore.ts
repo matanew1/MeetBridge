@@ -247,6 +247,7 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   // Discovery Actions
   loadDiscoverProfiles: async (refresh = false) => {
+    // get() is for accessing current state
     const { searchFilters } = get();
 
     set({

@@ -54,12 +54,14 @@ const LoginScreen = () => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.background }]}
+    >
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
         >
@@ -80,7 +82,9 @@ const LoginScreen = () => {
           </View>
 
           {/* Form Section */}
-          <View style={[styles.formSection, { backgroundColor: theme.surface }]}>
+          <View
+            style={[styles.formSection, { backgroundColor: theme.surface }]}
+          >
             <Text style={[styles.formTitle, { color: theme.text }]}>
               Sign In
             </Text>
@@ -90,10 +94,15 @@ const LoginScreen = () => {
               <Text style={[styles.inputLabel, { color: theme.text }]}>
                 Email Address
               </Text>
-              <View style={[styles.inputContainer, { 
-                backgroundColor: theme.background,
-                borderColor: theme.border 
-              }]}>
+              <View
+                style={[
+                  styles.inputContainer,
+                  {
+                    backgroundColor: theme.background,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
                 <Mail size={20} color={theme.textSecondary} />
                 <TextInput
                   style={[styles.input, { color: theme.text }]}
@@ -113,10 +122,15 @@ const LoginScreen = () => {
               <Text style={[styles.inputLabel, { color: theme.text }]}>
                 Password
               </Text>
-              <View style={[styles.inputContainer, { 
-                backgroundColor: theme.background,
-                borderColor: theme.border 
-              }]}>
+              <View
+                style={[
+                  styles.inputContainer,
+                  {
+                    backgroundColor: theme.background,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
                 <Lock size={20} color={theme.textSecondary} />
                 <TextInput
                   style={[styles.input, { color: theme.text }]}
@@ -143,7 +157,7 @@ const LoginScreen = () => {
             {/* Forgot Password */}
             <TouchableOpacity style={styles.forgotPassword}>
               <Link href="/auth/forgot-password" asChild>
-                <Text style={[styles.forgotPasswordText, { color: theme.primary }]}>
+                <Text style={{ color: theme.textSecondary }}>
                   Forgot Password?
                 </Text>
               </Link>
@@ -170,10 +184,12 @@ const LoginScreen = () => {
 
           {/* Footer */}
           <View style={styles.footer}>
-            <Text style={[styles.footerText, { color: theme.textSecondary }]}>
-              Don't have an account?{' '}
+            <Text style={styles.footerText}>
+              <Text style={{ color: theme.textSecondary }}>
+                Don't have an account?{' '}
+              </Text>
               <Link href="/auth/register" asChild>
-                <Text style={[styles.linkText, { color: theme.primary }]}>
+                <Text style={{ color: theme.textSecondary }}>
                   Sign Up
                 </Text>
               </Link>

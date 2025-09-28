@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
   },
   footerText: {
-    fontSize: 16,
+    fontSize: 15,
     textAlign: 'center',
   },
   linkText: {

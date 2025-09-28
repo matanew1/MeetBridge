@@ -14,7 +14,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, router } from 'expo-router';
-import { User, Mail, Lock, Eye, EyeOff, Calendar, Users, Heart } from 'lucide-react-native';
+import {
+  User,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  Calendar,
+  Users,
+  Heart,
+} from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -136,20 +145,30 @@ const RegisterScreen = () => {
     });
   };
 
+  const [tempDate, setTempDate] = useState<Date | null>(null);
   const onDateChange = (_: any, selectedDate?: Date) => {
-    setShowDatePicker(false);
     if (selectedDate) {
-      setFormData((prev) => ({ ...prev, dateOfBirth: selectedDate }));
+      setTempDate(selectedDate);
     }
   };
 
+  const commitDate = () => {
+    if (tempDate) {
+      setFormData((prev) => ({ ...prev, dateOfBirth: tempDate }));
+    }
+    setShowDatePicker(false);
+    setTempDate(null);
+  };
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.background }]}
+    >
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
         >
@@ -170,7 +189,9 @@ const RegisterScreen = () => {
           </View>
 
           {/* Form Section */}
-          <View style={[styles.formSection, { backgroundColor: theme.surface }]}>
+          <View
+            style={[styles.formSection, { backgroundColor: theme.surface }]}
+          >
             <Text style={[styles.formTitle, { color: theme.text }]}>
               Create Account
             </Text>
@@ -180,10 +201,15 @@ const RegisterScreen = () => {
               <Text style={[styles.inputLabel, { color: theme.text }]}>
                 Full Name
               </Text>
-              <View style={[styles.inputContainer, { 
-                backgroundColor: theme.background,
-                borderColor: theme.border 
-              }]}>
+              <View
+                style={[
+                  styles.inputContainer,
+                  {
+                    backgroundColor: theme.background,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
                 <User size={20} color={theme.textSecondary} />
                 <TextInput
                   style={[styles.input, { color: theme.text }]}
@@ -202,10 +228,15 @@ const RegisterScreen = () => {
               <Text style={[styles.inputLabel, { color: theme.text }]}>
                 Email Address
               </Text>
-              <View style={[styles.inputContainer, { 
-                backgroundColor: theme.background,
-                borderColor: theme.border 
-              }]}>
+              <View
+                style={[
+                  styles.inputContainer,
+                  {
+                    backgroundColor: theme.background,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
                 <Mail size={20} color={theme.textSecondary} />
                 <TextInput
                   style={[styles.input, { color: theme.text }]}
@@ -220,57 +251,79 @@ const RegisterScreen = () => {
               </View>
             </View>
 
-            {/* Date of Birth & Gender Row */}
-            <View style={styles.rowContainer}>
-              <View style={[styles.inputGroup, styles.halfWidth]}>
-                <Text style={[styles.inputLabel, { color: theme.text }]}>
-                  Date of Birth
-                </Text>
-                <TouchableOpacity
-                  style={[styles.inputContainer, { 
+            <View style={[styles.inputGroup, styles.halfWidth]}>
+              <Text style={[styles.inputLabel, { color: theme.text }]}>
+                Date of Birth
+              </Text>
+              <TouchableOpacity
+                style={[
+                  styles.inputContainer,
+                  {
                     backgroundColor: theme.background,
-                    borderColor: theme.border 
-                  }]}
-                  onPress={() => setShowDatePicker(true)}
-                >
-                  <Calendar size={20} color={theme.textSecondary} />
-                  <Text style={[styles.dateText, { color: theme.text }]}>
-                    {formatDate(formData.dateOfBirth)}
-                  </Text>
-                </TouchableOpacity>
-                {showDatePicker && (
+                    borderColor: theme.border,
+                  },
+                ]}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Calendar size={20} color={theme.textSecondary} />
+                <Text style={[styles.dateText, { color: theme.text }]}>
+                  {formatDate(formData.dateOfBirth)}
+                </Text>
+              </TouchableOpacity>
+              {showDatePicker && (
+                <>
                   <DateTimePicker
-                    value={formData.dateOfBirth}
+                    value={tempDate || formData.dateOfBirth}
                     mode="date"
-                    display="default"
+                    display="spinner"
                     maximumDate={new Date()}
                     minimumDate={new Date(1920, 0, 1)}
                     onChange={onDateChange}
                   />
-                )}
-              </View>
+                  <TouchableOpacity
+                    style={{
+                      marginTop: 8,
+                      alignSelf: 'flex-end',
+                      backgroundColor: theme.textSecondary,
+                      borderRadius: 8,
+                      paddingHorizontal: 16,
+                      paddingVertical: 8,
+                    }}
+                    onPress={commitDate}
+                  >
+                    <Text style={{ color: 'white', fontWeight: 'bold' }}>
+                      Confirm
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
 
-              <View style={[styles.inputGroup, styles.halfWidth]}>
-                <Text style={[styles.inputLabel, { color: theme.text }]}>
-                  Gender
-                </Text>
-                <View style={[styles.inputContainer, { 
-                  backgroundColor: theme.background,
-                  borderColor: theme.border 
-                }]}>
-                  <Users size={20} color={theme.textSecondary} />
-                  <View style={styles.pickerContainer}>
-                    <Picker
-                      selectedValue={formData.gender}
-                      onValueChange={(value) => updateFormData('gender', value)}
-                      style={[styles.picker, { color: theme.text }]}
-                      dropdownIconColor={theme.textSecondary}
-                    >
-                      <Picker.Item label="Male" value="male" />
-                      <Picker.Item label="Female" value="female" />
-                      <Picker.Item label="Other" value="other" />
-                    </Picker>
-                  </View>
+            <View style={[styles.inputGroup, styles.halfWidth]}>
+              <Text style={[styles.inputLabel, { color: theme.text }]}>
+                Gender
+              </Text>
+              <View
+                style={[
+                  styles.inputContainer,
+                  {
+                    backgroundColor: theme.background,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <Users size={20} color={theme.textSecondary} />
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={formData.gender}
+                    onValueChange={(value) => updateFormData('gender', value)}
+                    style={[styles.picker, { color: theme.text }]}
+                    dropdownIconColor={theme.textSecondary}
+                  >
+                    <Picker.Item label="Male" value="male" />
+                    <Picker.Item label="Female" value="female" />
+                    <Picker.Item label="Other" value="other" />
+                  </Picker>
                 </View>
               </View>
             </View>
@@ -280,10 +333,15 @@ const RegisterScreen = () => {
               <Text style={[styles.inputLabel, { color: theme.text }]}>
                 Password
               </Text>
-              <View style={[styles.inputContainer, { 
-                backgroundColor: theme.background,
-                borderColor: theme.border 
-              }]}>
+              <View
+                style={[
+                  styles.inputContainer,
+                  {
+                    backgroundColor: theme.background,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
                 <Lock size={20} color={theme.textSecondary} />
                 <TextInput
                   style={[styles.input, { color: theme.text }]}
@@ -312,17 +370,24 @@ const RegisterScreen = () => {
               <Text style={[styles.inputLabel, { color: theme.text }]}>
                 Confirm Password
               </Text>
-              <View style={[styles.inputContainer, { 
-                backgroundColor: theme.background,
-                borderColor: theme.border 
-              }]}>
+              <View
+                style={[
+                  styles.inputContainer,
+                  {
+                    backgroundColor: theme.background,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
                 <Lock size={20} color={theme.textSecondary} />
                 <TextInput
                   style={[styles.input, { color: theme.text }]}
                   placeholder="Confirm your password"
                   placeholderTextColor={theme.textSecondary}
                   value={formData.confirmPassword}
-                  onChangeText={(value) => updateFormData('confirmPassword', value)}
+                  onChangeText={(value) =>
+                    updateFormData('confirmPassword', value)
+                  }
                   secureTextEntry={!showConfirmPassword}
                   autoComplete="new-password"
                 />
@@ -448,6 +513,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: Platform.OS === 'ios' ? 16 : 12,
     gap: 12,
+    minHeight: 36, // ensure a smaller minimum height
   },
   input: {
     flex: 1,
