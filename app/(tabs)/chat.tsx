@@ -429,14 +429,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
   },
-  searchButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   content: {
     flex: 1,
     borderTopLeftRadius: 16,
@@ -521,10 +513,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 10,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    textAlign: 'center',
-    fontWeight: '500',
   },
 });

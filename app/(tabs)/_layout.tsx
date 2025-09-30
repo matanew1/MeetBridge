@@ -1,9 +1,7 @@
 import { Tabs } from 'expo-router';
 import {
-  Heart,
   Search,
   MessageCircleMore,
-  ShoppingCart as Shopping,
   HeartHandshake,
   Moon,
   Sun,
@@ -15,9 +13,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
-  SafeAreaView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -48,14 +44,6 @@ export default function TabLayout() {
         style={[styles.header, { backgroundColor: theme.headerBackground }]}
       >
         <View style={styles.headerLeft}>
-          <TouchableOpacity
-            style={[
-              styles.shoppingButton,
-              { backgroundColor: theme.primaryVariant },
-            ]}
-          >
-            <Shopping size={20} color={theme.primary} />
-          </TouchableOpacity>
           <TouchableOpacity
             style={[
               styles.darkModeButton,
@@ -158,9 +146,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  safeArea: {
-    flex: 1,
-  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -183,13 +168,6 @@ const styles = StyleSheet.create({
   headerProfile: {
     width: 40,
     height: 40,
-  },
-  shoppingButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   darkModeButton: {
     width: 40,

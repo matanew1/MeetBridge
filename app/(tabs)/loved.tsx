@@ -704,7 +704,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 2,
   },
-  matchOverlay: {},
   cardInfo: {
     alignItems: 'center',
     marginBottom: 16,
@@ -735,13 +734,11 @@ const styles = StyleSheet.create({
   matchActions: {
     width: '100%',
   },
-  matchMessageButton: {},
   messageText: {
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
   },
-  matchMessageText: {},
   unmatchButton: {
     paddingVertical: 8,
     paddingHorizontal: 16,
@@ -805,8 +802,6 @@ const styles = StyleSheet.create({
   confirmationText: {
     fontSize: 16,
     textAlign: 'center',
-    justifyContent: 'center',
-
     lineHeight: 24,
     marginBottom: 28,
     paddingHorizontal: 8,
@@ -828,8 +823,6 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   deleteButton: {
     backgroundColor: '#FF6B6B',
@@ -838,14 +831,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   cancelButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   deleteButtonText: {
     fontSize: 16,

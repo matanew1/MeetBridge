@@ -8,7 +8,6 @@ import {
   Dimensions,
   ScrollView,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { Heart, X, Filter, RefreshCw } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
