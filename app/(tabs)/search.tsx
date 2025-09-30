@@ -1,3 +1,4 @@
+// app/(tabs)/search.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -34,7 +35,7 @@ interface ProfileCardProps {
     id: string;
     name: string;
     age: number;
-    distance?: number;
+    distance?: number | null;
     image: string;
   };
   onLike: (id: string) => void;
@@ -77,6 +78,10 @@ const ProfileCard = ({
     transform: [{ translateY: translateY.value }, { scale: scale.value }],
   }));
 
+  // Safely get image URI
+  const imageUri = user.image || '';
+  const hasValidImage = imageUri && imageUri.trim().length > 0;
+
   return (
     <Animated.View style={[styles.cardContainer, animatedStyle]}>
       <TouchableOpacity
@@ -90,15 +95,24 @@ const ProfileCard = ({
         disabled={isLiked || isDisliked || isAnimatingOut}
       >
         <View style={styles.imageContainer}>
-          <Image
-            source={{ uri: user.image }}
-            style={styles.cardImage}
-            resizeMode="cover"
-          />
+          {hasValidImage ? (
+            <Image
+              source={{ uri: imageUri }}
+              style={styles.cardImage}
+              resizeMode="cover"
+              defaultSource={require('../../assets/images/logo.png')}
+            />
+          ) : (
+            <View style={[styles.cardImage, styles.placeholderImage]}>
+              <Text style={styles.placeholderText}>
+                {user.name?.charAt(0)?.toUpperCase() || '?'}
+              </Text>
+            </View>
+          )}
         </View>
         <View style={styles.cardInfo}>
           <Text style={[styles.cardText, { color: theme.text }]}>
-            {user.age}, {user.name}
+            {user.name || 'Unknown'}, {user.age || 0}
           </Text>
         </View>
 
@@ -132,10 +146,12 @@ const ProfileCard = ({
         </View>
       </TouchableOpacity>
 
-      {user.distance && (
+      {user.distance !== null && user.distance !== undefined && (
         <View style={styles.distanceContainer}>
           <Text style={styles.distanceText}>
-            {user.distance}m
+            {user.distance >= 1000
+              ? `${(user.distance / 1000).toFixed(1)}km`
+              : `${Math.round(user.distance)}m`}
           </Text>
         </View>
       )}
@@ -156,7 +172,7 @@ export default function SearchScreen() {
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [matchedUser, setMatchedUser] = useState<any>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [maxDistance, setMaxDistance] = useState(5);
+  const [maxDistance, setMaxDistance] = useState(5000); // Changed to 5000 meters default
 
   // Local state to track cards being animated out
   const [animatingOutCards, setAnimatingOutCards] = useState<Set<string>>(
@@ -192,10 +208,12 @@ export default function SearchScreen() {
     currentUser,
   } = useUserStore();
 
-  // Sort profiles by distance
-  const sortedDiscoverProfiles = [...discoverProfiles].sort(
-    (a, b) => (a.distance || 0) - (b.distance || 0)
-  );
+  // Sort profiles by distance (handle null distances)
+  const sortedDiscoverProfiles = [...discoverProfiles].sort((a, b) => {
+    const distA = a.distance ?? Number.MAX_SAFE_INTEGER;
+    const distB = b.distance ?? Number.MAX_SAFE_INTEGER;
+    return distA - distB;
+  });
 
   // Animation values
   const pulseAnimation = useSharedValue(0);
@@ -203,12 +221,14 @@ export default function SearchScreen() {
   const updateUserPreferences = () => {
     // Update search filters based on user preferences
     if (currentUser) {
-      setMaxDistance(currentUser.preferences.maxDistance);
+      const maxDistanceMeters =
+        (currentUser.preferences?.maxDistance || 5) * 1000;
+      setMaxDistance(maxDistanceMeters);
       updateSearchFilters({
-        gender: currentUser.gender,
-        ageRange: currentUser.ageRange,
-        location: currentUser.location,
-        maxDistance: currentUser.preferences.maxDistance,
+        gender: currentUser.preferences?.interestedIn || 'both',
+        ageRange: currentUser.preferences?.ageRange || [18, 99],
+        location: currentUser.location || '',
+        maxDistance: maxDistanceMeters,
       });
     }
   };
@@ -356,8 +376,9 @@ export default function SearchScreen() {
   };
 
   const handleDistanceChange = (distance: number) => {
-    setMaxDistance(distance);
-    updateSearchFilters({ maxDistance: distance });
+    const distanceInMeters = distance * 1000; // Convert km to meters
+    setMaxDistance(distanceInMeters);
+    updateSearchFilters({ maxDistance: distanceInMeters });
     loadDiscoverProfiles(true);
   };
 
@@ -365,6 +386,17 @@ export default function SearchScreen() {
     // Trigger the search animation (which now includes refresh functionality)
     setShowAnimation(true);
     triggerSearchAnimation();
+  };
+
+  const handleMessage = (userId: string) => {
+    // Find conversation with this user
+    const conversation = useUserStore
+      .getState()
+      .conversations.find((conv) => conv.participants.includes(userId));
+
+    if (conversation) {
+      router.push(`/chat/${conversation.id}`);
+    }
   };
 
   // Animated styles
@@ -431,7 +463,7 @@ export default function SearchScreen() {
                 >
                   {/* Center Profile */}
                   <View style={styles.centerProfileContainer}>
-                    {centerProfile ? (
+                    {centerProfile && centerProfile.image ? (
                       <Image
                         source={{ uri: centerProfile.image }}
                         style={styles.centerProfile}
@@ -494,11 +526,21 @@ export default function SearchScreen() {
                       },
                     ]}
                   >
-                    <Image
-                      source={{ uri: profile.image }}
-                      style={styles.profileImage}
-                      resizeMode="cover"
-                    />
+                    {profile.image ? (
+                      <Image
+                        source={{ uri: profile.image }}
+                        style={styles.profileImage}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View
+                        style={[styles.profileImage, styles.placeholderImage]}
+                      >
+                        <Text style={styles.placeholderText}>
+                          {profile.name?.charAt(0)?.toUpperCase() || '?'}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                 );
               })}
@@ -586,20 +628,28 @@ export default function SearchScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.grid}>
-          {sortedDiscoverProfiles.map((user) => (
-            <View key={user.id} style={styles.gridItem}>
-              <ProfileCard
-                user={user}
-                onLike={handleLike}
-                onDislike={handleDislike}
-                onPress={handleProfilePress}
-                isLiked={likedProfiles.includes(user.id)}
-                isDisliked={dislikedProfiles.includes(user.id)}
-                isAnimatingOut={animatingOutCards.has(user.id)}
-                theme={theme}
-              />
+          {sortedDiscoverProfiles.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={[styles.emptyText, { color: theme.text }]}>
+                {t('search.noProfiles')}
+              </Text>
             </View>
-          ))}
+          ) : (
+            sortedDiscoverProfiles.map((user) => (
+              <View key={user.id} style={styles.gridItem}>
+                <ProfileCard
+                  user={user}
+                  onLike={handleLike}
+                  onDislike={handleDislike}
+                  onPress={handleProfilePress}
+                  isLiked={likedProfiles.includes(user.id)}
+                  isDisliked={dislikedProfiles.includes(user.id)}
+                  isAnimatingOut={animatingOutCards.has(user.id)}
+                  theme={theme}
+                />
+              </View>
+            ))
+          )}
         </View>
       </ScrollView>
 
@@ -681,12 +731,13 @@ export default function SearchScreen() {
       <FilterModal
         visible={showFilterModal}
         onClose={() => setShowFilterModal(false)}
-        currentDistance={maxDistance}
+        currentDistance={maxDistance / 1000} // Convert back to km for display
         onDistanceChange={handleDistanceChange}
       />
     </View>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,

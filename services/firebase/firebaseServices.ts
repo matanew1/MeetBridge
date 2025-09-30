@@ -1,3 +1,4 @@
+// services/firebase/firebaseServices.ts
 import {
   collection,
   doc,
@@ -10,35 +11,21 @@ import {
   getDocs,
   orderBy,
   limit,
-  startAfter,
-  QueryDocumentSnapshot,
   serverTimestamp,
-  onSnapshot,
   addDoc,
+  writeBatch,
 } from 'firebase/firestore';
-import {
-  ref,
-  uploadBytes,
-  getDownloadURL,
-  deleteObject,
-} from 'firebase/storage';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
-  signInWithCredential,
   sendPasswordResetEmail,
   sendEmailVerification,
   updatePassword,
-  onAuthStateChanged,
   deleteUser,
   User as FirebaseUser,
 } from 'firebase/auth';
-import * as AuthSession from 'expo-auth-session';
-import * as WebBrowser from 'expo-web-browser';
-import * as Crypto from 'expo-crypto';
-import { Platform } from 'react-native';
-import { db, auth, storage } from './config';
+import { db, auth } from './config';
 import {
   IUserProfileService,
   IDiscoveryService,
@@ -53,20 +40,29 @@ import {
   Conversation,
   ChatMessage,
 } from '../../store/types';
+import storageService from '../storageService';
+import geohashService from '../geohashService';
 
-// Utility function to convert Firestore timestamps
-const convertTimestamp = (timestamp: any) => {
-  if (timestamp?.toDate) {
-    return timestamp.toDate();
-  }
-  if (timestamp?.seconds) {
-    return new Date(timestamp.seconds * 1000);
-  }
+// ============================================
+// Utility Functions
+// ============================================
+
+/**
+ * Convert Firestore timestamps to JavaScript Date objects
+ */
+const convertTimestamp = (timestamp: any): Date | undefined => {
+  if (timestamp?.toDate) return timestamp.toDate();
+  if (timestamp?.seconds) return new Date(timestamp.seconds * 1000);
   return timestamp;
 };
 
+// ============================================
 // Firebase User Profile Service
+// ============================================
 export class FirebaseUserProfileService implements IUserProfileService {
+  /**
+   * Get the current authenticated user's profile
+   */
   async getCurrentUser(): Promise<ApiResponse<User | null>> {
     try {
       const user = auth.currentUser;
@@ -100,20 +96,59 @@ export class FirebaseUserProfileService implements IUserProfileService {
     }
   }
 
+  /**
+   * Update user profile with automatic image upload to Cloudinary
+   */
   async updateProfile(userData: Partial<User>): Promise<ApiResponse<User>> {
     try {
       const user = auth.currentUser;
-      if (!user) {
-        throw new Error('No user logged in');
+      if (!user) throw new Error('No user logged in');
+
+      const dataToUpdate: Record<string, any> = { ...userData };
+
+      // Handle image upload if it's a local file or base64
+      if (
+        typeof dataToUpdate.image === 'string' &&
+        (dataToUpdate.image.startsWith('file://') ||
+          dataToUpdate.image.startsWith('content://') ||
+          dataToUpdate.image.startsWith('data:') ||
+          dataToUpdate.image.startsWith('/'))
+      ) {
+        console.log('📤 Uploading image to Cloudinary...');
+        const uploadResult = await storageService.uploadImage(
+          dataToUpdate.image
+        );
+
+        if (uploadResult.success && uploadResult.secureUrl) {
+          dataToUpdate.image = uploadResult.secureUrl;
+          console.log('✅ Image uploaded:', dataToUpdate.image);
+        } else {
+          throw new Error(uploadResult.message || 'Image upload failed');
+        }
       }
 
-      const userRef = doc(db, 'users', user.uid);
-      const updateData = {
-        ...userData,
-        updatedAt: serverTimestamp(),
-      };
+      // Handle geohash update if coordinates changed
+      if (dataToUpdate.coordinates) {
+        const { latitude, longitude } = dataToUpdate.coordinates;
+        dataToUpdate.geohash = geohashService.generateGeohash(
+          latitude,
+          longitude
+        );
+        console.log('📍 Generated geohash:', dataToUpdate.geohash);
+      }
 
-      await updateDoc(userRef, updateData);
+      // Remove undefined fields
+      Object.keys(dataToUpdate).forEach((key) => {
+        if (dataToUpdate[key] === undefined) {
+          delete dataToUpdate[key];
+        }
+      });
+
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        ...dataToUpdate,
+        updatedAt: serverTimestamp(),
+      });
 
       // Get updated document
       const updatedDoc = await getDoc(userRef);
@@ -140,40 +175,35 @@ export class FirebaseUserProfileService implements IUserProfileService {
     }
   }
 
+  /**
+   * Upload profile image to Cloudinary
+   */
   async uploadProfileImage(
     imageBlob: Blob | string
   ): Promise<ApiResponse<string>> {
     try {
       const user = auth.currentUser;
-      if (!user) {
-        throw new Error('No user logged in');
+      if (!user) throw new Error('No user logged in');
+
+      const uploadResult = await storageService.uploadImage(
+        typeof imageBlob === 'string'
+          ? imageBlob
+          : URL.createObjectURL(imageBlob)
+      );
+
+      if (!uploadResult.success || !uploadResult.secureUrl) {
+        throw new Error(uploadResult.message || 'Image upload failed');
       }
-
-      // Create a unique filename
-      const filename = `profile_images/${user.uid}/${Date.now()}.jpg`;
-      const imageRef = ref(storage, filename);
-
-      let uploadResult;
-      if (typeof imageBlob === 'string') {
-        // Convert base64 string to blob if needed
-        const response = await fetch(imageBlob);
-        const blob = await response.blob();
-        uploadResult = await uploadBytes(imageRef, blob);
-      } else {
-        uploadResult = await uploadBytes(imageRef, imageBlob);
-      }
-
-      const downloadURL = await getDownloadURL(uploadResult.ref);
 
       // Update user's profile with new image URL
       const userRef = doc(db, 'users', user.uid);
       await updateDoc(userRef, {
-        image: downloadURL,
+        image: uploadResult.secureUrl,
         updatedAt: serverTimestamp(),
       });
 
       return {
-        data: downloadURL,
+        data: uploadResult.secureUrl,
         success: true,
         message: 'Image uploaded successfully',
       };
@@ -188,6 +218,9 @@ export class FirebaseUserProfileService implements IUserProfileService {
     }
   }
 
+  /**
+   * Delete user profile
+   */
   async deleteProfile(userId: string): Promise<ApiResponse<boolean>> {
     try {
       const user = auth.currentUser;
@@ -195,17 +228,7 @@ export class FirebaseUserProfileService implements IUserProfileService {
         throw new Error('Unauthorized to delete this profile');
       }
 
-      // Delete user document
       await deleteDoc(doc(db, 'users', userId));
-
-      // Delete user images from storage
-      try {
-        const imagePath = `profile_images/${userId}`;
-        const imageRef = ref(storage, imagePath);
-        await deleteObject(imageRef);
-      } catch (storageError) {
-        console.warn('Could not delete user images:', storageError);
-      }
 
       return {
         data: true,
@@ -224,74 +247,129 @@ export class FirebaseUserProfileService implements IUserProfileService {
   }
 }
 
+// ============================================
 // Firebase Discovery Service
+// ============================================
 export class FirebaseDiscoveryService implements IDiscoveryService {
+  /**
+   * Get discover profiles using geohash-based location queries
+   */
   async getDiscoverProfiles(
     filters: SearchFilters,
     page: number = 1
   ): Promise<ApiResponse<User[]>> {
     try {
       const user = auth.currentUser;
-      if (!user) {
-        throw new Error('No user logged in');
+      if (!user) throw new Error('No user logged in');
+
+      // Get current user's location
+      const currentUserDoc = await getDoc(doc(db, 'users', user.uid));
+      if (!currentUserDoc.exists()) {
+        throw new Error('Current user not found');
       }
 
-      const pageSize = 10;
-      let q = query(
-        collection(db, 'users'),
-        where('id', '!=', user.uid),
-        orderBy('id'),
-        limit(pageSize)
+      const currentUserData = currentUserDoc.data();
+      const userLocation = currentUserData?.coordinates;
+
+      // If user doesn't have location, fall back to basic query without location
+      if (!userLocation) {
+        console.warn('User location not set, using basic query');
+        return this.getDiscoverProfilesBasic(filters, page, user.uid);
+      }
+
+      // Get geohash query bounds for the search radius
+      const bounds = geohashService.getQueryBounds(
+        userLocation,
+        filters.maxDistance
       );
 
-      // Add gender filter if specified
-      if (filters.gender !== 'both') {
-        q = query(
+      const profiles: User[] = [];
+      const pageSize = 20;
+      const seenIds = new Set<string>([user.uid]); // Track seen profiles to avoid duplicates
+
+      // Query each geohash range
+      for (const bound of bounds) {
+        const [startHash, endHash] = bound;
+
+        const q = query(
           collection(db, 'users'),
-          where('gender', '==', filters.gender),
-          where('id', '!=', user.uid),
-          orderBy('id'),
+          where('geohash', '>=', startHash),
+          where('geohash', '<=', endHash),
           limit(pageSize)
         );
+
+        const snapshot = await getDocs(q);
+
+        snapshot.forEach((docSnapshot) => {
+          // Skip current user and already seen profiles
+          if (seenIds.has(docSnapshot.id)) return;
+          seenIds.add(docSnapshot.id);
+
+          const data = docSnapshot.data();
+
+          // Validate required fields
+          if (!data || typeof data.age !== 'number' || !data.gender) {
+            console.warn(
+              `Skipping profile ${docSnapshot.id}: missing required fields`
+            );
+            return;
+          }
+
+          // Check if profile matches filters
+          const matchesGender =
+            filters.gender === 'both' || data.gender === filters.gender;
+          const matchesAge =
+            data.age >= filters.ageRange[0] && data.age <= filters.ageRange[1];
+
+          if (!matchesGender || !matchesAge) return;
+
+          // Calculate actual distance if coordinates exist
+          let distance: number | null = null;
+          if (data.coordinates?.latitude && data.coordinates?.longitude) {
+            try {
+              distance = geohashService.calculateDistance(
+                userLocation,
+                data.coordinates
+              );
+
+              // Skip if beyond max distance
+              if (distance > filters.maxDistance) return;
+            } catch (distError) {
+              console.warn(
+                `Error calculating distance for ${docSnapshot.id}:`,
+                distError
+              );
+            }
+          }
+
+          profiles.push({
+            id: docSnapshot.id,
+            ...data,
+            distance,
+            lastSeen: convertTimestamp(data.lastSeen),
+          } as User);
+        });
       }
 
-      const snapshot = await getDocs(q);
-      const profiles: User[] = [];
+      // Remove duplicates and sort by distance
+      const uniqueProfiles = Array.from(
+        new Map(profiles.map((p) => [p.id, p])).values()
+      );
 
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        // Add mock location data with distance calculation
-        const mockDistance = this.generateMockDistance();
-        profiles.push({
-          id: doc.id,
-          ...data,
-          lastSeen: convertTimestamp(data.lastSeen),
-          distance: mockDistance,
-          coordinates: this.generateMockCoordinates(),
-        } as User);
-      });
-
-      // Filter by age, distance and other criteria
-      const filteredProfiles = profiles.filter((profile) => {
-        return (
-          profile.age >= filters.ageRange[0] &&
-          profile.age <= filters.ageRange[1] &&
-          (profile.distance || 0) <= filters.maxDistance
-        );
-      });
-
-      // Sort by distance (closest first)
-      filteredProfiles.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+      const sortedProfiles = geohashService.sortByDistance(
+        uniqueProfiles,
+        userLocation
+      );
 
       return {
-        data: filteredProfiles,
+        data: sortedProfiles.slice(0, pageSize),
         success: true,
         message: 'Profiles retrieved successfully',
         pagination: {
           page,
           limit: pageSize,
-          total: filteredProfiles.length,
-          hasMore: snapshot.size === pageSize,
+          total: sortedProfiles.length,
+          hasMore: sortedProfiles.length > pageSize,
         },
       };
     } catch (error) {
@@ -305,24 +383,88 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
     }
   }
 
-  private generateMockDistance(): number {
-    // Generate random distance between 10m and 5000m
-    const distances = [10, 25, 50, 100, 200, 500, 1000, 2000, 5000];
-    return distances[Math.floor(Math.random() * distances.length)];
+  /**
+   * Fallback method for profiles without geohash (for migration period)
+   */
+  private async getDiscoverProfilesBasic(
+    filters: SearchFilters,
+    page: number,
+    currentUserId: string
+  ): Promise<ApiResponse<User[]>> {
+    try {
+      const pageSize = 20;
+
+      // Basic query without location filtering
+      let q = query(
+        collection(db, 'users'),
+        where('id', '!=', currentUserId),
+        limit(pageSize)
+      );
+
+      // Add gender filter if not 'both'
+      if (filters.gender !== 'both') {
+        q = query(
+          collection(db, 'users'),
+          where('gender', '==', filters.gender),
+          where('id', '!=', currentUserId),
+          limit(pageSize)
+        );
+      }
+
+      const snapshot = await getDocs(q);
+      const profiles: User[] = [];
+
+      snapshot.forEach((docSnapshot) => {
+        if (docSnapshot.id === currentUserId) return; // Extra safety check
+
+        const data = docSnapshot.data();
+
+        // Validate required fields
+        if (!data || typeof data.age !== 'number') {
+          console.warn(
+            `Skipping profile ${docSnapshot.id}: missing required fields`
+          );
+          return;
+        }
+
+        // Check age filter
+        const matchesAge =
+          data.age >= filters.ageRange[0] && data.age <= filters.ageRange[1];
+        if (!matchesAge) return;
+
+        profiles.push({
+          id: docSnapshot.id,
+          ...data,
+          distance: null, // No distance available without location
+          lastSeen: convertTimestamp(data.lastSeen),
+        } as User);
+      });
+
+      return {
+        data: profiles,
+        success: true,
+        message: 'Profiles retrieved successfully (basic mode)',
+        pagination: {
+          page,
+          limit: pageSize,
+          total: profiles.length,
+          hasMore: snapshot.size === pageSize,
+        },
+      };
+    } catch (error) {
+      console.error('Error in basic profile discovery:', error);
+      return {
+        data: [],
+        success: false,
+        message:
+          error instanceof Error ? error.message : 'Failed to get profiles',
+      };
+    }
   }
 
-  private generateMockCoordinates() {
-    // Generate mock coordinates around a central point
-    const baseLat = 32.0853; // Tel Aviv coordinates
-    const baseLng = 34.7818;
-    
-    return {
-      latitude: baseLat + (Math.random() - 0.5) * 0.1,
-      longitude: baseLng + (Math.random() - 0.5) * 0.1,
-      lastUpdated: new Date(),
-    };
-  }
-
+  /**
+   * Like a profile and check for mutual match
+   */
   async likeProfile(
     userId: string,
     targetUserId: string
@@ -335,7 +477,7 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         where('targetUserId', '==', targetUserId)
       );
       const existingLikeSnapshot = await getDocs(existingLikeQuery);
-      
+
       if (!existingLikeSnapshot.empty) {
         return {
           data: false,
@@ -344,16 +486,15 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         };
       }
 
-      const likeData = {
+      // Add like
+      await addDoc(collection(db, 'likes'), {
         userId,
         targetUserId,
         createdAt: serverTimestamp(),
         type: 'like',
-      };
+      });
 
-      await addDoc(collection(db, 'likes'), likeData);
-
-      // Check if target user also liked this user (match)
+      // Check for mutual like (match)
       const matchQuery = query(
         collection(db, 'likes'),
         where('userId', '==', targetUserId),
@@ -367,35 +508,39 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         // Check if match already exists
         const existingMatchQuery = query(
           collection(db, 'matches'),
-          where('users', 'array-contains-any', [userId, targetUserId])
+          where('users', 'array-contains', userId)
         );
         const existingMatchSnapshot = await getDocs(existingMatchQuery);
-        
+
         let isNewMatch = true;
         for (const matchDoc of existingMatchSnapshot.docs) {
           const matchData = matchDoc.data();
-          if (matchData.users.includes(userId) && matchData.users.includes(targetUserId)) {
+          if (matchData.users.includes(targetUserId)) {
             isNewMatch = false;
             break;
           }
         }
 
         if (isNewMatch) {
-          // Create match record
-          const matchData = {
+          const batch = writeBatch(db);
+
+          // Create match
+          const matchRef = doc(collection(db, 'matches'));
+          batch.set(matchRef, {
             users: [userId, targetUserId],
             createdAt: serverTimestamp(),
-          };
-          await addDoc(collection(db, 'matches'), matchData);
+          });
 
-          // Create conversation for the match
-          const conversationData = {
+          // Create conversation
+          const conversationRef = doc(collection(db, 'conversations'));
+          batch.set(conversationRef, {
             participants: [userId, targetUserId],
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
             unreadCount: 0,
-          };
-          await addDoc(collection(db, 'conversations'), conversationData);
+          });
+
+          await batch.commit();
 
           return {
             data: true,
@@ -421,19 +566,20 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
     }
   }
 
+  /**
+   * Dislike a profile
+   */
   async dislikeProfile(
     userId: string,
     targetUserId: string
   ): Promise<ApiResponse<boolean>> {
     try {
-      const dislikeData = {
+      await addDoc(collection(db, 'likes'), {
         userId,
         targetUserId,
         createdAt: serverTimestamp(),
         type: 'dislike',
-      };
-
-      await addDoc(collection(db, 'likes'), dislikeData);
+      });
 
       return {
         data: true,
@@ -451,19 +597,20 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
     }
   }
 
+  /**
+   * Super like a profile
+   */
   async superLikeProfile(
     userId: string,
     targetUserId: string
   ): Promise<ApiResponse<boolean>> {
     try {
-      const superLikeData = {
+      await addDoc(collection(db, 'likes'), {
         userId,
         targetUserId,
         createdAt: serverTimestamp(),
         type: 'super_like',
-      };
-
-      await addDoc(collection(db, 'likes'), superLikeData);
+      });
 
       return {
         data: true,
@@ -483,21 +630,22 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
     }
   }
 
+  /**
+   * Report a profile
+   */
   async reportProfile(
     userId: string,
     targetUserId: string,
     reason: string
   ): Promise<ApiResponse<boolean>> {
     try {
-      const reportData = {
+      await addDoc(collection(db, 'reports'), {
         reporterId: userId,
         reportedUserId: targetUserId,
         reason,
         createdAt: serverTimestamp(),
         status: 'pending',
-      };
-
-      await addDoc(collection(db, 'reports'), reportData);
+      });
 
       return {
         data: true,
@@ -516,8 +664,13 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
   }
 }
 
+// ============================================
 // Firebase Matching Service
+// ============================================
 export class FirebaseMatchingService implements IMatchingService {
+  /**
+   * Get all matches for a user
+   */
   async getMatches(
     userId: string,
     page: number = 1
@@ -573,6 +726,9 @@ export class FirebaseMatchingService implements IMatchingService {
     }
   }
 
+  /**
+   * Get all liked profiles for a user
+   */
   async getLikedProfiles(
     userId: string,
     page: number = 1
@@ -628,27 +784,45 @@ export class FirebaseMatchingService implements IMatchingService {
     }
   }
 
+  /**
+   * Unmatch a profile (removes match and conversation)
+   */
   async unmatchProfile(
     userId: string,
     targetUserId: string
   ): Promise<ApiResponse<boolean>> {
     try {
+      const batch = writeBatch(db);
+
+      // Delete match
       const matchQuery = query(
         collection(db, 'matches'),
-        where('users', 'array-contains-any', [userId, targetUserId])
+        where('users', 'array-contains', userId)
       );
-
       const matchSnapshot = await getDocs(matchQuery);
 
       for (const matchDoc of matchSnapshot.docs) {
         const matchData = matchDoc.data();
-        if (
-          matchData.users.includes(userId) &&
-          matchData.users.includes(targetUserId)
-        ) {
-          await deleteDoc(matchDoc.ref);
+        if (matchData.users.includes(targetUserId)) {
+          batch.delete(matchDoc.ref);
         }
       }
+
+      // Delete conversation
+      const convQuery = query(
+        collection(db, 'conversations'),
+        where('participants', 'array-contains', userId)
+      );
+      const convSnapshot = await getDocs(convQuery);
+
+      for (const convDoc of convSnapshot.docs) {
+        const convData = convDoc.data();
+        if (convData.participants.includes(targetUserId)) {
+          batch.delete(convDoc.ref);
+        }
+      }
+
+      await batch.commit();
 
       return {
         data: true,
@@ -666,6 +840,9 @@ export class FirebaseMatchingService implements IMatchingService {
     }
   }
 
+  /**
+   * Get detailed information about a match
+   */
   async getMatchDetails(
     userId: string,
     matchId: string
@@ -702,17 +879,19 @@ export class FirebaseMatchingService implements IMatchingService {
   }
 }
 
+// ============================================
 // Firebase Chat Service
+// ============================================
 export class FirebaseChatService implements IChatService {
+  /**
+   * Get all conversations for a user
+   */
   async getConversations(
     userId: string,
     page: number = 1
   ): Promise<ApiResponse<Conversation[]>> {
     try {
       const pageSize = 20;
-
-      // Temporary solution: Query without orderBy to avoid index requirement
-      // TODO: Remove this workaround after creating the composite index
       const conversationsQuery = query(
         collection(db, 'conversations'),
         where('participants', 'array-contains', userId),
@@ -725,7 +904,6 @@ export class FirebaseChatService implements IChatService {
       for (const convDoc of conversationsSnapshot.docs) {
         const convData = convDoc.data();
 
-        // Get messages for this conversation
         const messagesQuery = query(
           collection(db, 'conversations', convDoc.id, 'messages'),
           orderBy('timestamp', 'desc'),
@@ -738,7 +916,7 @@ export class FirebaseChatService implements IChatService {
         conversations.push({
           id: convDoc.id,
           participants: convData.participants,
-          messages: [], // Load separately when needed
+          messages: [],
           lastMessage: lastMessage
             ? ({
                 ...lastMessage,
@@ -751,8 +929,7 @@ export class FirebaseChatService implements IChatService {
         });
       }
 
-      // Sort conversations by updatedAt in descending order (client-side)
-      // TODO: Remove this after creating the composite index
+      // Sort by updatedAt (client-side sorting)
       conversations.sort((a, b) => {
         const aTime = a.updatedAt instanceof Date ? a.updatedAt.getTime() : 0;
         const bTime = b.updatedAt instanceof Date ? b.updatedAt.getTime() : 0;
@@ -783,6 +960,9 @@ export class FirebaseChatService implements IChatService {
     }
   }
 
+  /**
+   * Get a specific conversation with messages
+   */
   async getConversation(
     conversationId: string,
     page: number = 1
@@ -796,7 +976,6 @@ export class FirebaseChatService implements IChatService {
 
       const convData = convDoc.data();
 
-      // Get messages for this conversation
       const pageSize = 50;
       const messagesQuery = query(
         collection(db, 'conversations', conversationId, 'messages'),
@@ -848,6 +1027,9 @@ export class FirebaseChatService implements IChatService {
     }
   }
 
+  /**
+   * Send a message in a conversation
+   */
   async sendMessage(
     conversationId: string,
     message: Omit<ChatMessage, 'id' | 'timestamp'>
@@ -863,7 +1045,6 @@ export class FirebaseChatService implements IChatService {
         messageData
       );
 
-      // Update conversation's lastMessage and updatedAt
       await updateDoc(doc(db, 'conversations', conversationId), {
         updatedAt: serverTimestamp(),
       });
@@ -890,12 +1071,15 @@ export class FirebaseChatService implements IChatService {
     }
   }
 
+  /**
+   * Mark messages as read
+   */
   async markMessagesAsRead(
     conversationId: string,
     messageIds: string[]
   ): Promise<ApiResponse<boolean>> {
     try {
-      const batch = db.batch ? db.batch() : null;
+      const batch = writeBatch(db);
 
       for (const messageId of messageIds) {
         const messageRef = doc(
@@ -905,16 +1089,10 @@ export class FirebaseChatService implements IChatService {
           'messages',
           messageId
         );
-        if (batch) {
-          batch.update(messageRef, { isRead: true });
-        } else {
-          await updateDoc(messageRef, { isRead: true });
-        }
+        batch.update(messageRef, { isRead: true });
       }
 
-      if (batch) {
-        await batch.commit();
-      }
+      await batch.commit();
 
       return {
         data: true,
@@ -934,22 +1112,23 @@ export class FirebaseChatService implements IChatService {
     }
   }
 
+  /**
+   * Delete a conversation and all its messages
+   */
   async deleteConversation(
     conversationId: string
   ): Promise<ApiResponse<boolean>> {
     try {
-      // Delete all messages in the conversation
       const messagesQuery = query(
         collection(db, 'conversations', conversationId, 'messages')
       );
       const messagesSnapshot = await getDocs(messagesQuery);
 
-      for (const msgDoc of messagesSnapshot.docs) {
-        await deleteDoc(msgDoc.ref);
-      }
+      const batch = writeBatch(db);
+      messagesSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
+      batch.delete(doc(db, 'conversations', conversationId));
 
-      // Delete the conversation document
-      await deleteDoc(doc(db, 'conversations', conversationId));
+      await batch.commit();
 
       return {
         data: true,
@@ -970,13 +1149,13 @@ export class FirebaseChatService implements IChatService {
   }
 }
 
+// ============================================
 // Firebase Auth Service
+// ============================================
 export class FirebaseAuthService implements IAuthService {
-  // Configure WebBrowser for better UX on mobile
-  constructor() {
-    WebBrowser.maybeCompleteAuthSession();
-  }
-
+  /**
+   * Login with email and password
+   */
   async login(
     email: string,
     password: string
@@ -989,7 +1168,6 @@ export class FirebaseAuthService implements IAuthService {
       );
       const firebaseUser = userCredential.user;
 
-      // Get user profile from Firestore
       const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
       let userData: User;
 
@@ -1001,7 +1179,6 @@ export class FirebaseAuthService implements IAuthService {
           lastSeen: convertTimestamp(data.lastSeen),
         } as User;
 
-        // Update last seen
         await updateDoc(doc(db, 'users', firebaseUser.uid), {
           lastSeen: serverTimestamp(),
           isOnline: true,
@@ -1045,7 +1222,8 @@ export class FirebaseAuthService implements IAuthService {
       let errorMessage = 'Login failed';
 
       if (error instanceof Error) {
-        switch (error.message) {
+        const code = (error as any).code;
+        switch (code) {
           case 'auth/user-not-found':
             errorMessage = 'No account found with this email';
             break;
@@ -1071,6 +1249,9 @@ export class FirebaseAuthService implements IAuthService {
     }
   }
 
+  /**
+   * Register a new user with email and password
+   */
   async register(
     userData: Partial<User> & { email: string; password: string }
   ): Promise<ApiResponse<{ user: User; token: string }>> {
@@ -1100,15 +1281,46 @@ export class FirebaseAuthService implements IAuthService {
         },
       };
 
+      // Generate geohash if coordinates are provided
+      let geohash: string | undefined;
+      if (profileData.coordinates) {
+        geohash = geohashService.generateGeohash(
+          profileData.coordinates.latitude,
+          profileData.coordinates.longitude
+        );
+        console.log('📍 Generated geohash for new user:', geohash);
+      }
+
+      // Upload image if provided as local file
+      let imageUrl = newUser.image;
+      if (
+        imageUrl &&
+        (imageUrl.startsWith('file://') ||
+          imageUrl.startsWith('content://') ||
+          imageUrl.startsWith('data:') ||
+          imageUrl.startsWith('/'))
+      ) {
+        console.log('📤 Uploading registration image to Cloudinary...');
+        const uploadResult = await storageService.uploadImage(imageUrl);
+        if (uploadResult.success && uploadResult.secureUrl) {
+          imageUrl = uploadResult.secureUrl;
+          newUser.image = imageUrl;
+          console.log('✅ Registration image uploaded:', imageUrl);
+        }
+      }
+
       await setDoc(doc(db, 'users', firebaseUser.uid), {
         ...newUser,
+        ...(geohash && { geohash }),
+        ...(profileData.coordinates && {
+          coordinates: profileData.coordinates,
+        }),
         email,
         createdAt: serverTimestamp(),
         lastSeen: serverTimestamp(),
         isOnline: true,
       });
 
-      // Send email verification
       try {
         await sendEmailVerification(firebaseUser);
       } catch (emailError) {
@@ -1128,7 +1340,8 @@ export class FirebaseAuthService implements IAuthService {
       let errorMessage = 'Registration failed';
 
       if (error instanceof Error) {
-        switch (error.message) {
+        const code = (error as any).code;
+        switch (code) {
           case 'auth/email-already-in-use':
             errorMessage = 'An account with this email already exists';
             break;
@@ -1151,11 +1364,13 @@ export class FirebaseAuthService implements IAuthService {
     }
   }
 
+  /**
+   * Logout the current user
+   */
   async logout(): Promise<ApiResponse<boolean>> {
     try {
       const user = auth.currentUser;
 
-      // Update user's online status before logging out
       if (user) {
         try {
           await updateDoc(doc(db, 'users', user.uid), {
@@ -1183,12 +1398,13 @@ export class FirebaseAuthService implements IAuthService {
     }
   }
 
+  /**
+   * Refresh authentication token
+   */
   async refreshToken(): Promise<ApiResponse<{ token: string }>> {
     try {
       const user = auth.currentUser;
-      if (!user) {
-        throw new Error('No user logged in');
-      }
+      if (!user) throw new Error('No user logged in');
 
       const token = await user.getIdToken(true);
 
@@ -1208,6 +1424,9 @@ export class FirebaseAuthService implements IAuthService {
     }
   }
 
+  /**
+   * Send password reset email
+   */
   async forgotPassword(email: string): Promise<ApiResponse<boolean>> {
     try {
       await sendPasswordResetEmail(auth, email);
@@ -1222,7 +1441,8 @@ export class FirebaseAuthService implements IAuthService {
       let errorMessage = 'Failed to send reset email';
 
       if (error instanceof Error) {
-        switch (error.message) {
+        const code = (error as any).code;
+        switch (code) {
           case 'auth/user-not-found':
             errorMessage = 'No account found with this email address';
             break;
@@ -1242,15 +1462,16 @@ export class FirebaseAuthService implements IAuthService {
     }
   }
 
+  /**
+   * Reset password for logged-in user
+   */
   async resetPassword(
     token: string,
     newPassword: string
   ): Promise<ApiResponse<boolean>> {
     try {
       const user = auth.currentUser;
-      if (!user) {
-        throw new Error('No user logged in');
-      }
+      if (!user) throw new Error('No user logged in');
 
       await updatePassword(user, newPassword);
 
@@ -1264,7 +1485,8 @@ export class FirebaseAuthService implements IAuthService {
       let errorMessage = 'Failed to reset password';
 
       if (error instanceof Error) {
-        switch (error.message) {
+        const code = (error as any).code;
+        switch (code) {
           case 'auth/requires-recent-login':
             errorMessage =
               'Please log out and log back in before changing your password';
@@ -1285,10 +1507,12 @@ export class FirebaseAuthService implements IAuthService {
     }
   }
 
+  /**
+   * Verify email (placeholder - handled by Firebase auth link)
+   */
   async verifyEmail(token: string): Promise<ApiResponse<boolean>> {
     try {
-      // Firebase auth provides this functionality
-      // For now, we'll simulate it
+      // Firebase handles email verification through links
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       return {
@@ -1308,8 +1532,28 @@ export class FirebaseAuthService implements IAuthService {
   }
 
   /**
-   * Check if user exists in Firestore and clean up orphaned auth records
-   * This method should be called when a user is authenticated but their profile doesn't exist in Firestore
+   * Google Sign-In (requires additional setup)
+   */
+  async loginWithGoogle(): Promise<ApiResponse<{ user: User; token: string }>> {
+    try {
+      // This requires expo-auth-session and Google OAuth setup
+      // Implementation depends on your specific OAuth configuration
+      throw new Error(
+        'Google login not implemented. Please configure OAuth in your app.'
+      );
+    } catch (error) {
+      console.error('Error during Google login:', error);
+      return {
+        data: { user: {} as User, token: '' },
+        success: false,
+        message: error instanceof Error ? error.message : 'Google login failed',
+      };
+    }
+  }
+
+  /**
+   * Clean up orphaned authentication records
+   * Useful when a user exists in Firebase Auth but not in Firestore
    */
   async cleanupOrphanedAuth(
     firebaseUser: FirebaseUser
@@ -1320,7 +1564,6 @@ export class FirebaseAuthService implements IAuthService {
         firebaseUser.uid
       );
 
-      // Check if user document exists in Firestore
       const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
 
       if (!userDoc.exists()) {
@@ -1329,7 +1572,6 @@ export class FirebaseAuthService implements IAuthService {
         );
 
         try {
-          // Delete the user from Firebase Auth
           await deleteUser(firebaseUser);
           console.log('✅ Orphaned auth record deleted successfully');
 
@@ -1344,8 +1586,6 @@ export class FirebaseAuthService implements IAuthService {
             '❌ Failed to delete orphaned auth record:',
             deleteError
           );
-
-          // If we can't delete the auth record, at least sign them out
           await signOut(auth);
 
           return {
@@ -1356,7 +1596,6 @@ export class FirebaseAuthService implements IAuthService {
         }
       }
 
-      // User exists in both Auth and Firestore, all good
       return {
         data: true,
         success: true,
@@ -1365,7 +1604,6 @@ export class FirebaseAuthService implements IAuthService {
     } catch (error) {
       console.error('Error during orphaned auth cleanup:', error);
 
-      // On any error, sign out the user for security
       try {
         await signOut(auth);
       } catch (signOutError) {

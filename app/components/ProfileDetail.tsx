@@ -103,7 +103,7 @@ const ProfileDetail = ({
           {/* Age badge */}
           <View style={[styles.ageBadge, { backgroundColor: theme.surface }]}>
             <Text style={[styles.ageText, { color: theme.text }]}>
-              {user.age}
+              {user.age} y/o
             </Text>
           </View>
         </View>
@@ -115,13 +115,13 @@ const ProfileDetail = ({
             <Text style={[styles.nameText, { color: theme.text }]}>
               {user.name}
             </Text>
-            {user.distance && (
+            {user.location && (
               <View style={styles.distanceRow}>
                 <MapPin size={16} color={theme.textSecondary} />
                 <Text
                   style={[styles.distanceText, { color: theme.textSecondary }]}
                 >
-                  {user.distance} {t('search.distance')} {t('profile.distance')}
+                  {user.location}
                 </Text>
               </View>
             )}

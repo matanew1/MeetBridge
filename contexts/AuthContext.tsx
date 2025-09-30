@@ -1,3 +1,4 @@
+// contexts/AuthContext.tsx
 import React, {
   createContext,
   useContext,
@@ -6,16 +7,13 @@ import React, {
   ReactNode,
 } from 'react';
 import { Platform, AppState, AppStateStatus } from 'react-native';
-import {
-  onAuthStateChanged,
-  User as FirebaseUser,
-  signOut,
-} from 'firebase/auth';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db } from '../services/firebase/config';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { services } from '../services';
 import { User } from '../store/types';
 import LocationService from '../services/locationService';
+import geohashService from '../services/geohashService';
 
 interface AuthContextType {
   user: User | null;
@@ -63,12 +61,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   const convertTimestamp = (timestamp: any) => {
-    if (timestamp?.toDate) {
-      return timestamp.toDate();
-    }
-    if (timestamp?.seconds) {
-      return new Date(timestamp.seconds * 1000);
-    }
+    if (timestamp?.toDate) return timestamp.toDate();
+    if (timestamp?.seconds) return new Date(timestamp.seconds * 1000);
     return timestamp;
   };
 
@@ -99,7 +93,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setFirebaseUser(firebaseUser);
 
         try {
-          // Get user profile from Firestore
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
 
           if (userDoc.exists()) {
@@ -112,7 +105,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
             setUser(fullUser);
 
-            // Update user's online status and last seen
             try {
               await updateDoc(doc(db, 'users', firebaseUser.uid), {
                 lastSeen: serverTimestamp(),
@@ -142,7 +134,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return unsubscribe;
   }, []);
 
-  // Update user's offline status when app is backgrounded
   useEffect(() => {
     const handleAppStateChange = async () => {
       if (firebaseUser && user) {
@@ -341,7 +332,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  // ✅ PATCHED
   const updateProfile = async (userData: Partial<User>) => {
     try {
       if (!firebaseUser) {
@@ -351,43 +341,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         };
       }
 
-      const dataToSave: Record<string, any> = { ...userData };
+      // Use the Firebase service which now handles image upload internally
+      const response = await services.userProfile.updateProfile(userData);
 
-      // Upload image if it's local
-      if (
-        typeof dataToSave.image === 'string' &&
-        (dataToSave.image.startsWith('file://') ||
-          dataToSave.image.startsWith('content://') ||
-          dataToSave.image.startsWith('/'))
-      ) {
-        if (!services.storage?.uploadImage) {
-          return { success: false, message: 'Image upload service not available' };
-        }
-        const resp = await services.storage.uploadImage(dataToSave.image);
-        if (resp?.success && (resp.secureUrl || resp.url)) {
-          dataToSave.image = resp.secureUrl || resp.url;
-        } else {
-          return { success: false, message: resp?.message || 'Image upload failed' };
-        }
+      if (response.success) {
+        setUser(response.data);
+        return {
+          success: true,
+          message: 'Profile updated successfully',
+        };
       }
 
-      // Remove undefined fields
-      const sanitized: Record<string, any> = {};
-      Object.entries(dataToSave).forEach(([k, v]) => {
-        if (v !== undefined) sanitized[k] = v;
-      });
-
-      const userRef = doc(db, 'users', firebaseUser.uid);
-      await updateDoc(userRef, {
-        ...sanitized,
-        updatedAt: serverTimestamp(),
-      });
-
-      if (user) {
-        setUser((prev) => ({ ...prev!, ...sanitized }));
-      }
-
-      return { success: true, message: 'Profile updated successfully' };
+      return {
+        success: false,
+        message: response.message || 'Failed to update profile',
+      };
     } catch (error) {
       console.error('Update profile error:', error);
       return {
@@ -410,6 +378,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       const { coordinates, address } = locationData;
+
+      // Generate geohash for efficient location-based queries
+      const geohash = geohashService.generateGeohash(
+        coordinates.latitude,
+        coordinates.longitude
+      );
+
       const userRef = doc(db, 'users', firebaseUser.uid);
       await updateDoc(userRef, {
         location: address,
@@ -418,6 +393,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           longitude: coordinates.longitude,
           lastUpdated: new Date(),
         },
+        geohash,
         updatedAt: serverTimestamp(),
       });
 
@@ -430,10 +406,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             longitude: coordinates.longitude,
             lastUpdated: new Date(),
           },
+          geohash,
         }));
       }
 
-      return { success: true, message: 'Location updated successfully', location: address };
+      return {
+        success: true,
+        message: 'Location updated successfully',
+        location: address,
+      };
     } catch (error) {
       console.error('Update location error:', error);
       return { success: false, message: 'Failed to update location' };
