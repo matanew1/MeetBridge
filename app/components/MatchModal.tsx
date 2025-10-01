@@ -20,6 +20,7 @@ import Animated, {
   withDelay,
   interpolate,
   runOnJS,
+  Easing,
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
@@ -81,81 +82,79 @@ const MatchModal: React.FC<MatchModalProps> = ({
       sparkleScale.value = 0;
       sparkleOpacity.value = 0;
 
-      // Start animation sequence
-      overlayOpacity.value = withTiming(1, { duration: 300 });
-      
+      overlayOpacity.value = withTiming(1, { duration: 350, easing: Easing.bezier(0.25, 0.1, 0.25, 1) });
+
       modalScale.value = withDelay(
-        100,
+        80,
         withSpring(1, {
-          damping: 15,
-          stiffness: 150,
+          damping: 12,
+          stiffness: 180,
         })
       );
 
       profilesScale.value = withDelay(
-        200,
+        150,
         withSpring(1, {
-          damping: 12,
-          stiffness: 100,
+          damping: 10,
+          stiffness: 140,
         })
       );
 
       profilesRotation.value = withDelay(
-        300,
+        250,
         withSequence(
-          withTiming(10, { duration: 200 }),
-          withTiming(-10, { duration: 200 }),
-          withTiming(0, { duration: 200 })
+          withTiming(15, { duration: 150, easing: Easing.bezier(0.34, 1.56, 0.64, 1) }),
+          withTiming(-15, { duration: 150, easing: Easing.bezier(0.34, 1.56, 0.64, 1) }),
+          withTiming(0, { duration: 150, easing: Easing.out(Easing.cubic) })
         )
       );
 
       heartScale.value = withDelay(
-        400,
+        350,
         withSequence(
-          withSpring(1.5, {
-            damping: 8,
-            stiffness: 200,
+          withSpring(1.8, {
+            damping: 6,
+            stiffness: 220,
           }),
           withSpring(1, {
-            damping: 10,
-            stiffness: 150,
+            damping: 8,
+            stiffness: 180,
           })
         )
       );
 
-      // Sparkle animation
       sparkleScale.value = withDelay(
-        500,
+        450,
         withSequence(
-          withTiming(1, { duration: 300 }),
-          withTiming(0, { duration: 300 })
+          withTiming(1.2, { duration: 350, easing: Easing.bezier(0.34, 1.56, 0.64, 1) }),
+          withTiming(0, { duration: 350, easing: Easing.in(Easing.cubic) })
         )
       );
 
       sparkleOpacity.value = withDelay(
-        500,
+        450,
         withSequence(
-          withTiming(1, { duration: 300 }),
-          withTiming(0, { duration: 300 })
+          withTiming(1, { duration: 350 }),
+          withTiming(0, { duration: 350 })
         )
       );
 
       textOpacity.value = withDelay(
-        600,
-        withTiming(1, { duration: 400 })
+        550,
+        withTiming(1, { duration: 450, easing: Easing.bezier(0.25, 0.1, 0.25, 1) })
       );
 
       buttonsTranslateY.value = withDelay(
-        800,
+        700,
         withSpring(0, {
-          damping: 15,
-          stiffness: 150,
+          damping: 12,
+          stiffness: 180,
         })
       );
 
       buttonsOpacity.value = withDelay(
-        800,
-        withTiming(1, { duration: 400 })
+        700,
+        withTiming(1, { duration: 450, easing: Easing.bezier(0.25, 0.1, 0.25, 1) })
       );
     } else {
       // Exit animation
@@ -366,20 +365,20 @@ const styles = StyleSheet.create({
     gap: -20,
   },
   profileImageContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 4,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    borderWidth: 5,
     borderColor: '#FFF',
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 6,
     },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 10,
   },
   profileImage: {
     width: '100%',
@@ -397,9 +396,9 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   heartBackground: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     justifyContent: 'center',
     alignItems: 'center',
   },

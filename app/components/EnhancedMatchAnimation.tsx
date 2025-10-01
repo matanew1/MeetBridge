@@ -63,61 +63,54 @@ export default function EnhancedMatchAnimation({
 
   useEffect(() => {
     if (visible) {
-      // Sequence animation - slower overlay fade in
-      overlayOpacity.value = withTiming(1, { duration: 500 });
+      overlayOpacity.value = withTiming(1, { duration: 400, easing: Easing.bezier(0.25, 0.1, 0.25, 1) });
 
-      // Big heart burst - slower and more dramatic
       heartScale.value = withSequence(
-        withDelay(300, withSpring(1.5, { damping: 4 })),
-        withSpring(1, { damping: 6 })
+        withDelay(200, withSpring(1.8, { damping: 3, stiffness: 120 })),
+        withSpring(1, { damping: 5, stiffness: 100 })
       );
-      heartRotation.value = withDelay(300, withSpring(0, { damping: 10 }));
+      heartRotation.value = withDelay(200, withSpring(0, { damping: 8, stiffness: 100 }));
 
-      // Confetti effect - longer duration
       confettiOpacity.value = withDelay(
-        600,
+        400,
         withSequence(
-          withTiming(1, { duration: 500 }),
-          withDelay(1500, withTiming(0, { duration: 700 }))
+          withTiming(1, { duration: 400, easing: Easing.out(Easing.cubic) }),
+          withDelay(1800, withTiming(0, { duration: 600, easing: Easing.in(Easing.cubic) }))
         )
       );
 
-      // Profile cards - slower entrance
-      profileScale.value = withDelay(800, withSpring(1, { damping: 10 }));
+      profileScale.value = withDelay(600, withSpring(1, { damping: 8, stiffness: 120 }));
 
-      // Text fade in - slower
-      textOpacity.value = withDelay(1100, withSpring(1, { damping: 12 }));
+      textOpacity.value = withDelay(900, withTiming(1, { duration: 500, easing: Easing.bezier(0.25, 0.1, 0.25, 1) }));
 
-      // Buttons bounce in - slower
-      buttonScale.value = withDelay(1400, withSpring(1, { damping: 8 }));
+      buttonScale.value = withDelay(1200, withSpring(1, { damping: 6, stiffness: 150 }));
 
-      // Floating sparkles - longer durations
       sparkle1.value = withDelay(
-        900,
+        700,
         withSequence(
-          withTiming(1, { duration: 1200, easing: Easing.out(Easing.ease) }),
-          withTiming(0, { duration: 600 })
+          withTiming(1, { duration: 1000, easing: Easing.bezier(0.34, 1.56, 0.64, 1) }),
+          withTiming(0, { duration: 500, easing: Easing.in(Easing.ease) })
         )
       );
       sparkle2.value = withDelay(
-        1000,
+        800,
         withSequence(
-          withTiming(1, { duration: 1300, easing: Easing.out(Easing.ease) }),
-          withTiming(0, { duration: 600 })
+          withTiming(1, { duration: 1100, easing: Easing.bezier(0.34, 1.56, 0.64, 1) }),
+          withTiming(0, { duration: 500, easing: Easing.in(Easing.ease) })
         )
       );
       sparkle3.value = withDelay(
-        950,
+        750,
         withSequence(
-          withTiming(1, { duration: 1250, easing: Easing.out(Easing.ease) }),
-          withTiming(0, { duration: 600 })
+          withTiming(1, { duration: 1050, easing: Easing.bezier(0.34, 1.56, 0.64, 1) }),
+          withTiming(0, { duration: 500, easing: Easing.in(Easing.ease) })
         )
       );
       sparkle4.value = withDelay(
-        1050,
+        850,
         withSequence(
-          withTiming(1, { duration: 1350, easing: Easing.out(Easing.ease) }),
-          withTiming(0, { duration: 600 })
+          withTiming(1, { duration: 1150, easing: Easing.bezier(0.34, 1.56, 0.64, 1) }),
+          withTiming(0, { duration: 500, easing: Easing.in(Easing.ease) })
         )
       );
     } else {
@@ -167,32 +160,40 @@ export default function EnhancedMatchAnimation({
   const sparkle1Style = useAnimatedStyle(() => ({
     opacity: sparkle1.value,
     transform: [
-      { translateY: -(sparkle1.value * 60) },
-      { translateX: sparkle1.value * 40 },
+      { translateY: -(sparkle1.value * 80) },
+      { translateX: sparkle1.value * 60 },
+      { scale: 0.5 + sparkle1.value * 0.5 },
+      { rotate: `${sparkle1.value * 360}deg` },
     ],
   }));
 
   const sparkle2Style = useAnimatedStyle(() => ({
     opacity: sparkle2.value,
     transform: [
-      { translateY: -(sparkle2.value * 70) },
-      { translateX: -(sparkle2.value * 50) },
+      { translateY: -(sparkle2.value * 90) },
+      { translateX: -(sparkle2.value * 70) },
+      { scale: 0.5 + sparkle2.value * 0.5 },
+      { rotate: `${-sparkle2.value * 360}deg` },
     ],
   }));
 
   const sparkle3Style = useAnimatedStyle(() => ({
     opacity: sparkle3.value,
     transform: [
-      { translateY: -(sparkle3.value * 50) },
-      { translateX: sparkle3.value * 30 },
+      { translateY: -(sparkle3.value * 70) },
+      { translateX: sparkle3.value * 50 },
+      { scale: 0.5 + sparkle3.value * 0.5 },
+      { rotate: `${sparkle3.value * 360}deg` },
     ],
   }));
 
   const sparkle4Style = useAnimatedStyle(() => ({
     opacity: sparkle4.value,
     transform: [
-      { translateY: -(sparkle4.value * 65) },
-      { translateX: -(sparkle4.value * 35) },
+      { translateY: -(sparkle4.value * 85) },
+      { translateX: -(sparkle4.value * 55) },
+      { scale: 0.5 + sparkle4.value * 0.5 },
+      { rotate: `${-sparkle4.value * 360}deg` },
     ],
   }));
 
@@ -346,15 +347,15 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   heartCircle: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 16,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.6,
+    shadowRadius: 24,
+    elevation: 20,
   },
   sparkle: {
     position: 'absolute',
@@ -380,16 +381,16 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   profileCard: {
-    width: 120,
-    height: 160,
-    borderRadius: 16,
+    width: 130,
+    height: 170,
+    borderRadius: 20,
     overflow: 'hidden',
     backgroundColor: '#E0E0E0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 10,
   },
   profileImage: {
     width: '100%',

@@ -18,6 +18,7 @@ import Animated, {
   useAnimatedStyle,
   withRepeat,
   withTiming,
+  withSequence,
   interpolate,
   Easing,
 } from 'react-native-reanimated';
@@ -63,18 +64,27 @@ const ProfileCard = ({
   theme,
 }: ProfileCardProps) => {
   const { t } = useTranslation();
-  const opacity = useSharedValue(1);
-  const translateY = useSharedValue(0);
-  const scale = useSharedValue(1);
+  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(20);
+  const scale = useSharedValue(0.9);
 
-  // Animate out when card is being animated out
+  React.useEffect(() => {
+    opacity.value = withTiming(1, { duration: 400, easing: Easing.out(Easing.cubic) });
+    translateY.value = withTiming(0, { duration: 400, easing: Easing.out(Easing.cubic) });
+    scale.value = withSpring(1, { damping: 12, stiffness: 150 });
+  }, []);
+
   React.useEffect(() => {
     if (isAnimatingOut) {
-      opacity.value = withTiming(0, { duration: 300 });
-      translateY.value = withTiming(isLiked || !isDisliked ? -50 : 50, {
-        duration: 300,
+      opacity.value = withTiming(0, { duration: 400, easing: Easing.bezier(0.4, 0, 0.6, 1) });
+      translateY.value = withTiming(isLiked || !isDisliked ? -80 : 80, {
+        duration: 400,
+        easing: Easing.bezier(0.4, 0, 0.2, 1),
       });
-      scale.value = withTiming(0.8, { duration: 300 });
+      scale.value = withSequence(
+        withTiming(1.05, { duration: 100, easing: Easing.out(Easing.ease) }),
+        withTiming(0.7, { duration: 300, easing: Easing.in(Easing.cubic) })
+      );
     }
   }, [isAnimatingOut, isLiked, isDisliked]);
 
@@ -297,14 +307,13 @@ export default function SearchScreen() {
   }, [isSearching, currentUser]);
 
   useEffect(() => {
-    // Strong, noticeable infinite pulse animation
     pulseAnimation.value = withRepeat(
       withTiming(1, {
-        duration: 2000, // Faster for more noticeable effect
-        easing: Easing.inOut(Easing.ease),
+        duration: 1800,
+        easing: Easing.bezier(0.45, 0.05, 0.55, 0.95),
       }),
-      -1, // Infinite loop
-      true // reverse=true creates seamless back-and-forth motion
+      -1,
+      true
     );
   }, []);
 
@@ -693,21 +702,26 @@ export default function SearchScreen() {
 
   // Animated styles
   const pulseStyle = useAnimatedStyle(() => {
-    // Create a strong, noticeable breathing effect
     const scale = interpolate(
       pulseAnimation.value,
       [0, 1],
-      [1, 1.08] // Much more noticeable scale change
+      [1, 1.12]
     );
 
     const opacity = interpolate(
       pulseAnimation.value,
       [0, 1],
-      [0.7, 1] // More dramatic opacity change
+      [0.65, 1]
+    );
+
+    const rotate = interpolate(
+      pulseAnimation.value,
+      [0, 1],
+      [0, 5]
     );
 
     return {
-      transform: [{ scale }],
+      transform: [{ scale }, { rotate: `${rotate}deg` }],
       opacity,
     };
   });
@@ -981,17 +995,17 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: '#FFF',
-    borderRadius: 20,
+    borderRadius: 24,
     overflow: 'hidden',
-    elevation: 3,
+    elevation: 5,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 10,
+    padding: 12,
   },
   likedCard: {
     borderColor: '#FF69B4',
@@ -1003,11 +1017,13 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   imageContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 50,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     overflow: 'hidden',
-    marginBottom: 5,
+    marginBottom: 8,
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.8)',
   },
   cardImage: {
     width: '100%',
@@ -1020,16 +1036,16 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   actionBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 2,
+    elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
   },
   dislikeBtn: {
     backgroundColor: '#FFE5E5',

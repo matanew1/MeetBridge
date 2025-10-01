@@ -34,31 +34,28 @@ export default function DiscoveryAnimation({
   const heartScale = useSharedValue(1);
 
   useEffect(() => {
-    // Rotating circle animation
     rotation.value = withRepeat(
       withTiming(360, {
-        duration: 3000,
-        easing: Easing.linear,
+        duration: 2500,
+        easing: Easing.bezier(0.65, 0, 0.35, 1),
       }),
       -1,
       false
     );
 
-    // Pulsing center
     scale.value = withRepeat(
       withSequence(
-        withSpring(1.1, { damping: 2 }),
-        withSpring(1, { damping: 2 })
+        withSpring(1.25, { damping: 3, stiffness: 120 }),
+        withSpring(1, { damping: 3, stiffness: 120 })
       ),
       -1,
       true
     );
 
-    // Floating cards
     cardOffset1.value = withRepeat(
       withSequence(
-        withTiming(-10, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0, { duration: 2000, easing: Easing.inOut(Easing.ease) })
+        withTiming(-20, { duration: 1800, easing: Easing.bezier(0.45, 0, 0.55, 1) }),
+        withTiming(0, { duration: 1800, easing: Easing.bezier(0.45, 0, 0.55, 1) })
       ),
       -1,
       true
@@ -66,8 +63,8 @@ export default function DiscoveryAnimation({
 
     cardOffset2.value = withRepeat(
       withSequence(
-        withTiming(10, { duration: 2500, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0, { duration: 2500, easing: Easing.inOut(Easing.ease) })
+        withTiming(20, { duration: 2200, easing: Easing.bezier(0.45, 0, 0.55, 1) }),
+        withTiming(0, { duration: 2200, easing: Easing.bezier(0.45, 0, 0.55, 1) })
       ),
       -1,
       true
@@ -75,28 +72,26 @@ export default function DiscoveryAnimation({
 
     cardOffset3.value = withRepeat(
       withSequence(
-        withTiming(-8, { duration: 2200, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0, { duration: 2200, easing: Easing.inOut(Easing.ease) })
+        withTiming(-15, { duration: 2000, easing: Easing.bezier(0.45, 0, 0.55, 1) }),
+        withTiming(0, { duration: 2000, easing: Easing.bezier(0.45, 0, 0.55, 1) })
       ),
       -1,
       true
     );
 
-    // Twinkling sparkles
     sparkleOpacity.value = withRepeat(
       withSequence(
-        withTiming(1, { duration: 1000 }),
-        withTiming(0.3, { duration: 1000 })
+        withTiming(1, { duration: 800, easing: Easing.ease }),
+        withTiming(0.2, { duration: 800, easing: Easing.ease })
       ),
       -1,
       true
     );
 
-    // Beating heart
     heartScale.value = withRepeat(
       withSequence(
-        withSpring(1.2, { damping: 3 }),
-        withSpring(1, { damping: 3 })
+        withSpring(1.4, { damping: 2, stiffness: 180 }),
+        withSpring(1, { damping: 2, stiffness: 180 })
       ),
       -1,
       true
@@ -251,28 +246,28 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   iconCircle: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 12,
   },
   floatingCard: {
     position: 'absolute',
   },
   miniCard: {
-    width: 60,
-    height: 80,
-    borderRadius: 12,
+    width: 70,
+    height: 90,
+    borderRadius: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   card1: {
     top: 40,
