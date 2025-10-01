@@ -23,6 +23,14 @@ export interface IUserProfileService {
   deleteProfile(userId: string): Promise<ApiResponse<boolean>>;
 }
 
+// Match result type
+export interface MatchResult {
+  isMatch: boolean;
+  matchId?: string;
+  matchedUser?: User;
+  conversationId?: string;
+}
+
 // Discovery Service
 export interface IDiscoveryService {
   getDiscoverProfiles(
@@ -32,12 +40,8 @@ export interface IDiscoveryService {
   likeProfile(
     userId: string,
     targetUserId: string
-  ): Promise<ApiResponse<boolean>>;
+  ): Promise<ApiResponse<MatchResult>>;
   dislikeProfile(
-    userId: string,
-    targetUserId: string
-  ): Promise<ApiResponse<boolean>>;
-  superLikeProfile(
     userId: string,
     targetUserId: string
   ): Promise<ApiResponse<boolean>>;
@@ -46,6 +50,9 @@ export interface IDiscoveryService {
     targetUserId: string,
     reason: string
   ): Promise<ApiResponse<boolean>>;
+  // Queue optimization methods
+  syncDiscoveryQueue(userId: string): Promise<number>;
+  cleanDuplicatesInQueue(userId: string): Promise<number>;
 }
 
 // Matching Service
@@ -56,6 +63,7 @@ export interface IMatchingService {
     userId: string,
     targetUserId: string
   ): Promise<ApiResponse<boolean>>;
+  markMatchAnimationPlayed(matchId: string): Promise<ApiResponse<boolean>>;
   getMatchDetails(userId: string, matchId: string): Promise<ApiResponse<User>>;
 }
 
@@ -80,37 +88,6 @@ export interface IChatService {
   deleteConversation(conversationId: string): Promise<ApiResponse<boolean>>;
 }
 
-// Location Service
-export interface ILocationService {
-  getCurrentLocation(): Promise<
-    ApiResponse<{ latitude: number; longitude: number }>
-  >;
-  updateLocation(
-    userId: string,
-    location: { latitude: number; longitude: number }
-  ): Promise<ApiResponse<boolean>>;
-  calculateDistance(
-    lat1: number,
-    lon1: number,
-    lat2: number,
-    lon2: number
-  ): number;
-}
-
-// Notification Service
-export interface INotificationService {
-  registerForPushNotifications(
-    userId: string,
-    deviceToken: string
-  ): Promise<ApiResponse<boolean>>;
-  unregisterFromPushNotifications(
-    userId: string,
-    deviceToken: string
-  ): Promise<ApiResponse<boolean>>;
-  getNotifications(userId: string, page?: number): Promise<ApiResponse<any[]>>;
-  markNotificationAsRead(notificationId: string): Promise<ApiResponse<boolean>>;
-}
-
 // Error handling utility
 export class ApiError extends Error {
   constructor(
@@ -123,44 +100,12 @@ export class ApiError extends Error {
   }
 }
 
-// Base API client configuration
-export interface ApiClientConfig {
-  baseUrl: string;
-  timeout: number;
-  apiKey?: string;
-  authToken?: string;
-  headers?: Record<string, string>;
-}
-
-// HTTP methods
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-
-// Generic API request interface
-export interface ApiRequest {
-  url: string;
-  method: HttpMethod;
-  data?: any;
-  params?: Record<string, any>;
-  headers?: Record<string, string>;
-}
-
-// Base API client interface
-export interface IApiClient {
-  request<T>(request: ApiRequest): Promise<ApiResponse<T>>;
-  get<T>(url: string, params?: Record<string, any>): Promise<ApiResponse<T>>;
-  post<T>(url: string, data?: any): Promise<ApiResponse<T>>;
-  put<T>(url: string, data?: any): Promise<ApiResponse<T>>;
-  delete<T>(url: string): Promise<ApiResponse<T>>;
-  patch<T>(url: string, data?: any): Promise<ApiResponse<T>>;
-}
-
 // Authentication service
 export interface IAuthService {
   login(
     email: string,
     password: string
   ): Promise<ApiResponse<{ user: User; token: string }>>;
-  loginWithGoogle(): Promise<ApiResponse<{ user: User; token: string }>>;
   register(
     userData: Partial<User> & { email: string; password: string }
   ): Promise<ApiResponse<{ user: User; token: string }>>;
@@ -186,27 +131,12 @@ export interface IStorageService {
   getAllKeys(): Promise<string[]>;
 }
 
-// Analytics service for tracking user interactions
-export interface IAnalyticsService {
-  trackEvent(
-    eventName: string,
-    properties?: Record<string, any>
-  ): Promise<void>;
-  trackScreenView(screenName: string): Promise<void>;
-  setUserProperties(properties: Record<string, any>): Promise<void>;
-  identifyUser(userId: string, properties?: Record<string, any>): Promise<void>;
-}
-
 // Main service container interface
 export interface IServiceContainer {
   userProfile: IUserProfileService;
   discovery: IDiscoveryService;
   matching: IMatchingService;
   chat: IChatService;
-  location: ILocationService;
-  notification: INotificationService;
   auth: IAuthService;
   storage: IStorageService;
-  analytics: IAnalyticsService;
-  apiClient: IApiClient;
 }

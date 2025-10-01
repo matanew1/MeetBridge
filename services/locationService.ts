@@ -1,5 +1,9 @@
 import * as Location from 'expo-location';
-import { User } from '../store/types';
+import {
+  geohashForLocation,
+  geohashQueryBounds,
+  distanceBetween,
+} from 'geofire-common';
 
 export interface LocationCoordinates {
   latitude: number;
@@ -11,6 +15,16 @@ export interface LocationCoordinates {
 export interface LocationPermissionStatus {
   granted: boolean;
   canAskAgain: boolean;
+}
+
+export interface Coordinates {
+  latitude: number;
+  longitude: number;
+}
+
+export interface GeoData {
+  geohash: string;
+  coordinates: Coordinates;
 }
 
 class LocationService {
@@ -27,13 +41,29 @@ class LocationService {
   }
 
   /**
-   * Request location permissions from the user
+   * Request location permissions from the user (with background access)
    */
   async requestLocationPermissions(): Promise<LocationPermissionStatus> {
     try {
-      // Request foreground location permissions
+      // Request foreground location permissions first
       const foregroundStatus =
         await Location.requestForegroundPermissionsAsync();
+
+      if (foregroundStatus.status !== 'granted') {
+        return {
+          granted: false,
+          canAskAgain: foregroundStatus.canAskAgain,
+        };
+      }
+
+      // Request background location permissions for continuous tracking
+      const backgroundStatus =
+        await Location.requestBackgroundPermissionsAsync();
+
+      console.log('📍 Location permissions:', {
+        foreground: foregroundStatus.status,
+        background: backgroundStatus.status,
+      });
 
       return {
         granted: foregroundStatus.status === 'granted',
@@ -128,7 +158,7 @@ class LocationService {
   }
 
   /**
-   * Start watching location changes
+   * Start watching location changes with continuous updates
    */
   async startLocationWatcher(
     callback: (location: LocationCoordinates) => void,
@@ -143,6 +173,7 @@ class LocationService {
       if (!hasPermission) {
         const permissionResult = await this.requestLocationPermissions();
         if (!permissionResult.granted) {
+          console.warn('📍 Location permission denied');
           return false;
         }
       }
@@ -152,13 +183,27 @@ class LocationService {
         await this.stopLocationWatcher();
       }
 
+      console.log('📍 Starting location watcher with continuous tracking...');
+
       this.locationWatcher = await Location.watchPositionAsync(
         {
-          accuracy: options?.accuracy || Location.Accuracy.High,
-          timeInterval: options?.timeInterval || 30000, // 30 seconds
-          distanceInterval: options?.distanceInterval || 50, // 50 meters
+          accuracy: options?.accuracy || Location.Accuracy.Balanced,
+          timeInterval: options?.timeInterval || 60000, // Update every 60 seconds
+          distanceInterval: options?.distanceInterval || 100, // Update every 100 meters
+          showsBackgroundLocationIndicator: true, // Show indicator on iOS
+          foregroundService: {
+            notificationTitle: 'MeetBridge is active',
+            notificationBody: 'Updating your location to show nearby matches',
+            notificationColor: '#8E44AD',
+          },
         },
         (location) => {
+          console.log('📍 Location updated:', {
+            lat: location.coords.latitude,
+            lon: location.coords.longitude,
+            accuracy: location.coords.accuracy,
+          });
+
           callback({
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
@@ -168,6 +213,7 @@ class LocationService {
         }
       );
 
+      console.log('✅ Location watcher started successfully');
       return true;
     } catch (error) {
       console.error('Error starting location watcher:', error);
@@ -186,7 +232,7 @@ class LocationService {
   }
 
   /**
-   * Calculate distance between two coordinates in kilometers
+   * Calculate distance between two coordinates in kilometers using geofire-common
    */
   calculateDistance(
     lat1: number,
@@ -194,22 +240,84 @@ class LocationService {
     lat2: number,
     lon2: number
   ): number {
-    const R = 6371; // Radius of the Earth in km
-    const dLat = this.deg2rad(lat2 - lat1);
-    const dLon = this.deg2rad(lon2 - lon1);
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(this.deg2rad(lat1)) *
-        Math.cos(this.deg2rad(lat2)) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distance = R * c; // Distance in km
-    return Math.round(distance * 100) / 100; // Round to 2 decimal places
+    const distance = distanceBetween([lat1, lon1], [lat2, lon2]);
+    return Math.round(distance * 100) / 100; // Distance in km, rounded to 2 decimals
   }
 
-  private deg2rad(deg: number): number {
-    return deg * (Math.PI / 180);
+  /**
+   * Calculate distance between two coordinate objects (convenience method)
+   */
+  calculateDistanceBetween(from: Coordinates, to: Coordinates): number {
+    return this.calculateDistance(
+      from.latitude,
+      from.longitude,
+      to.latitude,
+      to.longitude
+    );
+  }
+
+  /**
+   * Generate geohash from coordinates
+   */
+  generateGeohash(latitude: number, longitude: number): string {
+    return geohashForLocation([latitude, longitude]);
+  }
+
+  /**
+   * Get query bounds for searching within a radius
+   */
+  getQueryBounds(center: Coordinates, radiusInKm: number): [string, string][] {
+    return geohashQueryBounds([center.latitude, center.longitude], radiusInKm);
+  }
+
+  /**
+   * Check if a location is within radius
+   */
+  isWithinRadius(
+    center: Coordinates,
+    target: Coordinates,
+    radiusInKm: number
+  ): boolean {
+    const distance = this.calculateDistance(
+      center.latitude,
+      center.longitude,
+      target.latitude,
+      target.longitude
+    );
+    return distance <= radiusInKm;
+  }
+
+  /**
+   * Sort locations by distance from center
+   */
+  sortByDistance<T extends { coordinates?: Coordinates; distance?: number }>(
+    locations: T[],
+    center: Coordinates
+  ): T[] {
+    return locations
+      .map((location) => {
+        if (location.coordinates) {
+          const distance = this.calculateDistance(
+            center.latitude,
+            center.longitude,
+            location.coordinates.latitude,
+            location.coordinates.longitude
+          );
+          return { ...location, distance };
+        }
+        return location;
+      })
+      .sort((a, b) => (a.distance || 0) - (b.distance || 0));
+  }
+
+  /**
+   * Format distance for display
+   */
+  formatDistance(km: number): string {
+    if (km < 1) {
+      return `${Math.round(km * 1000)}m`;
+    }
+    return `${km.toFixed(1)}km`;
   }
 
   /**

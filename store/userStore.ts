@@ -8,12 +8,20 @@ import {
 } from './types';
 import { services } from '../services';
 import { APP_CONFIG, DATING_CONSTANTS } from '../constants';
+import cacheService from '../services/cacheService';
 
 // Use Firebase services
 const userProfileService = services.userProfile;
 const discoveryService = services.discovery;
 const matchingService = services.matching;
 const chatService = services.chat;
+
+// Cache TTL constants (in milliseconds)
+const CACHE_TTL = {
+  CURRENT_USER: 10 * 60 * 1000, // 10 minutes
+  DISCOVER_PROFILES: 5 * 60 * 1000, // 5 minutes
+  CONVERSATIONS: 2 * 60 * 1000, // 2 minutes
+};
 
 interface UserState {
   // Current user
@@ -65,9 +73,13 @@ interface UserState {
   // Actions - Discover
   loadDiscoverProfiles: (refresh?: boolean) => Promise<void>;
   loadMoreProfiles: () => Promise<void>;
-  likeProfile: (profileId: string) => Promise<boolean>; // Returns true if it's a match
+  likeProfile: (profileId: string) => Promise<{
+    isMatch: boolean;
+    matchId?: string;
+    matchedUser?: User;
+    conversationId?: string;
+  }>;
   dislikeProfile: (profileId: string) => Promise<void>;
-  superLikeProfile: (profileId: string) => Promise<boolean>;
   unmatchProfile: (profileId: string) => Promise<void>;
   reportProfile: (profileId: string, reason: string) => Promise<void>;
 
@@ -126,11 +138,26 @@ export const useUserStore = create<UserState>((set, get) => ({
   setCurrentUser: (user) => set({ currentUser: user }),
 
   loadCurrentUser: async () => {
+    // Check cache first
+    const cachedUser = cacheService.get<User>('currentUser');
+    if (cachedUser) {
+      set({ currentUser: cachedUser });
+      return;
+    }
+
     set({ isLoadingCurrentUser: true, error: null });
     try {
       const response = await userProfileService.getCurrentUser();
       if (response.success) {
         set({ currentUser: response.data });
+        // Cache the user data
+        if (response.data) {
+          cacheService.set(
+            'currentUser',
+            response.data,
+            CACHE_TTL.CURRENT_USER
+          );
+        }
       } else {
         set({ error: response.message || 'Failed to load user profile' });
       }
@@ -148,6 +175,8 @@ export const useUserStore = create<UserState>((set, get) => ({
       const response = await userProfileService.updateProfile(userData);
       if (response.success) {
         set({ currentUser: response.data });
+        // Invalidate and update cache
+        cacheService.set('currentUser', response.data, CACHE_TTL.CURRENT_USER);
       } else {
         set({ error: response.message || 'Failed to update profile' });
       }
@@ -160,10 +189,13 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   // Search and Discovery Actions
-  updateSearchFilters: (filters) =>
+  updateSearchFilters: (filters) => {
+    // Invalidate discover profiles cache when filters change
+    cacheService.invalidateByPrefix('discoverProfiles_');
     set((state) => ({
       searchFilters: { ...state.searchFilters, ...filters },
-    })),
+    }));
+  },
 
   setMatchProfiles: (profiles) => set({ matchProfiles: profiles }),
 
@@ -258,6 +290,24 @@ export const useUserStore = create<UserState>((set, get) => ({
 
     try {
       const page = refresh ? 1 : get().currentPage;
+
+      // Use cache for first page only
+      const cacheKey =
+        page === 1 ? `discoverProfiles_${JSON.stringify(searchFilters)}` : null;
+
+      if (cacheKey && !refresh) {
+        const cached = cacheService.get<UserProfile[]>(cacheKey);
+        if (cached) {
+          set({
+            discoverProfiles: cached,
+            hasMoreProfiles: true,
+            currentPage: page,
+            isLoadingDiscover: false,
+          });
+          return;
+        }
+      }
+
       const response = await discoveryService.getDiscoverProfiles(
         searchFilters,
         page
@@ -269,13 +319,35 @@ export const useUserStore = create<UserState>((set, get) => ({
           (a, b) => (a.distance || 0) - (b.distance || 0)
         );
 
-        set((state) => ({
-          discoverProfiles: refresh
-            ? sortedProfiles
-            : [...state.discoverProfiles, ...sortedProfiles],
-          hasMoreProfiles: response.pagination?.hasMore || false,
-          currentPage: page,
-        }));
+        set((state) => {
+          let updatedProfiles: UserProfile[];
+
+          if (refresh) {
+            updatedProfiles = sortedProfiles;
+          } else {
+            // Combine existing and new profiles, then deduplicate by ID
+            const combined = [...state.discoverProfiles, ...sortedProfiles];
+            updatedProfiles = combined.filter(
+              (profile, index, self) =>
+                index === self.findIndex((p) => p.id === profile.id)
+            );
+          }
+
+          return {
+            discoverProfiles: updatedProfiles,
+            hasMoreProfiles: response.pagination?.hasMore || false,
+            currentPage: page,
+          };
+        });
+
+        // Cache only first page results
+        if (page === 1 && cacheKey) {
+          cacheService.set(
+            cacheKey,
+            sortedProfiles,
+            CACHE_TTL.DISCOVER_PROFILES
+          );
+        }
       } else {
         set({ error: response.message || 'Failed to load profiles' });
       }
@@ -302,7 +374,7 @@ export const useUserStore = create<UserState>((set, get) => ({
     console.log('Current user:', currentUser);
     if (!currentUser) {
       console.log('No current user found, returning false');
-      return false;
+      return { isMatch: false };
     }
 
     set({ isLoadingLike: true, error: null });
@@ -330,28 +402,51 @@ export const useUserStore = create<UserState>((set, get) => ({
         }));
 
         // If it's a match, update matched profiles and reload conversations
-        if (response.data) {
+        if (response.data?.isMatch) {
           console.log('🎉 Match detected!');
-          set((state) => ({
-            matchedProfiles: [...state.matchedProfiles, profileId],
-            matchedProfilesData: userProfile
-              ? [...state.matchedProfilesData, userProfile]
-              : state.matchedProfilesData,
-          }));
-          
-          // Reload conversations to get the newly created one
+
+          const matchedUser = response.data.matchedUser || userProfile;
+
+          set((state) => {
+            // Check if already in matched profiles to avoid duplicates
+            if (state.matchedProfiles.includes(profileId)) {
+              console.log(
+                '⏭️ Profile already in matched list, skipping duplicate'
+              );
+              return state;
+            }
+            return {
+              matchedProfiles: [...state.matchedProfiles, profileId],
+              matchedProfilesData: matchedUser
+                ? [...state.matchedProfilesData, matchedUser]
+                : state.matchedProfilesData,
+            };
+          });
+
+          // Invalidate conversations cache and reload to get the newly created one
+          const { currentUser } = get();
+          if (currentUser) {
+            cacheService.invalidateByPrefix(`conversations_${currentUser.id}`);
+          }
           await get().loadConversations();
+
+          return {
+            isMatch: true,
+            matchId: response.data.matchId,
+            matchedUser,
+            conversationId: response.data.conversationId,
+          };
         }
 
-        return response.data; // Returns true if it's a match
+        return { isMatch: false };
       } else {
         set({ error: response.message || 'Failed to like profile' });
-        return false;
+        return { isMatch: false };
       }
     } catch (error) {
       set({ error: 'Failed to like profile' });
       console.error('Error liking profile:', error);
-      return false;
+      return { isMatch: false };
     } finally {
       set({ isLoadingLike: false });
     }
@@ -375,64 +470,26 @@ export const useUserStore = create<UserState>((set, get) => ({
       if (response.success) {
         set((state) => ({
           dislikedProfiles: [...state.dislikedProfiles, profileId],
+          // Remove from discover profiles
           discoverProfiles: state.discoverProfiles.filter(
             (profile) => profile.id !== profileId
           ),
+          // Remove from liked profiles (if user previously liked them)
+          likedProfiles: state.likedProfiles.filter((id) => id !== profileId),
+          likedProfilesData: state.likedProfilesData.filter(
+            (profile) => profile.id !== profileId
+          ),
         }));
+
+        console.log(
+          `✅ Disliked profile ${profileId} - removed from discover and likes, blocked for 24 hours`
+        );
       } else {
         set({ error: response.message || 'Failed to dislike profile' });
       }
     } catch (error) {
       set({ error: 'Failed to dislike profile' });
       console.error('Error disliking profile:', error);
-    }
-  },
-
-  superLikeProfile: async (profileId) => {
-    const { currentUser } = get();
-    if (!currentUser) return false;
-
-    set({ isLoadingLike: true, error: null });
-
-    try {
-      const response = await discoveryService.superLikeProfile(
-        currentUser.id,
-        profileId
-      );
-
-      if (response.success) {
-        // Find the user object before removing from discoverProfiles
-        const userProfile = get().discoverProfiles.find(
-          (p) => p.id === profileId
-        );
-
-        set((state) => ({
-          likedProfiles: [...state.likedProfiles, profileId],
-          likedProfilesData: userProfile
-            ? [...state.likedProfilesData, userProfile]
-            : state.likedProfilesData,
-          discoverProfiles: state.discoverProfiles.filter(
-            (profile) => profile.id !== profileId
-          ),
-          ...(response.data && {
-            matchedProfiles: [...state.matchedProfiles, profileId],
-            matchedProfilesData: userProfile
-              ? [...state.matchedProfilesData, userProfile]
-              : state.matchedProfilesData,
-          }),
-        }));
-
-        return response.data;
-      } else {
-        set({ error: response.message || 'Failed to super like profile' });
-        return false;
-      }
-    } catch (error) {
-      set({ error: 'Failed to super like profile' });
-      console.error('Error super liking profile:', error);
-      return false;
-    } finally {
-      set({ isLoadingLike: false });
     }
   },
 
@@ -471,6 +528,10 @@ export const useUserStore = create<UserState>((set, get) => ({
             (conv) => !conv.participants.includes(profileId)
           ),
         }));
+
+        // Invalidate conversations cache since we're filtering them
+        cacheService.invalidateByPrefix('conversations_');
+
         console.log('🔴 Unmatch successful, state updated');
       } else {
         console.log('🔴 Unmatch failed:', response.message);
@@ -524,10 +585,20 @@ export const useUserStore = create<UserState>((set, get) => ({
     set({ isLoadingConversations: true, error: null });
 
     try {
+      // Check cache first
+      const cacheKey = `conversations_${currentUser.id}`;
+      const cached = cacheService.get<Conversation[]>(cacheKey);
+
+      if (cached) {
+        set({ conversations: cached, isLoadingConversations: false });
+        return;
+      }
+
       const response = await chatService.getConversations(currentUser.id);
 
       if (response.success) {
         set({ conversations: response.data });
+        cacheService.set(cacheKey, response.data, CACHE_TTL.CONVERSATIONS);
       } else {
         set({ error: response.message || 'Failed to load conversations' });
       }
@@ -585,6 +656,9 @@ export const useUserStore = create<UserState>((set, get) => ({
         conversations: [newConversation, ...state.conversations],
       }));
 
+      // Invalidate conversations cache
+      cacheService.invalidateByPrefix('conversations_');
+
       console.log('🔴 Conversation created:', conversationRef.id);
     } catch (error) {
       console.error('Error creating conversation:', error);
@@ -604,8 +678,9 @@ export const useUserStore = create<UserState>((set, get) => ({
       });
 
       if (response.success) {
-        // Update conversations with new message
-        await get().loadConversations();
+        // Don't reload conversations here - the real-time listener in chat screen
+        // will update messages automatically. Reloading would cause empty message arrays.
+        console.log('✅ Message sent successfully');
       } else {
         set({ error: response.message || 'Failed to send message' });
       }

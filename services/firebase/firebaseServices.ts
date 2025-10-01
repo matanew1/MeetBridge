@@ -14,6 +14,8 @@ import {
   serverTimestamp,
   addDoc,
   writeBatch,
+  onSnapshot,
+  Unsubscribe,
 } from 'firebase/firestore';
 import {
   createUserWithEmailAndPassword,
@@ -41,7 +43,7 @@ import {
   ChatMessage,
 } from '../../store/types';
 import storageService from '../storageService';
-import geohashService from '../geohashService';
+import LocationService from '../locationService';
 
 // ============================================
 // Utility Functions
@@ -130,7 +132,7 @@ export class FirebaseUserProfileService implements IUserProfileService {
       // Handle geohash update if coordinates changed
       if (dataToUpdate.coordinates) {
         const { latitude, longitude } = dataToUpdate.coordinates;
-        dataToUpdate.geohash = geohashService.generateGeohash(
+        dataToUpdate.geohash = LocationService.generateGeohash(
           latitude,
           longitude
         );
@@ -252,9 +254,685 @@ export class FirebaseUserProfileService implements IUserProfileService {
 // ============================================
 export class FirebaseDiscoveryService implements IDiscoveryService {
   /**
-   * Get discover profiles using geohash-based location queries
+   * Populate discovery queue for a user
+   * This should be called periodically or when queue is empty
+   */
+  private async populateDiscoveryQueue(
+    userId: string,
+    filters: SearchFilters,
+    count: number = 50
+  ): Promise<void> {
+    try {
+      // Get current user's data
+      const currentUserDoc = await getDoc(doc(db, 'users', userId));
+      if (!currentUserDoc.exists()) return;
+
+      const currentUserData = currentUserDoc.data();
+      const userLocation = currentUserData?.coordinates;
+
+      if (!userLocation || !userLocation.latitude || !userLocation.longitude) {
+        console.warn(
+          'User location not set, cannot populate queue',
+          userLocation
+        );
+        return;
+      }
+
+      // Get existing profiles in queue using HashMap for O(1) lookup
+      const existingQueueQuery = query(
+        collection(db, 'discovery_queue'),
+        where('userId', '==', userId),
+        where('shown', '==', false)
+      );
+      const existingQueueSnapshot = await getDocs(existingQueueQuery);
+
+      // Use Map for faster lookups and storing metadata
+      const existingProfilesMap = new Map<
+        string,
+        {
+          docId: string;
+          addedAt: any;
+          score: number;
+        }
+      >();
+
+      existingQueueSnapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        existingProfilesMap.set(data.profileId, {
+          docId: doc.id,
+          addedAt: data.addedAt,
+          score: data.score || 0,
+        });
+      });
+
+      console.log(
+        `📋 Found ${existingProfilesMap.size} existing profiles in queue (using HashMap)`
+      );
+
+      // Get existing interactions to exclude (likes and non-expired dislikes)
+      const interactionsQuery = query(
+        collection(db, 'interactions'),
+        where('userId', '==', userId)
+      );
+      const interactionsSnapshot = await getDocs(interactionsQuery);
+
+      const now = new Date();
+      const interactedUserIds = new Set<string>();
+      const expiredDislikeIds: string[] = [];
+
+      interactionsSnapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        const targetUserId = data.targetUserId;
+
+        // Check if it's a dislike with expiration
+        if (data.type === 'dislike' && data.expiresAt) {
+          const expiresAt = data.expiresAt.toDate
+            ? data.expiresAt.toDate()
+            : new Date(data.expiresAt);
+
+          // If expired, mark for deletion and don't exclude
+          if (expiresAt <= now) {
+            console.log(
+              `⏰ Dislike for ${targetUserId} has expired, will be deleted`
+            );
+            expiredDislikeIds.push(doc.id);
+            return; // Don't add to exclusion set
+          }
+        }
+
+        // Add to exclusion set (likes and non-expired dislikes)
+        interactedUserIds.add(targetUserId);
+      });
+
+      // Delete expired dislikes in the background
+      if (expiredDislikeIds.length > 0) {
+        console.log(`🗑️ Deleting ${expiredDislikeIds.length} expired dislikes`);
+        const deletePromises = expiredDislikeIds.map((docId) =>
+          deleteDoc(doc(db, 'interactions', docId))
+        );
+        Promise.all(deletePromises).catch((error) =>
+          console.error('Error deleting expired dislikes:', error)
+        );
+      }
+
+      // Get existing matches to exclude
+      const matchesQuery1 = query(
+        collection(db, 'matches'),
+        where('user1', '==', userId),
+        where('unmatched', '==', false)
+      );
+      const matchesQuery2 = query(
+        collection(db, 'matches'),
+        where('user2', '==', userId),
+        where('unmatched', '==', false)
+      );
+      const [matches1, matches2] = await Promise.all([
+        getDocs(matchesQuery1),
+        getDocs(matchesQuery2),
+      ]);
+
+      const matchedUserIds = new Set<string>();
+      matches1.docs.forEach((doc) => matchedUserIds.add(doc.data().user2));
+      matches2.docs.forEach((doc) => matchedUserIds.add(doc.data().user1));
+
+      // Get geohash query bounds
+      const bounds = LocationService.getQueryBounds(
+        userLocation,
+        filters.maxDistance
+      );
+
+      const potentialProfiles: Array<{
+        profile: User;
+        distance: number;
+        score: number;
+      }> = [];
+
+      // Query each geohash range
+      for (const bound of bounds) {
+        const [startHash, endHash] = bound;
+
+        const q = query(
+          collection(db, 'users'),
+          where('geohash', '>=', startHash),
+          where('geohash', '<=', endHash),
+          limit(100)
+        );
+
+        const snapshot = await getDocs(q);
+
+        snapshot.forEach((docSnapshot) => {
+          // Skip current user, already interacted, matched users, and already queued users
+          // Using Map.has() for O(1) lookup instead of array iteration
+          if (
+            docSnapshot.id === userId ||
+            interactedUserIds.has(docSnapshot.id) ||
+            matchedUserIds.has(docSnapshot.id) ||
+            existingProfilesMap.has(docSnapshot.id)
+          ) {
+            return;
+          }
+
+          const data = docSnapshot.data();
+
+          // Validate and filter
+          if (!data || typeof data.age !== 'number' || !data.gender) return;
+
+          const matchesGender =
+            filters.gender === 'both' || data.gender === filters.gender;
+          const matchesAge =
+            data.age >= filters.ageRange[0] && data.age <= filters.ageRange[1];
+
+          if (!matchesGender || !matchesAge) return;
+
+          // Calculate distance and score
+          if (data.coordinates?.latitude && data.coordinates?.longitude) {
+            try {
+              const distance = LocationService.calculateDistance(
+                userLocation.latitude,
+                userLocation.longitude,
+                data.coordinates.latitude,
+                data.coordinates.longitude
+              );
+
+              if (distance > filters.maxDistance) return;
+
+              // Calculate compatibility score (0-100)
+              const score = this.calculateCompatibilityScore(
+                currentUserData,
+                data,
+                distance
+              );
+
+              potentialProfiles.push({
+                profile: {
+                  id: docSnapshot.id,
+                  ...data,
+                  distance,
+                  lastSeen: convertTimestamp(data.lastSeen),
+                } as User,
+                distance,
+                score,
+              });
+            } catch (error) {
+              console.warn(
+                `Error processing profile ${docSnapshot.id}:`,
+                error
+              );
+            }
+          }
+        });
+      }
+
+      // Sort by score and take top profiles
+      const topProfiles = potentialProfiles
+        .sort((a, b) => b.score - a.score)
+        .slice(0, count);
+
+      // Add to discovery queue
+      const batch = writeBatch(db);
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7); // Expire in 7 days
+
+      topProfiles.forEach(({ profile, distance, score }) => {
+        const queueRef = doc(collection(db, 'discovery_queue'));
+        batch.set(queueRef, {
+          userId,
+          profileId: profile.id,
+          distance,
+          score,
+          addedAt: serverTimestamp(),
+          expiresAt,
+          shown: false,
+        });
+      });
+
+      await batch.commit();
+      console.log(`Added ${topProfiles.length} profiles to discovery queue`);
+    } catch (error) {
+      console.error('Error populating discovery queue:', error);
+    }
+  }
+
+  /**
+   * Calculate compatibility score between users
+   */
+  private calculateCompatibilityScore(
+    currentUser: any,
+    targetUser: any,
+    distance: number
+  ): number {
+    let score = 100;
+
+    // Distance factor (closer is better) - max 30 points deduction
+    const distanceKm = distance / 1000;
+    score -= Math.min(distanceKm * 2, 30);
+
+    // Age difference factor - max 20 points deduction
+    const ageDiff = Math.abs((currentUser.age || 25) - (targetUser.age || 25));
+    score -= Math.min(ageDiff * 2, 20);
+
+    // Common interests - add up to 20 points
+    if (currentUser.interests && targetUser.interests) {
+      const commonInterests = currentUser.interests.filter((interest: string) =>
+        targetUser.interests.includes(interest)
+      );
+      score += Math.min(commonInterests.length * 4, 20);
+    }
+
+    // Online status bonus - 10 points
+    if (targetUser.isOnline) {
+      score += 10;
+    }
+
+    // Has photo bonus - 10 points
+    if (
+      targetUser.image ||
+      (targetUser.images && targetUser.images.length > 0)
+    ) {
+      score += 10;
+    }
+
+    // Has bio bonus - 5 points
+    if (targetUser.bio && targetUser.bio.length > 20) {
+      score += 5;
+    }
+
+    return Math.max(0, Math.min(100, score));
+  }
+
+  /**
+   * Get discover profiles from queue (primary method)
    */
   async getDiscoverProfiles(
+    filters: SearchFilters,
+    page: number = 1
+  ): Promise<ApiResponse<User[]>> {
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error('No user logged in');
+
+      const pageSize = 20;
+
+      // Check discovery queue first
+      const queueQuery = query(
+        collection(db, 'discovery_queue'),
+        where('userId', '==', user.uid),
+        where('shown', '==', false),
+        limit(pageSize)
+      );
+
+      const queueSnapshot = await getDocs(queueQuery);
+
+      // If queue is empty or has less than 5 profiles, repopulate
+      if (queueSnapshot.size < 5) {
+        console.log('Discovery queue low, repopulating...');
+        await this.populateDiscoveryQueue(user.uid, filters, 50);
+
+        // Fetch again after populating
+        const newQueueSnapshot = await getDocs(queueQuery);
+
+        if (newQueueSnapshot.empty) {
+          // Queue still empty, fall back to direct query
+          console.log(
+            'Queue still empty after repopulation, using direct query'
+          );
+          return this.getDiscoverProfilesDirect(filters, page);
+        }
+
+        return this.getProfilesFromQueue(newQueueSnapshot, pageSize, page);
+      }
+
+      return this.getProfilesFromQueue(queueSnapshot, pageSize, page);
+    } catch (error) {
+      console.error('Error getting discover profiles:', error);
+      return {
+        data: [],
+        success: false,
+        message:
+          error instanceof Error ? error.message : 'Failed to get profiles',
+      };
+    }
+  }
+
+  /**
+   * Helper to get profiles from queue snapshot
+   */
+  private async getProfilesFromQueue(
+    queueSnapshot: any,
+    pageSize: number,
+    page: number
+  ): Promise<ApiResponse<User[]>> {
+    const profiles: User[] = [];
+    const seenProfileIds = new Set<string>();
+
+    // Deduplicate profile IDs from queue
+    const profileIds = queueSnapshot.docs
+      .map((doc: any) => doc.data().profileId)
+      .filter((profileId: string) => {
+        if (seenProfileIds.has(profileId)) {
+          console.warn(
+            `⚠️ Duplicate profile ${profileId} found in queue, skipping`
+          );
+          return false;
+        }
+        seenProfileIds.add(profileId);
+        return true;
+      });
+
+    // Fetch actual profile data
+    for (const profileId of profileIds) {
+      try {
+        const profileDoc = await getDoc(doc(db, 'users', profileId));
+        if (profileDoc.exists()) {
+          const data = profileDoc.data();
+          profiles.push({
+            id: profileDoc.id,
+            ...data,
+            lastSeen: convertTimestamp(data.lastSeen),
+          } as User);
+        }
+      } catch (error) {
+        console.warn(`Error fetching profile ${profileId}:`, error);
+      }
+    }
+
+    return {
+      data: profiles,
+      success: true,
+      message: 'Profiles retrieved successfully',
+      pagination: {
+        page,
+        limit: pageSize,
+        total: profiles.length,
+        hasMore: queueSnapshot.size >= pageSize,
+      },
+    };
+  }
+
+  /**
+   * Mark profile as shown in discovery queue
+   */
+  async markProfileAsShown(userId: string, profileId: string): Promise<void> {
+    try {
+      const queueQuery = query(
+        collection(db, 'discovery_queue'),
+        where('userId', '==', userId),
+        where('profileId', '==', profileId)
+      );
+
+      const queueSnapshot = await getDocs(queueQuery);
+
+      if (!queueSnapshot.empty) {
+        await updateDoc(queueSnapshot.docs[0].ref, {
+          shown: true,
+          shownAt: serverTimestamp(),
+        });
+      }
+    } catch (error) {
+      console.error('Error marking profile as shown:', error);
+    }
+  }
+
+  /**
+   * Remove profile from discovery queue (called after like/dislike/match)
+   */
+  async removeFromQueue(userId: string, profileId: string): Promise<void> {
+    try {
+      const queueQuery = query(
+        collection(db, 'discovery_queue'),
+        where('userId', '==', userId),
+        where('profileId', '==', profileId)
+      );
+
+      const queueSnapshot = await getDocs(queueQuery);
+
+      if (queueSnapshot.empty) {
+        return; // Nothing to remove
+      }
+
+      const batch = writeBatch(db);
+      queueSnapshot.docs.forEach((docSnapshot) => {
+        batch.delete(docSnapshot.ref);
+      });
+
+      await batch.commit();
+      console.log(`🗑️ Removed profile ${profileId} from discovery queue`);
+    } catch (error) {
+      console.error('Error removing from queue:', error);
+    }
+  }
+
+  /**
+   * Clear all discovery queue entries for a user (useful when filters change)
+   */
+  async clearDiscoveryQueue(userId: string): Promise<void> {
+    try {
+      const queueQuery = query(
+        collection(db, 'discovery_queue'),
+        where('userId', '==', userId)
+      );
+
+      const queueSnapshot = await getDocs(queueQuery);
+
+      if (queueSnapshot.empty) {
+        return;
+      }
+
+      const batch = writeBatch(db);
+      queueSnapshot.docs.forEach((docSnapshot) => {
+        batch.delete(docSnapshot.ref);
+      });
+
+      await batch.commit();
+      console.log(
+        `🧹 Cleared ${queueSnapshot.size} profiles from discovery queue`
+      );
+    } catch (error) {
+      console.error('Error clearing discovery queue:', error);
+    }
+  }
+
+  /**
+   * Clean duplicate entries in discovery queue for a user using HashMap
+   * Keeps the most recent entry for each unique profileId
+   */
+  async cleanDuplicatesInQueue(userId: string): Promise<number> {
+    try {
+      const queueQuery = query(
+        collection(db, 'discovery_queue'),
+        where('userId', '==', userId)
+      );
+
+      const queueSnapshot = await getDocs(queueQuery);
+
+      if (queueSnapshot.empty) {
+        return 0;
+      }
+
+      // Use HashMap to group by profileId - O(n) instead of O(n²)
+      const profileMap = new Map<string, Array<{ id: string; data: any }>>();
+
+      queueSnapshot.docs.forEach((doc) => {
+        const profileId = doc.data().profileId;
+        if (!profileMap.has(profileId)) {
+          profileMap.set(profileId, []);
+        }
+        profileMap.get(profileId)!.push({ id: doc.id, data: doc.data() });
+      });
+
+      // Find duplicates using Set for O(1) lookups
+      const duplicatesToDelete = new Set<string>();
+
+      profileMap.forEach((docs, profileId) => {
+        if (docs.length > 1) {
+          // Sort by addedAt timestamp, keep the most recent
+          docs.sort((a, b) => {
+            const timeA = a.data.addedAt?.toMillis?.() || 0;
+            const timeB = b.data.addedAt?.toMillis?.() || 0;
+            return timeB - timeA; // Descending (newest first)
+          });
+
+          // Delete all except the first (most recent) using Set
+          for (let i = 1; i < docs.length; i++) {
+            duplicatesToDelete.add(docs[i].id);
+          }
+
+          console.log(
+            `🔍 Found ${docs.length - 1} duplicate(s) for profile ${profileId}`
+          );
+        }
+      });
+
+      if (duplicatesToDelete.size === 0) {
+        console.log('✅ No duplicates found in discovery queue');
+        return 0;
+      }
+
+      // Delete duplicates in batches
+      const batch = writeBatch(db);
+      duplicatesToDelete.forEach((docId) => {
+        batch.delete(doc(db, 'discovery_queue', docId));
+      });
+
+      await batch.commit();
+      console.log(
+        `🗑️ Cleaned ${duplicatesToDelete.size} duplicate entries from discovery queue (using Set)`
+      );
+
+      return duplicatesToDelete.size;
+    } catch (error) {
+      console.error('Error cleaning duplicates in queue:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Synchronize discovery queue with current interactions and matches
+   * Removes profiles that should not be in queue based on:
+   * - Existing interactions (likes, non-expired dislikes)
+   * - Existing matches
+   * - Self (user's own profile)
+   */
+  async syncDiscoveryQueue(userId: string): Promise<number> {
+    try {
+      console.log(`🔄 Starting queue sync for user ${userId}`);
+
+      // Get all queue entries for user
+      const queueQuery = query(
+        collection(db, 'discovery_queue'),
+        where('userId', '==', userId)
+      );
+      const queueSnapshot = await getDocs(queueQuery);
+
+      if (queueSnapshot.empty) {
+        console.log('📭 Queue is empty, nothing to sync');
+        return 0;
+      }
+
+      console.log(`📋 Found ${queueSnapshot.size} profiles in queue`);
+
+      // Get interactions to check
+      const interactionsQuery = query(
+        collection(db, 'interactions'),
+        where('userId', '==', userId)
+      );
+      const interactionsSnapshot = await getDocs(interactionsQuery);
+
+      const now = new Date();
+      const interactedUserIds = new Set<string>();
+
+      interactionsSnapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        const targetUserId = data.targetUserId;
+
+        // Check if it's a dislike with expiration
+        if (data.type === 'dislike' && data.expiresAt) {
+          const expiresAt = data.expiresAt.toDate
+            ? data.expiresAt.toDate()
+            : new Date(data.expiresAt);
+
+          // If expired, don't exclude
+          if (expiresAt <= now) {
+            return; // Skip expired dislikes
+          }
+        }
+
+        // Add to exclusion set (likes and non-expired dislikes)
+        interactedUserIds.add(targetUserId);
+      });
+
+      // Get matches to check
+      const matchesQuery1 = query(
+        collection(db, 'matches'),
+        where('user1', '==', userId),
+        where('unmatched', '==', false)
+      );
+      const matchesQuery2 = query(
+        collection(db, 'matches'),
+        where('user2', '==', userId),
+        where('unmatched', '==', false)
+      );
+      const [matches1, matches2] = await Promise.all([
+        getDocs(matchesQuery1),
+        getDocs(matchesQuery2),
+      ]);
+
+      const matchedUserIds = new Set<string>();
+      matches1.docs.forEach((doc) => matchedUserIds.add(doc.data().user2));
+      matches2.docs.forEach((doc) => matchedUserIds.add(doc.data().user1));
+
+      console.log(
+        `🔍 Found ${interactedUserIds.size} interactions and ${matchedUserIds.size} matches`
+      );
+
+      // Find profiles that should be removed - using Set for O(1) add operations
+      const profilesToRemove = new Set<string>();
+
+      queueSnapshot.docs.forEach((doc) => {
+        const profileId = doc.data().profileId;
+
+        // Check if should be removed using Set.has() for O(1) lookup
+        if (
+          profileId === userId || // User's own profile
+          interactedUserIds.has(profileId) || // Already interacted (O(1))
+          matchedUserIds.has(profileId) // Already matched (O(1))
+        ) {
+          profilesToRemove.add(doc.id); // O(1) add
+        }
+      });
+
+      if (profilesToRemove.size === 0) {
+        console.log('✅ Queue is already in sync');
+        return 0;
+      }
+
+      console.log(
+        `🗑️ Removing ${profilesToRemove.size} profiles from queue (using Set)`
+      );
+
+      // Remove invalid entries in batches
+      const batch = writeBatch(db);
+      profilesToRemove.forEach((docId) => {
+        batch.delete(doc(db, 'discovery_queue', docId));
+      });
+
+      await batch.commit();
+
+      console.log(
+        `✅ Queue sync complete! Removed ${profilesToRemove.size} profiles`
+      );
+
+      return profilesToRemove.length;
+    } catch (error) {
+      console.error('Error syncing discovery queue:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Legacy method - fallback for direct geohash queries
+   */
+  private async getDiscoverProfilesDirect(
     filters: SearchFilters,
     page: number = 1
   ): Promise<ApiResponse<User[]>> {
@@ -272,13 +950,70 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
       const userLocation = currentUserData?.coordinates;
 
       // If user doesn't have location, fall back to basic query without location
-      if (!userLocation) {
-        console.warn('User location not set, using basic query');
+      if (!userLocation || !userLocation.latitude || !userLocation.longitude) {
+        console.warn('User location not set, using basic query', userLocation);
         return this.getDiscoverProfilesBasic(filters, page, user.uid);
       }
 
+      // IMPORTANT: Get existing interactions to exclude (likes and non-expired dislikes)
+      const interactionsQuery = query(
+        collection(db, 'interactions'),
+        where('userId', '==', user.uid)
+      );
+      const interactionsSnapshot = await getDocs(interactionsQuery);
+
+      const now = new Date();
+      const interactedUserIds = new Set<string>();
+
+      interactionsSnapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        const targetUserId = data.targetUserId;
+
+        // Check if it's a dislike with expiration
+        if (data.type === 'dislike' && data.expiresAt) {
+          const expiresAt = data.expiresAt.toDate
+            ? data.expiresAt.toDate()
+            : new Date(data.expiresAt);
+
+          // If expired, don't exclude
+          if (expiresAt <= now) {
+            console.log(
+              `⏰ Dislike for ${targetUserId} has expired (direct query)`
+            );
+            return; // Don't add to exclusion set
+          }
+        }
+
+        // Add to exclusion set (likes and non-expired dislikes)
+        interactedUserIds.add(targetUserId);
+      });
+
+      // Get existing matches to exclude
+      const matchesQuery1 = query(
+        collection(db, 'matches'),
+        where('user1', '==', user.uid),
+        where('unmatched', '==', false)
+      );
+      const matchesQuery2 = query(
+        collection(db, 'matches'),
+        where('user2', '==', user.uid),
+        where('unmatched', '==', false)
+      );
+      const [matches1, matches2] = await Promise.all([
+        getDocs(matchesQuery1),
+        getDocs(matchesQuery2),
+      ]);
+
+      const matchedUserIds = new Set<string>();
+      matches1.docs.forEach((doc) => matchedUserIds.add(doc.data().user2));
+      matches2.docs.forEach((doc) => matchedUserIds.add(doc.data().user1));
+
+      console.log(
+        `🔍 Direct Query - Excluding ${interactedUserIds.size} interacted + ${matchedUserIds.size} matched users`
+      );
+
       // Get geohash query bounds for the search radius
-      const bounds = geohashService.getQueryBounds(
+      const bounds = LocationService.getQueryBounds(
         userLocation,
         filters.maxDistance
       );
@@ -301,8 +1036,14 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         const snapshot = await getDocs(q);
 
         snapshot.forEach((docSnapshot) => {
-          // Skip current user and already seen profiles
-          if (seenIds.has(docSnapshot.id)) return;
+          // Skip current user, already seen, interacted, and matched profiles
+          if (
+            seenIds.has(docSnapshot.id) ||
+            interactedUserIds.has(docSnapshot.id) ||
+            matchedUserIds.has(docSnapshot.id)
+          ) {
+            return;
+          }
           seenIds.add(docSnapshot.id);
 
           const data = docSnapshot.data();
@@ -327,9 +1068,11 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
           let distance: number | null = null;
           if (data.coordinates?.latitude && data.coordinates?.longitude) {
             try {
-              distance = geohashService.calculateDistance(
-                userLocation,
-                data.coordinates
+              distance = LocationService.calculateDistance(
+                userLocation.latitude,
+                userLocation.longitude,
+                data.coordinates.latitude,
+                data.coordinates.longitude
               );
 
               // Skip if beyond max distance
@@ -356,7 +1099,7 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         new Map(profiles.map((p) => [p.id, p])).values()
       );
 
-      const sortedProfiles = geohashService.sortByDistance(
+      const sortedProfiles = LocationService.sortByDistance(
         uniqueProfiles,
         userLocation
       );
@@ -394,6 +1137,60 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
     try {
       const pageSize = 20;
 
+      // IMPORTANT: Get existing interactions to exclude
+      const interactionsQuery = query(
+        collection(db, 'interactions'),
+        where('userId', '==', currentUserId)
+      );
+      const interactionsSnapshot = await getDocs(interactionsQuery);
+
+      const now = new Date();
+      const interactedUserIds = new Set<string>();
+
+      interactionsSnapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        const targetUserId = data.targetUserId;
+
+        // Check if it's a dislike with expiration
+        if (data.type === 'dislike' && data.expiresAt) {
+          const expiresAt = data.expiresAt.toDate
+            ? data.expiresAt.toDate()
+            : new Date(data.expiresAt);
+
+          // If expired, don't exclude
+          if (expiresAt <= now) {
+            return; // Don't add to exclusion set
+          }
+        }
+
+        // Add to exclusion set (likes and non-expired dislikes)
+        interactedUserIds.add(targetUserId);
+      });
+
+      // Get existing matches to exclude
+      const matchesQuery1 = query(
+        collection(db, 'matches'),
+        where('user1', '==', currentUserId),
+        where('unmatched', '==', false)
+      );
+      const matchesQuery2 = query(
+        collection(db, 'matches'),
+        where('user2', '==', currentUserId),
+        where('unmatched', '==', false)
+      );
+      const [matches1, matches2] = await Promise.all([
+        getDocs(matchesQuery1),
+        getDocs(matchesQuery2),
+      ]);
+
+      const matchedUserIds = new Set<string>();
+      matches1.docs.forEach((doc) => matchedUserIds.add(doc.data().user2));
+      matches2.docs.forEach((doc) => matchedUserIds.add(doc.data().user1));
+
+      console.log(
+        `🔍 Basic Query - Excluding ${interactedUserIds.size} interacted + ${matchedUserIds.size} matched users`
+      );
+
       // Basic query without location filtering
       let q = query(
         collection(db, 'users'),
@@ -415,7 +1212,14 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
       const profiles: User[] = [];
 
       snapshot.forEach((docSnapshot) => {
-        if (docSnapshot.id === currentUserId) return; // Extra safety check
+        // Skip current user, interacted, and matched users
+        if (
+          docSnapshot.id === currentUserId ||
+          interactedUserIds.has(docSnapshot.id) ||
+          matchedUserIds.has(docSnapshot.id)
+        ) {
+          return;
+        }
 
         const data = docSnapshot.data();
 
@@ -468,90 +1272,208 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
   async likeProfile(
     userId: string,
     targetUserId: string
-  ): Promise<ApiResponse<boolean>> {
+  ): Promise<
+    ApiResponse<{ isMatch: boolean; matchId?: string; matchedUser?: User }>
+  > {
     try {
-      // Check if user already liked this profile
-      const existingLikeQuery = query(
-        collection(db, 'likes'),
+      console.log(`❤️ LIKE: User ${userId} is liking ${targetUserId}`);
+
+      // Remove from discovery queue first
+      await this.removeFromQueue(userId, targetUserId);
+
+      // Check if user already interacted with this profile
+      const existingInteractionQuery = query(
+        collection(db, 'interactions'),
         where('userId', '==', userId),
         where('targetUserId', '==', targetUserId)
       );
-      const existingLikeSnapshot = await getDocs(existingLikeQuery);
+      const existingInteractionSnapshot = await getDocs(
+        existingInteractionQuery
+      );
 
-      if (!existingLikeSnapshot.empty) {
-        return {
-          data: false,
-          success: true,
-          message: 'Profile already liked',
-        };
+      console.log(
+        `📋 Existing interaction found: ${!existingInteractionSnapshot.empty}`
+      );
+
+      if (!existingInteractionSnapshot.empty) {
+        const existingType = existingInteractionSnapshot.docs[0].data().type;
+
+        if (existingType === 'like') {
+          return {
+            data: { isMatch: false },
+            success: true,
+            message: 'Profile already liked',
+          };
+        } else {
+          // User previously disliked, update to like
+          await updateDoc(existingInteractionSnapshot.docs[0].ref, {
+            type: 'like',
+            createdAt: serverTimestamp(),
+          });
+        }
+      } else {
+        // Add new like interaction
+        await addDoc(collection(db, 'interactions'), {
+          userId,
+          targetUserId,
+          type: 'like',
+          createdAt: serverTimestamp(),
+        });
+        console.log(
+          `✅ Created new like interaction: ${userId} → ${targetUserId}`
+        );
       }
 
-      // Add like
-      await addDoc(collection(db, 'likes'), {
-        userId,
-        targetUserId,
-        createdAt: serverTimestamp(),
-        type: 'like',
-      });
-
       // Check for mutual like (match)
-      const matchQuery = query(
-        collection(db, 'likes'),
+      const mutualLikeQuery = query(
+        collection(db, 'interactions'),
         where('userId', '==', targetUserId),
         where('targetUserId', '==', userId),
         where('type', '==', 'like')
       );
 
-      const matchSnapshot = await getDocs(matchQuery);
+      const mutualLikeSnapshot = await getDocs(mutualLikeQuery);
 
-      if (!matchSnapshot.empty) {
-        // Check if match already exists
+      console.log(`🔍 Checking mutual like: ${userId} liked ${targetUserId}`);
+      console.log(`🔍 Looking for: ${targetUserId} liked ${userId}`);
+      console.log(`🔍 Mutual like found: ${!mutualLikeSnapshot.empty}`);
+      console.log(`🔍 Mutual docs count: ${mutualLikeSnapshot.size}`);
+
+      if (!mutualLikeSnapshot.empty) {
+        // Check if match already exists (not unmatched)
+        const [user1, user2] = [userId, targetUserId].sort();
+
         const existingMatchQuery = query(
           collection(db, 'matches'),
-          where('users', 'array-contains', userId)
+          where('user1', '==', user1),
+          where('user2', '==', user2)
         );
         const existingMatchSnapshot = await getDocs(existingMatchQuery);
 
-        let isNewMatch = true;
-        for (const matchDoc of existingMatchSnapshot.docs) {
-          const matchData = matchDoc.data();
-          if (matchData.users.includes(targetUserId)) {
-            isNewMatch = false;
-            break;
-          }
-        }
+        let matchDoc = existingMatchSnapshot.docs[0];
 
-        if (isNewMatch) {
-          const batch = writeBatch(db);
-
-          // Create match
-          const matchRef = doc(collection(db, 'matches'));
-          batch.set(matchRef, {
-            users: [userId, targetUserId],
-            createdAt: serverTimestamp(),
-          });
-
-          // Create conversation
-          const conversationRef = doc(collection(db, 'conversations'));
-          batch.set(conversationRef, {
-            participants: [userId, targetUserId],
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-            unreadCount: 0,
-          });
-
-          await batch.commit();
+        if (matchDoc && !matchDoc.data().unmatched) {
+          // Match already exists and is active - get matched user data
+          const matchedUserDoc = await getDoc(doc(db, 'users', targetUserId));
+          const matchedUserData = matchedUserDoc.exists()
+            ? matchedUserDoc.data()
+            : null;
 
           return {
-            data: true,
+            data: {
+              isMatch: true,
+              matchId: matchDoc.id,
+              conversationId: matchDoc.data().conversationId,
+              matchedUser: matchedUserData
+                ? ({
+                    id: matchedUserDoc.id,
+                    ...matchedUserData,
+                    lastSeen: convertTimestamp(matchedUserData.lastSeen),
+                  } as User)
+                : undefined,
+            },
             success: true,
-            message: 'Match created successfully',
+            message: 'Match already exists',
           };
         }
+
+        // Create new match or reactivate unmatched
+        const batch = writeBatch(db);
+
+        // Create conversation first
+        const conversationRef = doc(collection(db, 'conversations'));
+        const conversationId = conversationRef.id;
+
+        batch.set(conversationRef, {
+          participants: [userId, targetUserId],
+          matchId: '',
+          unreadCount: {
+            [userId]: 0,
+            [targetUserId]: 0,
+          },
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+
+        let matchRef;
+        // Create or update match
+        if (matchDoc && matchDoc.data().unmatched) {
+          // Reactivate unmatched
+          matchRef = matchDoc.ref;
+          batch.update(matchRef, {
+            unmatched: false,
+            unmatchedAt: null,
+            unmatchedBy: null,
+            conversationId,
+            createdAt: serverTimestamp(),
+          });
+
+          // Update conversation with matchId
+          batch.update(conversationRef, {
+            matchId: matchRef.id,
+          });
+        } else {
+          // Create new match
+          matchRef = doc(collection(db, 'matches'));
+          batch.set(matchRef, {
+            users: [userId, targetUserId],
+            user1,
+            user2,
+            conversationId,
+            unmatched: false,
+            animationPlayed: false, // Animation not yet shown
+            createdAt: serverTimestamp(),
+          });
+
+          // Update conversation with matchId
+          batch.update(conversationRef, {
+            matchId: matchRef.id,
+          });
+        }
+
+        await batch.commit();
+
+        console.log(`🎉 MATCH CREATED! ${userId} ❤️ ${targetUserId}`);
+        console.log(`💬 Conversation created with ID: ${conversationId}`);
+        console.log(`🔗 Match ID: ${matchRef.id}`);
+
+        // Remove both users from each other's discovery queue
+        await Promise.all([
+          this.removeFromQueue(userId, targetUserId),
+          this.removeFromQueue(targetUserId, userId),
+        ]);
+
+        // Get matched user data
+        const matchedUserDoc = await getDoc(doc(db, 'users', targetUserId));
+        const matchedUserData = matchedUserDoc.exists()
+          ? matchedUserDoc.data()
+          : null;
+
+        console.log(`✅ Match data prepared, returning isMatch: true`);
+        console.log(`💬 Conversation ID: ${conversationId}`);
+
+        return {
+          data: {
+            isMatch: true,
+            matchId: matchRef.id,
+            conversationId: conversationId,
+            matchedUser: matchedUserData
+              ? ({
+                  id: matchedUserDoc.id,
+                  ...matchedUserData,
+                  lastSeen: convertTimestamp(matchedUserData.lastSeen),
+                } as User)
+              : undefined,
+          },
+          success: true,
+          message: 'Match created successfully',
+        };
       }
 
+      console.log(`👍 Like successful, but NO MATCH (no mutual like)`);
+
       return {
-        data: false,
+        data: { isMatch: false },
         success: true,
         message: 'Profile liked successfully',
       };
@@ -574,12 +1496,40 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
     targetUserId: string
   ): Promise<ApiResponse<boolean>> {
     try {
-      await addDoc(collection(db, 'likes'), {
-        userId,
-        targetUserId,
-        createdAt: serverTimestamp(),
-        type: 'dislike',
-      });
+      // Remove from discovery queue first
+      await this.removeFromQueue(userId, targetUserId);
+
+      // Check if interaction already exists
+      const existingInteractionQuery = query(
+        collection(db, 'interactions'),
+        where('userId', '==', userId),
+        where('targetUserId', '==', targetUserId)
+      );
+      const existingInteractionSnapshot = await getDocs(
+        existingInteractionQuery
+      );
+
+      // Calculate expiration time: 24 hours from now
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 24);
+
+      if (!existingInteractionSnapshot.empty) {
+        // Update existing interaction to dislike with 24-hour expiration
+        await updateDoc(existingInteractionSnapshot.docs[0].ref, {
+          type: 'dislike',
+          createdAt: serverTimestamp(),
+          expiresAt: expiresAt, // Block for 24 hours
+        });
+      } else {
+        // Add new dislike interaction with 24-hour expiration
+        await addDoc(collection(db, 'interactions'), {
+          userId,
+          targetUserId,
+          type: 'dislike',
+          createdAt: serverTimestamp(),
+          expiresAt: expiresAt, // Block for 24 hours
+        });
+      }
 
       return {
         data: true,
@@ -593,39 +1543,6 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         success: false,
         message:
           error instanceof Error ? error.message : 'Failed to dislike profile',
-      };
-    }
-  }
-
-  /**
-   * Super like a profile
-   */
-  async superLikeProfile(
-    userId: string,
-    targetUserId: string
-  ): Promise<ApiResponse<boolean>> {
-    try {
-      await addDoc(collection(db, 'likes'), {
-        userId,
-        targetUserId,
-        createdAt: serverTimestamp(),
-        type: 'super_like',
-      });
-
-      return {
-        data: true,
-        success: true,
-        message: 'Profile super-liked successfully',
-      };
-    } catch (error) {
-      console.error('Error super-liking profile:', error);
-      return {
-        data: false,
-        success: false,
-        message:
-          error instanceof Error
-            ? error.message
-            : 'Failed to super-like profile',
       };
     }
   }
@@ -669,7 +1586,7 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
 // ============================================
 export class FirebaseMatchingService implements IMatchingService {
   /**
-   * Get all matches for a user
+   * Get all matches for a user (active matches only)
    */
   async getMatches(
     userId: string,
@@ -677,21 +1594,44 @@ export class FirebaseMatchingService implements IMatchingService {
   ): Promise<ApiResponse<User[]>> {
     try {
       const pageSize = 20;
-      const matchesQuery = query(
+
+      // Query matches where user is user1
+      const matchesQuery1 = query(
         collection(db, 'matches'),
-        where('users', 'array-contains', userId),
+        where('user1', '==', userId),
+        where('unmatched', '==', false),
         orderBy('createdAt', 'desc'),
         limit(pageSize)
       );
 
-      const matchesSnapshot = await getDocs(matchesQuery);
+      // Query matches where user is user2
+      const matchesQuery2 = query(
+        collection(db, 'matches'),
+        where('user2', '==', userId),
+        where('unmatched', '==', false),
+        orderBy('createdAt', 'desc'),
+        limit(pageSize)
+      );
+
+      const [matchesSnapshot1, matchesSnapshot2] = await Promise.all([
+        getDocs(matchesQuery1),
+        getDocs(matchesQuery2),
+      ]);
+
       const matchedUsers: User[] = [];
+      const seenUserIds = new Set<string>();
 
-      for (const matchDoc of matchesSnapshot.docs) {
+      // Process matches from both queries
+      const allMatches = [...matchesSnapshot1.docs, ...matchesSnapshot2.docs];
+
+      for (const matchDoc of allMatches) {
         const matchData = matchDoc.data();
-        const otherUserId = matchData.users.find((id: string) => id !== userId);
+        const otherUserId =
+          matchData.user1 === userId ? matchData.user2 : matchData.user1;
 
-        if (otherUserId) {
+        if (!seenUserIds.has(otherUserId)) {
+          seenUserIds.add(otherUserId);
+
           const userDoc = await getDoc(doc(db, 'users', otherUserId));
           if (userDoc.exists()) {
             const userData = userDoc.data();
@@ -704,15 +1644,33 @@ export class FirebaseMatchingService implements IMatchingService {
         }
       }
 
+      // Sort by match creation date
+      matchedUsers.sort((a, b) => {
+        const matchA = allMatches.find((m) => {
+          const data = m.data();
+          return data.user1 === a.id || data.user2 === a.id;
+        });
+        const matchB = allMatches.find((m) => {
+          const data = m.data();
+          return data.user1 === b.id || data.user2 === b.id;
+        });
+
+        if (!matchA || !matchB) return 0;
+
+        const timeA = matchA.data().createdAt?.toMillis() || 0;
+        const timeB = matchB.data().createdAt?.toMillis() || 0;
+        return timeB - timeA;
+      });
+
       return {
-        data: matchedUsers,
+        data: matchedUsers.slice(0, pageSize),
         success: true,
         message: 'Matches retrieved successfully',
         pagination: {
           page,
           limit: pageSize,
           total: matchedUsers.length,
-          hasMore: matchesSnapshot.size === pageSize,
+          hasMore: matchedUsers.length > pageSize,
         },
       };
     } catch (error) {
@@ -727,7 +1685,7 @@ export class FirebaseMatchingService implements IMatchingService {
   }
 
   /**
-   * Get all liked profiles for a user
+   * Get all liked profiles for a user (that haven't matched yet)
    */
   async getLikedProfiles(
     userId: string,
@@ -735,20 +1693,54 @@ export class FirebaseMatchingService implements IMatchingService {
   ): Promise<ApiResponse<User[]>> {
     try {
       const pageSize = 20;
-      const likesQuery = query(
-        collection(db, 'likes'),
+      const interactionsQuery = query(
+        collection(db, 'interactions'),
         where('userId', '==', userId),
         where('type', '==', 'like'),
         orderBy('createdAt', 'desc'),
         limit(pageSize)
       );
 
-      const likesSnapshot = await getDocs(likesQuery);
+      const interactionsSnapshot = await getDocs(interactionsQuery);
       const likedUsers: User[] = [];
 
-      for (const likeDoc of likesSnapshot.docs) {
-        const likeData = likeDoc.data();
-        const userDoc = await getDoc(doc(db, 'users', likeData.targetUserId));
+      // Get user's matches to filter them out
+      const [user1, user2] = [userId, userId];
+      const matchesQuery1 = query(
+        collection(db, 'matches'),
+        where('user1', '==', userId),
+        where('unmatched', '==', false)
+      );
+      const matchesQuery2 = query(
+        collection(db, 'matches'),
+        where('user2', '==', userId),
+        where('unmatched', '==', false)
+      );
+
+      const [matchesSnapshot1, matchesSnapshot2] = await Promise.all([
+        getDocs(matchesQuery1),
+        getDocs(matchesQuery2),
+      ]);
+
+      const matchedUserIds = new Set<string>();
+      [...matchesSnapshot1.docs, ...matchesSnapshot2.docs].forEach(
+        (matchDoc) => {
+          const matchData = matchDoc.data();
+          const otherId =
+            matchData.user1 === userId ? matchData.user2 : matchData.user1;
+          matchedUserIds.add(otherId);
+        }
+      );
+
+      // Fetch liked user profiles (excluding matched ones)
+      for (const interactionDoc of interactionsSnapshot.docs) {
+        const interactionData = interactionDoc.data();
+        const targetUserId = interactionData.targetUserId;
+
+        // Skip if already matched
+        if (matchedUserIds.has(targetUserId)) continue;
+
+        const userDoc = await getDoc(doc(db, 'users', targetUserId));
 
         if (userDoc.exists()) {
           const userData = userDoc.data();
@@ -768,7 +1760,7 @@ export class FirebaseMatchingService implements IMatchingService {
           page,
           limit: pageSize,
           total: likedUsers.length,
-          hasMore: likesSnapshot.size === pageSize,
+          hasMore: interactionsSnapshot.size === pageSize,
         },
       };
     } catch (error) {
@@ -785,44 +1777,161 @@ export class FirebaseMatchingService implements IMatchingService {
   }
 
   /**
-   * Unmatch a profile (removes match and conversation)
+   * Unmatch a profile (soft delete - marks as unmatched)
    */
   async unmatchProfile(
     userId: string,
     targetUserId: string
   ): Promise<ApiResponse<boolean>> {
     try {
-      const batch = writeBatch(db);
+      // Find the match document
+      const [user1, user2] = [userId, targetUserId].sort();
 
-      // Delete match
       const matchQuery = query(
         collection(db, 'matches'),
-        where('users', 'array-contains', userId)
+        where('user1', '==', user1),
+        where('user2', '==', user2)
       );
       const matchSnapshot = await getDocs(matchQuery);
 
-      for (const matchDoc of matchSnapshot.docs) {
-        const matchData = matchDoc.data();
-        if (matchData.users.includes(targetUserId)) {
-          batch.delete(matchDoc.ref);
-        }
+      if (matchSnapshot.empty) {
+        return {
+          data: false,
+          success: false,
+          message: 'Match not found',
+        };
       }
 
-      // Delete conversation
-      const convQuery = query(
-        collection(db, 'conversations'),
-        where('participants', 'array-contains', userId)
+      const matchDoc = matchSnapshot.docs[0];
+      const matchData = matchDoc.data();
+      const conversationId = matchData.conversationId;
+
+      console.log(
+        `🗑️ Starting unmatch cleanup for ${userId} ⟷ ${targetUserId}`
       );
-      const convSnapshot = await getDocs(convQuery);
+      console.log(`🗑️ Match ID: ${matchDoc.id}`);
+      console.log(`🗑️ Conversation ID: ${conversationId}`);
 
-      for (const convDoc of convSnapshot.docs) {
-        const convData = convDoc.data();
-        if (convData.participants.includes(targetUserId)) {
-          batch.delete(convDoc.ref);
+      // Use batch for atomic operations
+      const batch = writeBatch(db);
+
+      // 1. Delete the match document
+      batch.delete(matchDoc.ref);
+
+      // 2. Delete all messages in the conversation subcollection
+      if (conversationId) {
+        try {
+          const messagesQuery = query(
+            collection(db, 'conversations', conversationId, 'messages')
+          );
+          const messagesSnapshot = await getDocs(messagesQuery);
+
+          console.log(
+            `🗑️ Deleting ${messagesSnapshot.size} messages from conversation`
+          );
+
+          messagesSnapshot.docs.forEach((messageDoc) => {
+            batch.delete(messageDoc.ref);
+          });
+        } catch (error) {
+          console.error('Error deleting messages:', error);
         }
+
+        // 3. Delete the conversation document
+        batch.delete(doc(db, 'conversations', conversationId));
       }
 
+      // 4. Replace interaction with 24-hour dislike ban: userId → targetUserId
+      try {
+        const interaction1Query = query(
+          collection(db, 'interactions'),
+          where('userId', '==', userId),
+          where('targetUserId', '==', targetUserId)
+        );
+        const interaction1Snapshot = await getDocs(interaction1Query);
+
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + 24); // 24-hour ban
+
+        if (!interaction1Snapshot.empty) {
+          // Update existing interaction to dislike with expiration
+          interaction1Snapshot.docs.forEach((interactionDoc) => {
+            batch.update(interactionDoc.ref, {
+              type: 'dislike',
+              createdAt: serverTimestamp(),
+              expiresAt: expiresAt,
+            });
+          });
+          console.log(
+            `🚫 Updated interaction to 24h dislike: ${userId} → ${targetUserId}`
+          );
+        } else {
+          // Create new dislike interaction
+          const interactionRef = doc(collection(db, 'interactions'));
+          batch.set(interactionRef, {
+            userId,
+            targetUserId,
+            type: 'dislike',
+            createdAt: serverTimestamp(),
+            expiresAt: expiresAt,
+          });
+          console.log(
+            `🚫 Created 24h dislike interaction: ${userId} → ${targetUserId}`
+          );
+        }
+      } catch (error) {
+        console.error('Error creating unmatch dislike 1:', error);
+      }
+
+      // 5. Replace interaction with 24-hour dislike ban: targetUserId → userId
+      try {
+        const interaction2Query = query(
+          collection(db, 'interactions'),
+          where('userId', '==', targetUserId),
+          where('targetUserId', '==', userId)
+        );
+        const interaction2Snapshot = await getDocs(interaction2Query);
+
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + 24); // 24-hour ban
+
+        if (!interaction2Snapshot.empty) {
+          // Update existing interaction to dislike with expiration
+          interaction2Snapshot.docs.forEach((interactionDoc) => {
+            batch.update(interactionDoc.ref, {
+              type: 'dislike',
+              createdAt: serverTimestamp(),
+              expiresAt: expiresAt,
+            });
+          });
+          console.log(
+            `🚫 Updated interaction to 24h dislike: ${targetUserId} → ${userId}`
+          );
+        } else {
+          // Create new dislike interaction
+          const interactionRef = doc(collection(db, 'interactions'));
+          batch.set(interactionRef, {
+            userId: targetUserId,
+            targetUserId: userId,
+            type: 'dislike',
+            createdAt: serverTimestamp(),
+            expiresAt: expiresAt,
+          });
+          console.log(
+            `🚫 Created 24h dislike interaction: ${targetUserId} → ${userId}`
+          );
+        }
+      } catch (error) {
+        console.error('Error creating unmatch dislike 2:', error);
+      }
+
+      // Commit all operations atomically
       await batch.commit();
+
+      console.log(`✅ UNMATCH COMPLETE! Actions taken:`);
+      console.log(`   ✓ Match document deleted`);
+      console.log(`   ✓ Conversation + all messages deleted`);
+      console.log(`   ✓ 24-hour dislike ban applied (both directions)`);
 
       return {
         data: true,
@@ -836,6 +1945,36 @@ export class FirebaseMatchingService implements IMatchingService {
         success: false,
         message:
           error instanceof Error ? error.message : 'Failed to unmatch profile',
+      };
+    }
+  }
+
+  /**
+   * Mark match animation as played to prevent showing it again
+   */
+  async markMatchAnimationPlayed(
+    matchId: string
+  ): Promise<ApiResponse<boolean>> {
+    try {
+      const matchRef = doc(db, 'matches', matchId);
+      await updateDoc(matchRef, {
+        animationPlayed: true,
+      });
+
+      console.log(`✅ Match animation marked as played for match: ${matchId}`);
+
+      return {
+        data: true,
+        success: true,
+        message: 'Animation marked as played',
+      };
+    } catch (error) {
+      console.error('Error marking animation as played:', error);
+      return {
+        data: false,
+        success: false,
+        message:
+          error instanceof Error ? error.message : 'Failed to update match',
       };
     }
   }
@@ -876,6 +2015,105 @@ export class FirebaseMatchingService implements IMatchingService {
             : 'Failed to get match details',
       };
     }
+  }
+
+  /**
+   * Subscribe to new matches for real-time updates
+   * This allows both users to see the match animation when it happens
+   */
+  subscribeToMatches(
+    userId: string,
+    onMatchCreated: (match: {
+      matchId: string;
+      matchedUserId: string;
+      matchedUser: User;
+      conversationId: string;
+    }) => void
+  ): Unsubscribe {
+    console.log(`🔔 Setting up match listener for user: ${userId}`);
+
+    // Listen for matches where current user is user1
+    const matchesQuery1 = query(
+      collection(db, 'matches'),
+      where('user1', '==', userId),
+      where('unmatched', '==', false),
+      orderBy('createdAt', 'desc'),
+      limit(1)
+    );
+
+    // Listen for matches where current user is user2
+    const matchesQuery2 = query(
+      collection(db, 'matches'),
+      where('user2', '==', userId),
+      where('unmatched', '==', false),
+      orderBy('createdAt', 'desc'),
+      limit(1)
+    );
+
+    let lastMatchId: string | null = null;
+
+    const unsubscribe1 = onSnapshot(matchesQuery1, async (snapshot) => {
+      snapshot.docChanges().forEach(async (change) => {
+        if (change.type === 'added' && change.doc.id !== lastMatchId) {
+          const matchData = change.doc.data();
+          const matchedUserId = matchData.user2;
+
+          console.log(`🎉 New match detected (as user1): ${matchedUserId}`);
+          lastMatchId = change.doc.id;
+
+          // Fetch matched user data
+          const userDoc = await getDoc(doc(db, 'users', matchedUserId));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            onMatchCreated({
+              matchId: change.doc.id,
+              matchedUserId,
+              matchedUser: {
+                id: userDoc.id,
+                ...userData,
+                lastSeen: convertTimestamp(userData.lastSeen),
+              } as User,
+              conversationId: matchData.conversationId,
+            });
+          }
+        }
+      });
+    });
+
+    const unsubscribe2 = onSnapshot(matchesQuery2, async (snapshot) => {
+      snapshot.docChanges().forEach(async (change) => {
+        if (change.type === 'added' && change.doc.id !== lastMatchId) {
+          const matchData = change.doc.data();
+          const matchedUserId = matchData.user1;
+
+          console.log(`🎉 New match detected (as user2): ${matchedUserId}`);
+          lastMatchId = change.doc.id;
+
+          // Fetch matched user data
+          const userDoc = await getDoc(doc(db, 'users', matchedUserId));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            onMatchCreated({
+              matchId: change.doc.id,
+              matchedUserId,
+              matchedUser: {
+                id: userDoc.id,
+                ...userData,
+                lastSeen: convertTimestamp(userData.lastSeen),
+              } as User,
+              conversationId: matchData.conversationId,
+            });
+          }
+        }
+      });
+    });
+
+    // Return combined unsubscribe function
+    return () => {
+      console.log(`🔕 Unsubscribing from match listener for user: ${userId}`);
+      unsubscribe1();
+      unsubscribe2();
+    };
   }
 }
 
@@ -1036,8 +2274,10 @@ export class FirebaseChatService implements IChatService {
   ): Promise<ApiResponse<ChatMessage>> {
     try {
       const messageData = {
-        ...message,
-        timestamp: serverTimestamp(),
+        senderId: message.senderId,
+        text: message.text,
+        isRead: false,
+        createdAt: serverTimestamp(),
       };
 
       const messageRef = await addDoc(
@@ -1045,9 +2285,34 @@ export class FirebaseChatService implements IChatService {
         messageData
       );
 
-      await updateDoc(doc(db, 'conversations', conversationId), {
+      // Get conversation to determine recipient
+      const convDoc = await getDoc(doc(db, 'conversations', conversationId));
+      if (!convDoc.exists()) {
+        throw new Error('Conversation not found');
+      }
+
+      const convData = convDoc.data();
+      const recipientId = convData.participants.find(
+        (id: string) => id !== message.senderId
+      );
+
+      // Update conversation with last message and increment unread count
+      const updates: any = {
         updatedAt: serverTimestamp(),
-      });
+        lastMessage: {
+          text: message.text,
+          senderId: message.senderId,
+          createdAt: new Date(),
+        },
+      };
+
+      // Increment unread count for recipient
+      if (recipientId) {
+        updates[`unreadCount.${recipientId}`] =
+          (convData.unreadCount?.[recipientId] || 0) + 1;
+      }
+
+      await updateDoc(doc(db, 'conversations', conversationId), updates);
 
       const newMessage: ChatMessage = {
         id: messageRef.id,
@@ -1072,15 +2337,17 @@ export class FirebaseChatService implements IChatService {
   }
 
   /**
-   * Mark messages as read
+   * Mark messages as read and reset unread count for user
    */
   async markMessagesAsRead(
     conversationId: string,
-    messageIds: string[]
+    messageIds: string[],
+    userId: string
   ): Promise<ApiResponse<boolean>> {
     try {
       const batch = writeBatch(db);
 
+      // Mark individual messages as read
       for (const messageId of messageIds) {
         const messageRef = doc(
           db,
@@ -1089,8 +2356,17 @@ export class FirebaseChatService implements IChatService {
           'messages',
           messageId
         );
-        batch.update(messageRef, { isRead: true });
+        batch.update(messageRef, {
+          isRead: true,
+          readAt: serverTimestamp(),
+        });
       }
+
+      // Reset unread count for this user in conversation
+      const convRef = doc(db, 'conversations', conversationId);
+      batch.update(convRef, {
+        [`unreadCount.${userId}`]: 0,
+      });
 
       await batch.commit();
 
@@ -1284,7 +2560,7 @@ export class FirebaseAuthService implements IAuthService {
       // Generate geohash if coordinates are provided
       let geohash: string | undefined;
       if (profileData.coordinates) {
-        geohash = geohashService.generateGeohash(
+        geohash = LocationService.generateGeohash(
           profileData.coordinates.latitude,
           profileData.coordinates.longitude
         );
@@ -1527,26 +2803,6 @@ export class FirebaseAuthService implements IAuthService {
         success: false,
         message:
           error instanceof Error ? error.message : 'Failed to verify email',
-      };
-    }
-  }
-
-  /**
-   * Google Sign-In (requires additional setup)
-   */
-  async loginWithGoogle(): Promise<ApiResponse<{ user: User; token: string }>> {
-    try {
-      // This requires expo-auth-session and Google OAuth setup
-      // Implementation depends on your specific OAuth configuration
-      throw new Error(
-        'Google login not implemented. Please configure OAuth in your app.'
-      );
-    } catch (error) {
-      console.error('Error during Google login:', error);
-      return {
-        data: { user: {} as User, token: '' },
-        success: false,
-        message: error instanceof Error ? error.message : 'Google login failed',
       };
     }
   }

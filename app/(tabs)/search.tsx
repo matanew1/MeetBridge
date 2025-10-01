@@ -25,8 +25,13 @@ import { useUserStore } from '../../store';
 import ProfileDetail from '../components/ProfileDetail';
 import MatchModal from '../components/MatchModal';
 import FilterModal from '../components/FilterModal';
+import DiscoveryAnimation from '../components/DiscoveryAnimation';
+import EnhancedMatchAnimation from '../components/EnhancedMatchAnimation';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
+import { FirebaseDiscoveryService } from '../../services/firebase/firebaseServices';
+import { services } from '../../services';
 
 const { width, height } = Dimensions.get('window');
 
@@ -159,9 +164,13 @@ const ProfileCard = ({
   );
 };
 
+// Create discovery service instance outside component to avoid recreating
+const discoveryService = new FirebaseDiscoveryService();
+
 export default function SearchScreen() {
   const { t } = useTranslation();
   const { isDarkMode } = useTheme();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const theme = isDarkMode ? darkTheme : lightTheme;
   const router = useRouter();
   const [showAnimation, setShowAnimation] = useState(true);
@@ -173,11 +182,20 @@ export default function SearchScreen() {
   const [matchedUser, setMatchedUser] = useState<any>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [maxDistance, setMaxDistance] = useState(5000); // Changed to 5000 meters default
+  const [showMatchAnimation, setShowMatchAnimation] = useState(false);
+  const [matchData, setMatchData] = useState<{
+    user: any;
+    matchId: string;
+    conversationId?: string;
+  } | null>(null);
 
   // Local state to track cards being animated out
   const [animatingOutCards, setAnimatingOutCards] = useState<Set<string>>(
     new Set()
   );
+
+  // Track processed matches to prevent duplicate animations
+  const processedMatchesRef = React.useRef<Set<string>>(new Set());
 
   // Zustand store
   const {
@@ -208,12 +226,21 @@ export default function SearchScreen() {
     currentUser,
   } = useUserStore();
 
-  // Sort profiles by distance (handle null distances)
-  const sortedDiscoverProfiles = [...discoverProfiles].sort((a, b) => {
-    const distA = a.distance ?? Number.MAX_SAFE_INTEGER;
-    const distB = b.distance ?? Number.MAX_SAFE_INTEGER;
-    return distA - distB;
-  });
+  // Sort profiles by distance and filter out matched/liked/disliked profiles (handle null distances)
+  // Also deduplicate by ID to prevent duplicate key errors
+  const sortedDiscoverProfiles = [...discoverProfiles]
+    .filter((profile) => !matchedProfiles.includes(profile.id)) // Exclude matched profiles
+    .filter((profile) => !likedProfiles.includes(profile.id)) // Exclude liked profiles
+    .filter((profile) => !dislikedProfiles.includes(profile.id)) // Exclude disliked profiles (24h block)
+    .filter(
+      (profile, index, self) =>
+        index === self.findIndex((p) => p.id === profile.id)
+    ) // Deduplicate by ID
+    .sort((a, b) => {
+      const distA = a.distance ?? Number.MAX_SAFE_INTEGER;
+      const distB = b.distance ?? Number.MAX_SAFE_INTEGER;
+      return distA - distB;
+    });
 
   // Animation values
   const pulseAnimation = useSharedValue(0);
@@ -233,18 +260,32 @@ export default function SearchScreen() {
     }
   };
 
+  // Handle authentication redirect
   useEffect(() => {
-    // Load current user and discover profiles on component mount
-    loadCurrentUser(); // Ensure we have a current user for like/dislike functionality
-    loadConversations(); // Load existing conversations
-    loadDiscoverProfiles(true);
+    if (!isAuthLoading && !isAuthenticated) {
+      router.replace('/auth/login');
+    }
+  }, [isAuthenticated, isAuthLoading]);
 
-    // Small delay to ensure profiles are loaded before starting animation
-    setTimeout(() => {
-      setShowAnimation(true);
-      triggerSearchAnimation();
-    }, 500); // Increased delay to allow for async loading
-  }, []); // Empty dependency array means this runs only once on mount
+  useEffect(() => {
+    // Only load profiles if user is authenticated
+    if (isAuthenticated && !isAuthLoading) {
+      // Load data sequentially to ensure user is loaded before profiles
+      const loadData = async () => {
+        await loadCurrentUser(); // Ensure we have a current user first
+        loadConversations(); // Load existing conversations
+        loadDiscoverProfiles(true); // Load profiles after user is loaded
+
+        // Small delay to ensure profiles are loaded before starting animation
+        setTimeout(() => {
+          setShowAnimation(true);
+          triggerSearchAnimation();
+        }, 500);
+      };
+
+      loadData();
+    }
+  }, [isAuthenticated, isAuthLoading]); // Run when authentication state changes
 
   // Handle when isSearching changes (from button trigger or auto-trigger)
   useEffect(() => {
@@ -267,6 +308,190 @@ export default function SearchScreen() {
     );
   }, []);
 
+  // Subscribe to new matches in real-time
+  useEffect(() => {
+    if (!currentUser) return;
+
+    console.log('🔔 Setting up real-time match listener');
+
+    // Import Firebase functions inline
+    const {
+      collection,
+      query,
+      where,
+      orderBy,
+      limit,
+      onSnapshot,
+      doc: firestoreDoc,
+      getDoc,
+    } = require('firebase/firestore');
+    const { db } = require('../../services/firebase/config');
+
+    // Inline timestamp converter
+    const convertTimestamp = (timestamp: any): Date | undefined => {
+      if (timestamp?.toDate) return timestamp.toDate();
+      if (timestamp?.seconds) return new Date(timestamp.seconds * 1000);
+      return timestamp;
+    };
+
+    // Listen for matches where current user is user1
+    const matchesQuery1 = query(
+      collection(db, 'matches'),
+      where('user1', '==', currentUser.id),
+      where('unmatched', '==', false),
+      orderBy('createdAt', 'desc'),
+      limit(1)
+    );
+
+    // Listen for matches where current user is user2
+    const matchesQuery2 = query(
+      collection(db, 'matches'),
+      where('user2', '==', currentUser.id),
+      where('unmatched', '==', false),
+      orderBy('createdAt', 'desc'),
+      limit(1)
+    );
+
+    const handleMatchChange = async (change: any, isUser1: boolean) => {
+      const matchData = change.doc.data();
+      const otherUserId = isUser1 ? matchData.user2 : matchData.user1;
+
+      // Handle match removal (unmatch)
+      if (change.type === 'removed') {
+        console.log(
+          `🚫 Real-time unmatch detected in search! User ${otherUserId} was unmatched`
+        );
+
+        // Remove match from processed matches
+        processedMatchesRef.current.delete(change.doc.id);
+
+        // Update store to remove unmatched user
+        useUserStore.setState((state) => ({
+          matchedProfiles: state.matchedProfiles.filter(
+            (id) => id !== otherUserId
+          ),
+          matchedProfilesData: state.matchedProfilesData.filter(
+            (profile) => profile.id !== otherUserId
+          ),
+          likedProfiles: state.likedProfiles.filter((id) => id !== otherUserId),
+          likedProfilesData: state.likedProfilesData.filter(
+            (profile) => profile.id !== otherUserId
+          ),
+          conversations: state.conversations.filter(
+            (conv) => !conv.participants.includes(otherUserId)
+          ),
+        }));
+
+        console.log(
+          `✅ Removed ${otherUserId} from all lists in search screen`
+        );
+        return;
+      }
+
+      // Only process 'added' events and avoid duplicates
+      if (
+        change.type === 'added' &&
+        !processedMatchesRef.current.has(change.doc.id)
+      ) {
+        processedMatchesRef.current.add(change.doc.id);
+
+        const matchedUserId = otherUserId;
+
+        console.log(
+          `🎉 Real-time match notification received! Matched with: ${matchedUserId}, Match ID: ${change.doc.id}`
+        );
+
+        // Fetch matched user data
+        const userDoc = await getDoc(firestoreDoc(db, 'users', matchedUserId));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const matchedUser = {
+            id: userDoc.id,
+            ...userData,
+            lastSeen: convertTimestamp(userData.lastSeen),
+          };
+
+          // Check if animation has already been played for this match
+          const matchData = change.doc.data();
+          const animationAlreadyPlayed = matchData.animationPlayed === true;
+
+          // Check if this match is already being shown (avoid duplicate from likeProfile response)
+          const currentMatchData = matchData;
+          const isAlreadyShowing =
+            showMatchAnimation &&
+            matchData &&
+            matchData.matchId === change.doc.id;
+
+          // Update store with matched profile
+          useUserStore.setState((state) => {
+            // Check if already in matched profiles
+            if (state.matchedProfiles.includes(matchedUserId)) {
+              return state; // No update needed
+            }
+            return {
+              matchedProfiles: [...state.matchedProfiles, matchedUserId],
+              matchedProfilesData: [...state.matchedProfilesData, matchedUser],
+              // Remove from discover profiles
+              discoverProfiles: state.discoverProfiles.filter(
+                (profile) => profile.id !== matchedUserId
+              ),
+            };
+          });
+
+          // Show match animation only if not already played and not currently showing
+          if (!animationAlreadyPlayed && !isAlreadyShowing) {
+            setMatchData({
+              user: matchedUser,
+              matchId: change.doc.id,
+              conversationId: matchData.conversationId,
+            });
+            setShowMatchAnimation(true);
+
+            console.log(
+              `✅ Match animation triggered for: ${matchedUser.name}`
+            );
+            console.log(`🗑️ Removed ${matchedUser.name} from discover queue`);
+          } else {
+            if (animationAlreadyPlayed) {
+              console.log(
+                `⏭️ Skipping match animation (already played) for: ${matchedUser.name}`
+              );
+            } else {
+              console.log(
+                `⏭️ Skipping duplicate match animation for: ${matchedUser.name}`
+              );
+            }
+          }
+
+          // Invalidate cache and reload conversations to get the new one
+          if (currentUser) {
+            const cacheService = require('../../services/cacheService').default;
+            cacheService.invalidateByPrefix(`conversations_${currentUser.id}`);
+          }
+          loadConversations();
+        }
+      }
+    };
+
+    const unsubscribe1 = onSnapshot(matchesQuery1, (snapshot: any) => {
+      snapshot
+        .docChanges()
+        .forEach((change: any) => handleMatchChange(change, true));
+    });
+
+    const unsubscribe2 = onSnapshot(matchesQuery2, (snapshot: any) => {
+      snapshot
+        .docChanges()
+        .forEach((change: any) => handleMatchChange(change, false));
+    });
+
+    return () => {
+      console.log('🔕 Cleaning up match listener');
+      unsubscribe1();
+      unsubscribe2();
+    };
+  }, [currentUser?.id]);
+
   const handleLike = (profileId: string) => {
     console.log('handleLike called for profile:', profileId);
 
@@ -279,7 +504,7 @@ export default function SearchScreen() {
     // Delay the actual like action to allow animation to play
     setTimeout(() => {
       likeProfile(profileId)
-        .then((isMatch) => {
+        .then((result) => {
           // Remove from animating cards
           setAnimatingOutCards((prev) => {
             const newSet = new Set(prev);
@@ -287,9 +512,22 @@ export default function SearchScreen() {
             return newSet;
           });
 
-          if (isMatch && userToLike) {
-            setMatchedUser(userToLike);
-            setShowMatchModal(true);
+          // Check if it's a match using the new result structure
+          if (result.isMatch && result.matchedUser && result.matchId) {
+            // Mark this match as processed to prevent duplicate animation from real-time listener
+            processedMatchesRef.current.add(result.matchId);
+
+            // Use the new enhanced match animation
+            setMatchData({
+              user: result.matchedUser,
+              matchId: result.matchId,
+              conversationId: result.conversationId,
+            });
+            setShowMatchAnimation(true);
+
+            console.log(
+              `✅ Match animation shown for: ${result.matchedUser.name} (from like action)`
+            );
           }
         })
         .catch((error) => {
@@ -399,6 +637,60 @@ export default function SearchScreen() {
     }
   };
 
+  const handleMatchAnimationClose = async () => {
+    // Mark animation as played before closing
+    if (matchData?.matchId) {
+      try {
+        await services.matching.markMatchAnimationPlayed(matchData.matchId);
+        console.log(
+          `✅ Match animation marked as played for: ${matchData.matchId}`
+        );
+      } catch (error) {
+        console.error('Failed to mark animation as played:', error);
+      }
+    }
+    setShowMatchAnimation(false);
+    setMatchData(null);
+  };
+
+  const handleSendMessage = async () => {
+    if (matchData) {
+      // Mark animation as played
+      if (matchData.matchId) {
+        try {
+          await services.matching.markMatchAnimationPlayed(matchData.matchId);
+          console.log(
+            `✅ Match animation marked as played for: ${matchData.matchId}`
+          );
+        } catch (error) {
+          console.error('Failed to mark animation as played:', error);
+        }
+      }
+      setShowMatchAnimation(false);
+
+      // Use the conversationId from match data (already created by backend)
+      if (matchData.conversationId) {
+        console.log(`🚀 Navigating to chat: ${matchData.conversationId}`);
+        router.push(`/chat/${matchData.conversationId}`);
+      } else {
+        // Fallback: Find conversation in store
+        const conversation = useUserStore
+          .getState()
+          .conversations.find((conv) =>
+            conv.participants.includes(matchData.user.id)
+          );
+
+        if (conversation) {
+          console.log(`🚀 Found conversation in store: ${conversation.id}`);
+          router.push(`/chat/${conversation.id}`);
+        } else {
+          console.error('❌ No conversation ID available');
+        }
+      }
+      setMatchData(null);
+    }
+  };
+
   // Animated styles
   const pulseStyle = useAnimatedStyle(() => {
     // Create a strong, noticeable breathing effect
@@ -424,150 +716,10 @@ export default function SearchScreen() {
   if (showAnimation || isSearching) {
     return (
       <View style={[styles.container, { backgroundColor: theme.background }]}>
-        {/* Circular Search Interface */}
-        <View style={styles.searchInterface}>
-          <Text style={[styles.searchTitle, { color: theme.primary }]}>
-            {t('search.searchingPerfectMatch')}
-          </Text>
-          {/* Single Animated Structure */}
-          <Animated.View style={[styles.circularStructure, pulseStyle]}>
-            {/* Outer Circle */}
-            <View
-              style={[
-                styles.outerCircle,
-                {
-                  backgroundColor: isDarkMode
-                    ? 'rgba(142, 68, 173, 0.3)'
-                    : 'rgba(225, 200, 235, 0.7)',
-                  borderColor: theme.primary,
-                },
-              ]}
-            >
-              {/* Middle Circle */}
-              <View
-                style={[
-                  styles.middleCircle,
-                  {
-                    backgroundColor: isDarkMode
-                      ? 'rgba(142, 68, 173, 0.2)'
-                      : 'rgba(245, 225, 250, 0.9)',
-                  },
-                ]}
-              >
-                {/* Inner Circle */}
-                <View
-                  style={[
-                    styles.innerCircle,
-                    { backgroundColor: theme.surface },
-                  ]}
-                >
-                  {/* Center Profile */}
-                  <View style={styles.centerProfileContainer}>
-                    {centerProfile && centerProfile.image ? (
-                      <Image
-                        source={{ uri: centerProfile.image }}
-                        style={styles.centerProfile}
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <View
-                        style={[
-                          styles.placeholderProfile,
-                          {
-                            backgroundColor: isDarkMode
-                              ? 'rgba(142, 68, 173, 0.4)'
-                              : '#E1C8EB',
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.placeholderText,
-                            { color: theme.primary },
-                          ]}
-                        >
-                          ?
-                        </Text>
-                      </View>
-                    )}
-                    {/* Heart Icon positioned over center profile */}
-                    <View
-                      style={[
-                        styles.heartContainer,
-                        { backgroundColor: theme.surface },
-                      ]}
-                    >
-                      <Heart
-                        size={22}
-                        color={theme.primary}
-                        fill={theme.primary}
-                      />
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              {/* Fixed Position Profiles */}
-              {matchProfiles.map((profile, index) => {
-                const angle = index * 72 - 90; // 360/5 = 72 degrees apart, start from top
-                const x = Math.cos((angle * Math.PI) / 180) * profile.radius;
-                const y = Math.sin((angle * Math.PI) / 180) * profile.radius;
-
-                return (
-                  <View
-                    key={profile.id}
-                    style={[
-                      styles.surroundingProfile,
-                      {
-                        width: profile.size,
-                        height: profile.size,
-                        borderRadius: profile.size / 2,
-                        transform: [{ translateX: x }, { translateY: y }],
-                      },
-                    ]}
-                  >
-                    {profile.image ? (
-                      <Image
-                        source={{ uri: profile.image }}
-                        style={styles.profileImage}
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <View
-                        style={[styles.profileImage, styles.placeholderImage]}
-                      >
-                        <Text style={styles.placeholderText}>
-                          {profile.name?.charAt(0)?.toUpperCase() || '?'}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                );
-              })}
-            </View>
-          </Animated.View>
-
-          {/* Searching indicator */}
-          <View
-            style={[
-              styles.searchingIndicator,
-              {
-                backgroundColor: `rgba(${
-                  isDarkMode ? '255, 255, 255' : '142, 68, 173'
-                }, 0.9)`,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.searchingText,
-                { color: isDarkMode ? theme.text : '#FFF' },
-              ]}
-            >
-              {t('search.searching')}
-            </Text>
-          </View>
-        </View>
+        <DiscoveryAnimation
+          theme={theme}
+          message={t('search.searchingPerfectMatch')}
+        />
       </View>
     );
   }
@@ -586,6 +738,20 @@ export default function SearchScreen() {
         <Text style={[styles.loadingText, { color: theme.text }]}>
           {t('search.loading')}
         </Text>
+      </View>
+    );
+  }
+
+  // Show loading while checking authentication or redirecting
+  if (isAuthLoading || !isAuthenticated) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.text }]}>
+            {t('common.loading')}
+          </Text>
+        </View>
       </View>
     );
   }
@@ -734,6 +900,18 @@ export default function SearchScreen() {
         currentDistance={maxDistance / 1000} // Convert back to km for display
         onDistanceChange={handleDistanceChange}
       />
+
+      {/* Enhanced Match Animation */}
+      {showMatchAnimation && matchData && currentUser && (
+        <EnhancedMatchAnimation
+          visible={showMatchAnimation}
+          matchedUser={matchData.user}
+          currentUser={currentUser}
+          onClose={handleMatchAnimationClose}
+          onSendMessage={handleSendMessage}
+          theme={theme}
+        />
+      )}
     </View>
   );
 }
@@ -1105,5 +1283,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFF',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
   },
 });

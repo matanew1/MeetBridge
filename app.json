@@ -10,14 +10,28 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.meetbridge.app"
+      "bundleIdentifier": "com.meetbridge.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "MeetBridge needs your location to show you nearby matches and update your profile location.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "MeetBridge needs your location in the background to keep your profile location up-to-date and show you the best matches.",
+        "UIBackgroundModes": [
+          "location"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#FF6B9D"
       },
-      "package": "com.meetbridge.app"
+      "package": "com.meetbridge.app",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -27,7 +41,17 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow MeetBridge to use your location to show nearby matches and keep your profile updated.",
+          "locationAlwaysPermission": "Allow MeetBridge to use your location in the background to keep your profile location up-to-date.",
+          "locationWhenInUsePermission": "Allow MeetBridge to use your location to show nearby matches.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

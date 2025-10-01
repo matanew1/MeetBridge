@@ -20,6 +20,7 @@ const resources = {
         newSearch: 'New Search',
         loading: 'Loading...',
         distance: 'm',
+        noProfiles: 'No profiles available. Try adjusting your filters.',
       },
 
       // Chat Screen
@@ -42,6 +43,8 @@ const resources = {
         unmatchTitle: 'Unmatch',
         unmatchConfirm:
           'Are you sure you want to unmatch {{name}}? This cannot be undone.',
+        newMatch: "It's a match! Say hi 👋",
+        unmatchDetected: 'This conversation has ended.',
       },
 
       // Loved/Liked Screen

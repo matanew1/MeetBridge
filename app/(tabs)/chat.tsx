@@ -258,16 +258,19 @@ export default function ChatScreen() {
           hasLastMessage: !!conversation.lastMessage,
         });
 
-        if (!otherParticipant || !conversation.lastMessage) {
+        if (!otherParticipant) {
           return null;
         }
 
+        // Show conversation even without messages (new matches)
         return {
           id: conversation.id,
           name: otherParticipant.name,
           age: otherParticipant.age,
-          lastMessage: conversation.lastMessage.text,
-          time: formatTime(conversation.lastMessage.timestamp),
+          lastMessage: conversation.lastMessage?.text || t('chat.newMatch'),
+          time: conversation.lastMessage
+            ? formatTime(conversation.lastMessage.timestamp)
+            : formatTime(conversation.createdAt),
           image: otherParticipant.image,
           unread: conversation.unreadCount > 0,
           isOnline: otherParticipant.isOnline,

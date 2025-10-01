@@ -69,7 +69,8 @@ const MessageItem: React.FC<MessageItemProps> = memo(
     const isHeartMessage = useMemo(() => message.text === '❤️', [message.text]);
 
     React.useEffect(() => {
-      const animationDelay = index * 30; // Reduced delay for better performance
+      // Disable animation for existing messages to reduce jumping
+      const animationDelay = 0; // No delay for smooth rendering
 
       const messageTimer = setTimeout(() => {
         messageAnim.value = withSpring(1, {
@@ -86,7 +87,7 @@ const MessageItem: React.FC<MessageItemProps> = memo(
         clearTimeout(messageTimer);
         clearTimeout(fadeTimer);
       };
-    }, [index, messageAnim, fadeAnim]);
+    }, []); // Remove dependencies to prevent re-animation on re-render
 
     const messageStyle = useAnimatedStyle(
       () => ({
@@ -176,6 +177,15 @@ const MessageItem: React.FC<MessageItemProps> = memo(
         </View>
         <Text style={timeStyle}>{formattedTime}</Text>
       </Animated.View>
+    );
+  },
+  (prevProps, nextProps) => {
+    // Only re-render if message content changes
+    return (
+      prevProps.message.id === nextProps.message.id &&
+      prevProps.message.text === nextProps.message.text &&
+      prevProps.message.isFromCurrentUser ===
+        nextProps.message.isFromCurrentUser
     );
   }
 );
@@ -308,14 +318,8 @@ const ChatScreen = () => {
       console.log('✅ All conditions met, setting otherUser');
       setOtherUser(foundUser);
 
-      // Convert conversation messages to display format
-      const displayMessages: Message[] = conversation.messages.map((msg) => ({
-        id: msg.id,
-        text: msg.text,
-        timestamp: msg.timestamp,
-        isFromCurrentUser: msg.senderId === currentUser.id,
-      }));
-      setMessages(displayMessages);
+      // Don't set messages here - let real-time listener handle it
+      // This prevents conflicts between store data and Firestore data
 
       // Mark messages as read (debounced)
       const unreadMessageIds = conversation.messages
@@ -335,6 +339,166 @@ const ChatScreen = () => {
       if (!foundUser) console.log('❌ Missing foundUser');
     }
   }, [conversation, currentUser, foundUser, markMessagesAsRead]);
+
+  // Real-time message listener
+  useEffect(() => {
+    if (!id || !currentUser) return;
+
+    console.log('🔔 Setting up real-time message listener for:', id);
+
+    const {
+      collection,
+      query,
+      orderBy,
+      onSnapshot,
+    } = require('firebase/firestore');
+    const { db } = require('../../services/firebase/config');
+
+    // Listen to messages collection
+    const messagesQuery = query(
+      collection(db, 'conversations', id, 'messages'),
+      orderBy('createdAt', 'asc')
+    );
+
+    const unsubscribe = onSnapshot(
+      messagesQuery,
+      (snapshot: any) => {
+        const newMessages: Message[] = snapshot.docs.map((doc: any) => {
+          const data = doc.data();
+          const timestamp =
+            data.createdAt?.toDate?.() ||
+            (data.createdAt?.seconds
+              ? new Date(data.createdAt.seconds * 1000)
+              : new Date());
+
+          return {
+            id: doc.id,
+            text: data.text,
+            timestamp,
+            isFromCurrentUser: data.senderId === currentUser.id,
+          };
+        });
+
+        console.log(
+          `📨 Received ${newMessages.length} messages from Firestore`
+        );
+        console.log('📨 Message IDs:', newMessages.map((m) => m.id).join(', '));
+
+        // Update messages from Firestore (single source of truth)
+        setMessages(newMessages);
+
+        // Scroll to bottom when messages are loaded or updated
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: false });
+        }, 50);
+      },
+      (error) => {
+        console.error('❌ Error in message listener:', error);
+      }
+    );
+
+    return () => {
+      console.log('🔕 Cleaning up message listener');
+      unsubscribe();
+    };
+  }, [id, currentUser?.id]);
+
+  // Real-time unmatch listener
+  useEffect(() => {
+    if (!conversation?.matchId) return;
+
+    console.log('🔔 Setting up real-time unmatch listener');
+
+    const { doc, onSnapshot } = require('firebase/firestore');
+    const { db } = require('../../services/firebase/config');
+
+    const matchDocRef = doc(db, 'matches', conversation.matchId);
+
+    const unsubscribe = onSnapshot(matchDocRef, (snapshot: any) => {
+      if (!snapshot.exists()) {
+        console.log('🚫 Match document deleted - unmatch detected!');
+
+        // Update store to remove unmatched user
+        if (otherUserId) {
+          console.log(`🚫 Removing ${otherUserId} from store`);
+          useUserStore.setState((state) => ({
+            matchedProfiles: state.matchedProfiles.filter(
+              (id) => id !== otherUserId
+            ),
+            matchedProfilesData: state.matchedProfilesData.filter(
+              (profile) => profile.id !== otherUserId
+            ),
+            likedProfiles: state.likedProfiles.filter(
+              (id) => id !== otherUserId
+            ),
+            likedProfilesData: state.likedProfilesData.filter(
+              (profile) => profile.id !== otherUserId
+            ),
+            conversations: state.conversations.filter(
+              (conv) => !conv.participants.includes(otherUserId)
+            ),
+          }));
+        }
+
+        Alert.alert(
+          t('chat.unmatchTitle'),
+          t('chat.unmatchDetected'),
+          [
+            {
+              text: t('actions.close'),
+              onPress: () => router.back(),
+            },
+          ],
+          { cancelable: false }
+        );
+        return;
+      }
+
+      const data = snapshot.data();
+      if (data?.unmatched) {
+        console.log('🚫 Match unmatched - redirecting');
+
+        // Update store to remove unmatched user
+        if (otherUserId) {
+          console.log(`🚫 Removing ${otherUserId} from store`);
+          useUserStore.setState((state) => ({
+            matchedProfiles: state.matchedProfiles.filter(
+              (id) => id !== otherUserId
+            ),
+            matchedProfilesData: state.matchedProfilesData.filter(
+              (profile) => profile.id !== otherUserId
+            ),
+            likedProfiles: state.likedProfiles.filter(
+              (id) => id !== otherUserId
+            ),
+            likedProfilesData: state.likedProfilesData.filter(
+              (profile) => profile.id !== otherUserId
+            ),
+            conversations: state.conversations.filter(
+              (conv) => !conv.participants.includes(otherUserId)
+            ),
+          }));
+        }
+
+        Alert.alert(
+          t('chat.unmatchTitle'),
+          t('chat.unmatchDetected'),
+          [
+            {
+              text: t('actions.close'),
+              onPress: () => router.back(),
+            },
+          ],
+          { cancelable: false }
+        );
+      }
+    });
+
+    return () => {
+      console.log('🔕 Cleaning up unmatch listener');
+      unsubscribe();
+    };
+  }, [conversation?.matchId, router, t]);
 
   // Memoized animation styles
   const headerStyle = useAnimatedStyle(
@@ -364,24 +528,17 @@ const ChatScreen = () => {
   const handleSendMessage = useCallback(() => {
     if (inputText.trim() && id && currentUser) {
       const messageText = inputText.trim();
-      const newMessage: Message = {
-        id: `msg_${Date.now()}_${Math.random()}`,
-        text: messageText,
-        timestamp: new Date(),
-        isFromCurrentUser: true,
-      };
 
-      // Batch state updates
-      setMessages((prev) => [...prev, newMessage]);
+      // Clear input immediately for better UX
       setInputText('');
 
-      // Send message to store
+      // Send message to Firestore - real-time listener will update UI
       sendMessage(id as string, messageText);
 
-      // Optimized scroll with requestAnimationFrame
-      requestAnimationFrame(() => {
+      // Scroll to bottom after a short delay to ensure message is rendered
+      setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
-      });
+      }, 150);
     }
   }, [inputText, id, currentUser, sendMessage]);
 
@@ -396,19 +553,13 @@ const ChatScreen = () => {
         }
       );
 
-      const heartMessage: Message = {
-        id: `msg_heart_${Date.now()}_${Math.random()}`,
-        text: '❤️',
-        timestamp: new Date(),
-        isFromCurrentUser: true,
-      };
-
-      setMessages((prev) => [...prev, heartMessage]);
+      // Send heart to Firestore - real-time listener will update UI
       sendMessage(id as string, '❤️');
 
-      requestAnimationFrame(() => {
+      // Scroll to bottom after a short delay to ensure message is rendered
+      setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
-      });
+      }, 150);
     }
   }, [id, currentUser, sendMessage, heartScale]);
 
@@ -620,7 +771,7 @@ const ChatScreen = () => {
               activeOpacity={0.7}
             >
               <Animated.View style={heartAnimatedStyle}>
-                <Heart size={20} color={theme.primary} />
+                <Heart size={18} color={theme.primary} />
               </Animated.View>
             </TouchableOpacity>
             <TextInput
@@ -895,7 +1046,7 @@ const styles = StyleSheet.create({
   },
   messageText: {
     fontSize: 16,
-    lineHeight: 20,
+    lineHeight: 22,
     flexWrap: 'wrap',
     flexShrink: 1,
   },
@@ -903,11 +1054,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     elevation: 0,
     shadowOpacity: 0,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    minHeight: 50,
+    minWidth: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   heartText: {
-    fontSize: 24,
+    fontSize: 32,
+    lineHeight: 36,
     textAlign: 'center',
   },
   messageTime: {

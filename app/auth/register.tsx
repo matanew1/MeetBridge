@@ -199,7 +199,7 @@ const RegisterScreen = () => {
             {/* Name Input */}
             <View style={styles.inputGroup}>
               <Text style={[styles.inputLabel, { color: theme.text }]}>
-                Full Name
+                First Name
               </Text>
               <View
                 style={[

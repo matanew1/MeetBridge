@@ -298,9 +298,103 @@ export default function LovedScreen() {
     }
   }, []);
 
+  // Real-time unmatch listener - syncs unmatch across both users
+  useEffect(() => {
+    const currentUser = useUserStore.getState().currentUser;
+    if (!currentUser) return;
+
+    console.log('🔔 Setting up real-time unmatch listener for matches list');
+
+    // Import Firebase functions inline
+    const {
+      collection,
+      query,
+      where,
+      onSnapshot,
+      doc: firestoreDoc,
+    } = require('firebase/firestore');
+    const { db } = require('../../services/firebase/config');
+
+    // Listen for matches where current user is user1
+    const matchesQuery1 = query(
+      collection(db, 'matches'),
+      where('user1', '==', currentUser.id)
+    );
+
+    // Listen for matches where current user is user2
+    const matchesQuery2 = query(
+      collection(db, 'matches'),
+      where('user2', '==', currentUser.id)
+    );
+
+    const handleUnmatchDetection = (snapshot: any, isUser1: boolean) => {
+      snapshot.docChanges().forEach((change: any) => {
+        if (change.type === 'removed') {
+          const matchData = change.doc.data();
+          const unmatchedUserId = isUser1 ? matchData.user2 : matchData.user1;
+
+          console.log(
+            `🚫 Real-time unmatch detected! User ${unmatchedUserId} was unmatched`
+          );
+
+          // Update store to remove unmatched user from both lists
+          useUserStore.setState((state) => ({
+            matchedProfiles: state.matchedProfiles.filter(
+              (id) => id !== unmatchedUserId
+            ),
+            matchedProfilesData: state.matchedProfilesData.filter(
+              (profile) => profile.id !== unmatchedUserId
+            ),
+            likedProfiles: state.likedProfiles.filter(
+              (id) => id !== unmatchedUserId
+            ),
+            likedProfilesData: state.likedProfilesData.filter(
+              (profile) => profile.id !== unmatchedUserId
+            ),
+            conversations: state.conversations.filter(
+              (conv) => !conv.participants.includes(unmatchedUserId)
+            ),
+          }));
+
+          console.log(`✅ Removed ${unmatchedUserId} from all lists`);
+
+          // Close profile detail if viewing unmatched user
+          if (selectedProfile?.id === unmatchedUserId) {
+            handleCloseProfile();
+          }
+        }
+      });
+    };
+
+    const unsubscribe1 = onSnapshot(matchesQuery1, (snapshot) =>
+      handleUnmatchDetection(snapshot, true)
+    );
+
+    const unsubscribe2 = onSnapshot(matchesQuery2, (snapshot) =>
+      handleUnmatchDetection(snapshot, false)
+    );
+
+    return () => {
+      console.log('🔕 Cleaning up unmatch listeners');
+      unsubscribe1();
+      unsubscribe2();
+    };
+  }, [selectedProfile]);
+
   // Get liked and matched profiles from store
-  const likedProfilesData = getLikedProfiles();
-  const matchedProfilesData = getMatchedProfiles();
+  const likedProfilesDataRaw = getLikedProfiles();
+  const matchedProfilesDataRaw = getMatchedProfiles();
+
+  // Deduplicate profiles by ID to prevent duplicate key errors
+  const likedProfilesData = likedProfilesDataRaw.filter(
+    (profile, index, self) =>
+      index === self.findIndex((p) => p.id === profile.id)
+  );
+
+  const matchedProfilesData = matchedProfilesDataRaw.filter(
+    (profile, index, self) =>
+      index === self.findIndex((p) => p.id === profile.id)
+  );
 
   // Get only liked profiles that are not matches
   const onlyLikedProfiles = likedProfilesData.filter(

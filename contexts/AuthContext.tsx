@@ -13,7 +13,7 @@ import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { services } from '../services';
 import { User } from '../store/types';
 import LocationService from '../services/locationService';
-import geohashService from '../services/geohashService';
+import * as Location from 'expo-location';
 
 interface AuthContextType {
   user: User | null;
@@ -24,7 +24,6 @@ interface AuthContextType {
     email: string,
     password: string
   ) => Promise<{ success: boolean; message: string }>;
-  loginWithGoogle: () => Promise<{ success: boolean; message: string }>;
   register: (
     userData: Partial<User> & { email: string; password: string }
   ) => Promise<{ success: boolean; message: string }>;
@@ -84,6 +83,89 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.error('Error refreshing user profile:', error);
     }
   };
+
+  // Start continuous location tracking when user is authenticated
+  useEffect(() => {
+    if (!firebaseUser) return;
+
+    const startTracking = async () => {
+      const hasPermission = await LocationService.hasLocationPermissions();
+
+      if (!hasPermission) {
+        console.log('📍 Requesting location permissions for tracking...');
+        const permissionResult =
+          await LocationService.requestLocationPermissions();
+        if (!permissionResult.granted) {
+          console.warn('📍 Location permission denied, tracking disabled');
+          return;
+        }
+      }
+
+      console.log('📍 Starting continuous location tracking...');
+
+      const success = await LocationService.startLocationWatcher(
+        async (location) => {
+          try {
+            // Update Firebase with new location
+            const geohash = LocationService.generateGeohash(
+              location.latitude,
+              location.longitude
+            );
+
+            const userRef = doc(db, 'users', firebaseUser.uid);
+            await updateDoc(userRef, {
+              coordinates: {
+                latitude: location.latitude,
+                longitude: location.longitude,
+                lastUpdated: new Date(),
+              },
+              geohash,
+              lastLocationUpdate: serverTimestamp(),
+            });
+
+            console.log('✅ Location updated in Firebase:', {
+              lat: location.latitude.toFixed(4),
+              lon: location.longitude.toFixed(4),
+            });
+
+            // Update local user state
+            if (user) {
+              setUser((prev) => ({
+                ...prev!,
+                coordinates: {
+                  latitude: location.latitude,
+                  longitude: location.longitude,
+                  lastUpdated: new Date(),
+                },
+                geohash,
+              }));
+            }
+          } catch (error) {
+            console.error('Error updating location in Firebase:', error);
+          }
+        },
+        {
+          accuracy: Location.Accuracy.Balanced,
+          timeInterval: 60000, // Every 60 seconds
+          distanceInterval: 100, // Every 100 meters
+        }
+      );
+
+      if (success) {
+        console.log('✅ Location tracking started');
+      } else {
+        console.warn('⚠️ Failed to start location tracking');
+      }
+    };
+
+    startTracking();
+
+    // Cleanup on unmount or when user logs out
+    return () => {
+      console.log('🛑 Stopping location tracking...');
+      LocationService.stopLocationWatcher();
+    };
+  }, [firebaseUser]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -189,26 +271,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Login failed',
-      };
-    }
-  };
-
-  const loginWithGoogle = async () => {
-    try {
-      const response = await services.auth.loginWithGoogle();
-      return {
-        success: response.success,
-        message:
-          response.message ||
-          (response.success
-            ? 'Google login successful'
-            : 'Google login failed'),
-      };
-    } catch (error) {
-      console.error('Google login error:', error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Google login failed',
       };
     }
   };
@@ -380,7 +442,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const { coordinates, address } = locationData;
 
       // Generate geohash for efficient location-based queries
-      const geohash = geohashService.generateGeohash(
+      const geohash = LocationService.generateGeohash(
         coordinates.latitude,
         coordinates.longitude
       );
@@ -437,7 +499,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isLoading,
     isAuthenticated: !!user && !!firebaseUser,
     login,
-    loginWithGoogle,
     register,
     logout,
     forgotPassword,

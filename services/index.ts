@@ -61,46 +61,14 @@ class AsyncStorageService {
   }
 }
 
-// ...location service removed as requested...
-
-// API client implementation
-class ApiClient {
-  async request<T>(request: any): Promise<any> {
-    // Generic API request implementation
-    throw new Error('Generic API requests not implemented for Firebase');
-  }
-
-  async get<T>(url: string, params?: any): Promise<any> {
-    throw new Error('Generic GET requests not implemented for Firebase');
-  }
-
-  async post<T>(url: string, data?: any): Promise<any> {
-    throw new Error('Generic POST requests not implemented for Firebase');
-  }
-
-  async put<T>(url: string, data?: any): Promise<any> {
-    throw new Error('Generic PUT requests not implemented for Firebase');
-  }
-
-  async delete<T>(url: string): Promise<any> {
-    throw new Error('Generic DELETE requests not implemented for Firebase');
-  }
-
-  async patch<T>(url: string, data?: any): Promise<any> {
-    throw new Error('Generic PATCH requests not implemented for Firebase');
-  }
-}
-
 // Export service container with Firebase implementations
 export const services: IServiceContainer = {
   userProfile: new FirebaseUserProfileService(),
   discovery: new FirebaseDiscoveryService(),
   matching: new FirebaseMatchingService(),
   chat: new FirebaseChatService(),
-  // location service removed
   auth: new FirebaseAuthService(),
   storage: new AsyncStorageService(),
-  apiClient: new ApiClient(),
 };
 
 // Export individual services for direct access
@@ -111,6 +79,13 @@ export {
   FirebaseChatService,
   FirebaseAuthService,
 };
+
+// Export singleton instances for direct use
+export const discoveryService = services.discovery;
+export const matchingService = services.matching;
+export const chatService = services.chat;
+export const authService = services.auth;
+export const userProfileService = services.userProfile;
 
 // Export Firebase config
 export { db, auth, storage } from './firebase/config';
