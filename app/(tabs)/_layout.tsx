@@ -88,11 +88,11 @@ export default function TabLayout() {
           onPress={handleProfilePress}
         >
           <Image
-            source={{
-              uri:
-                user?.image ||
-                'https://images.pexels.com/photos/1043474/pexels-photo-1043474.jpeg?auto=compress&cs=tinysrgb&w=100',
-            }}
+            source={
+              user?.image
+                ? { uri: user.image }
+                : require('../../assets/images/placeholder.png')
+            }
             style={styles.headerProfile}
           />
         </TouchableOpacity>

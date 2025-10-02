@@ -207,6 +207,7 @@ export default function SearchScreen() {
   const [matchedUser, setMatchedUser] = useState<any>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [maxDistance, setMaxDistance] = useState(5000); // Changed to 5000 meters default
+  const [ageRange, setAgeRange] = useState<[number, number]>([18, 99]); // Default age range
   const [showMatchAnimation, setShowMatchAnimation] = useState(false);
   const [matchData, setMatchData] = useState<{
     user: any;
@@ -257,6 +258,11 @@ export default function SearchScreen() {
     .filter((profile) => !matchedProfiles.includes(profile.id)) // Exclude matched profiles
     .filter((profile) => !likedProfiles.includes(profile.id)) // Exclude liked profiles
     .filter((profile) => !dislikedProfiles.includes(profile.id)) // Exclude disliked profiles (24h block)
+    .filter((profile) => {
+      // Filter by age range (client-side safety check)
+      const profileAge = profile.age || 0;
+      return profileAge >= ageRange[0] && profileAge <= ageRange[1];
+    })
     .filter(
       (profile, index, self) =>
         index === self.findIndex((p) => p.id === profile.id)
@@ -274,10 +280,12 @@ export default function SearchScreen() {
     // Update search filters based on user preferences
     if (currentUser) {
       const maxDistanceMeters = currentUser.preferences?.maxDistance || 5000; // Already in meters
+      const userAgeRange = currentUser.preferences?.ageRange || [18, 99];
       setMaxDistance(maxDistanceMeters);
+      setAgeRange(userAgeRange as [number, number]);
       updateSearchFilters({
         gender: currentUser.preferences?.interestedIn || 'both',
-        ageRange: currentUser.preferences?.ageRange || [18, 99],
+        ageRange: userAgeRange,
         location: currentUser.location || '',
         maxDistance: maxDistanceMeters,
       });
@@ -678,6 +686,31 @@ export default function SearchScreen() {
     loadDiscoverProfiles(true);
   };
 
+  const handleAgeRangeChange = async (newAgeRange: [number, number]) => {
+    // Update local state and search filters
+    setAgeRange(newAgeRange);
+    updateSearchFilters({ ageRange: newAgeRange });
+
+    // Update user preferences in database for bi-directional sync
+    if (currentUser && updateProfile) {
+      try {
+        await updateProfile({
+          preferences: {
+            ...currentUser.preferences,
+            ageRange: newAgeRange,
+          },
+        });
+        console.log(
+          `✅ User ageRange preference updated to [${newAgeRange[0]}, ${newAgeRange[1]}]`
+        );
+      } catch (error) {
+        console.error('Error updating user ageRange preference:', error);
+      }
+    }
+
+    loadDiscoverProfiles(true);
+  };
+
   const handleSearchButton = () => {
     // Trigger the search animation (which now includes refresh functionality)
     setShowAnimation(true);
@@ -950,6 +983,8 @@ export default function SearchScreen() {
         onClose={() => setShowFilterModal(false)}
         currentDistance={maxDistance} // Already in meters
         onDistanceChange={handleDistanceChange}
+        currentAgeRange={ageRange}
+        onAgeRangeChange={handleAgeRangeChange}
       />
 
       {/* Enhanced Match Animation */}
@@ -1092,20 +1127,25 @@ const styles = StyleSheet.create({
   },
   distanceContainer: {
     position: 'absolute',
-    top: 0,
-    right: 0,
-    backgroundColor: '#c9b7e9ff',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(201, 183, 233, 0.95)',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 10,
-    zIndex: 2,
-    minWidth: 40,
+    borderRadius: 12,
+    zIndex: 10,
+    minWidth: 50,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   distanceText: {
     color: '#461237ff',
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
   },
   cardInfo: {
     alignItems: 'center',

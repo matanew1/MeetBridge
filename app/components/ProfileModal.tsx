@@ -20,7 +20,6 @@ import {
   Settings,
   LogOut,
   Edit3,
-  Camera,
   Users,
   Target,
   Clock,
@@ -205,6 +204,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     return Math.round((completionScore / totalFields) * 100);
   };
 
+  // Guard clause for null user
+  if (!user) {
+    return null;
+  }
+
   return (
     <Modal
       visible={visible}
@@ -256,18 +260,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               onPress={handleChangePhoto}
             >
               <Image
-                source={{
-                  uri:
-                    user.image ||
-                    'https://images.pexels.com/photos/1043474/pexels-photo-1043474.jpeg?auto=compress&cs=tinysrgb&w=300',
-                }}
+                source={
+                  user.image
+                    ? { uri: user.image }
+                    : require('../../assets/images/placeholder.png')
+                }
                 style={styles.profileImage}
               />
-              <View
-                style={[styles.cameraIcon, { backgroundColor: theme.primary }]}
-              >
-                <Camera size={16} color="white" />
-              </View>
             </TouchableOpacity>
 
             <Text style={[styles.userName, { color: theme.text }]}>
@@ -646,18 +645,6 @@ const styles = StyleSheet.create({
     borderRadius: 60,
     borderWidth: 3,
     borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  cameraIcon: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'white',
   },
   userName: {
     fontSize: 24,

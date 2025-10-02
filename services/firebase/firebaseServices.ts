@@ -605,6 +605,13 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
     const profiles: User[] = [];
     const seenProfileIds = new Set<string>();
 
+    // Create a map of profileId to queue data (includes distance)
+    const queueDataMap = new Map<string, any>();
+    queueSnapshot.docs.forEach((doc: any) => {
+      const data = doc.data();
+      queueDataMap.set(data.profileId, data);
+    });
+
     // Deduplicate profile IDs from queue
     const profileIds = queueSnapshot.docs
       .map((doc: any) => doc.data().profileId)
@@ -625,9 +632,12 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         const profileDoc = await getDoc(doc(db, 'users', profileId));
         if (profileDoc.exists()) {
           const data = profileDoc.data();
+          const queueData = queueDataMap.get(profileId);
+
           profiles.push({
             id: profileDoc.id,
             ...data,
+            distance: queueData?.distance || null, // Include distance from queue
             lastSeen: convertTimestamp(data.lastSeen),
           } as User);
         }

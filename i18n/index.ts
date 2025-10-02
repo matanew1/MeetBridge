@@ -108,7 +108,7 @@ const resources = {
 
       // Filter Modal
       filter: {
-        title: 'Search Distance',
+        title: 'Search Filters',
         apply: 'Apply',
         upTo: 'Up to',
         meters: 'm',
