@@ -135,11 +135,27 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   };
 
   const getPreferencesDisplay = (preferences?: User['preferences']) => {
-    if (!preferences) return 'Not set';
+    if (!preferences) {
+      return {
+        ageRange: 'Not set',
+        distance: 'Not set',
+        interestedIn: 'Not set',
+      };
+    }
+
     const { ageRange, maxDistance, interestedIn } = preferences;
+
+    // Format distance (stored in meters)
+    let distanceDisplay: string;
+    if (maxDistance >= 1000) {
+      distanceDisplay = `${(maxDistance / 1000).toFixed(1)} km`;
+    } else {
+      distanceDisplay = `${maxDistance} m`;
+    }
+
     return {
       ageRange: `${ageRange[0]}-${ageRange[1]} years`,
-      distance: `${maxDistance} km`,
+      distance: distanceDisplay,
       interestedIn: getGenderDisplay(interestedIn),
     };
   };

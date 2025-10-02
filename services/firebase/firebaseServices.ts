@@ -2572,7 +2572,7 @@ export class FirebaseAuthService implements IAuthService {
           location: '',
           preferences: {
             ageRange: [20, 35] as [number, number],
-            maxDistance: 50,
+            maxDistance: 5000, // meters (5 km default)
             interestedIn: 'both' as const,
           },
         };
@@ -2652,7 +2652,7 @@ export class FirebaseAuthService implements IAuthService {
         location: profileData.location || '',
         preferences: profileData.preferences || {
           ageRange: [20, 35] as [number, number],
-          maxDistance: 50,
+          maxDistance: 5000, // meters (5 km default)
           interestedIn: 'both' as const,
         },
       };

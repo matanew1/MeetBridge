@@ -58,7 +58,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     interests: user?.interests ? [...user.interests] : [],
     preferences: user?.preferences || {
       ageRange: [18, 35] as [number, number],
-      maxDistance: 50,
+      maxDistance: 5000, // meters (5 km default)
       interestedIn: 'both' as 'male' | 'female' | 'both',
     },
   });

@@ -191,7 +191,11 @@ const discoveryService = new FirebaseDiscoveryService();
 export default function SearchScreen() {
   const { t } = useTranslation();
   const { isDarkMode } = useTheme();
-  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const {
+    isAuthenticated,
+    isLoading: isAuthLoading,
+    updateProfile,
+  } = useAuth();
   const theme = isDarkMode ? darkTheme : lightTheme;
   const router = useRouter();
   const [showAnimation, setShowAnimation] = useState(true);
@@ -269,8 +273,7 @@ export default function SearchScreen() {
   const updateUserPreferences = () => {
     // Update search filters based on user preferences
     if (currentUser) {
-      const maxDistanceMeters =
-        (currentUser.preferences?.maxDistance || 5) * 1000;
+      const maxDistanceMeters = currentUser.preferences?.maxDistance || 5000; // Already in meters
       setMaxDistance(maxDistanceMeters);
       updateSearchFilters({
         gender: currentUser.preferences?.interestedIn || 'both',
@@ -652,10 +655,26 @@ export default function SearchScreen() {
     setShowFilterModal(true);
   };
 
-  const handleDistanceChange = (distance: number) => {
-    const distanceInMeters = distance * 1000; // Convert km to meters
-    setMaxDistance(distanceInMeters);
-    updateSearchFilters({ maxDistance: distanceInMeters });
+  const handleDistanceChange = async (distance: number) => {
+    // Distance is already in meters from FilterModal
+    setMaxDistance(distance);
+    updateSearchFilters({ maxDistance: distance });
+
+    // Update user preferences in database for bi-directional sync
+    if (currentUser && updateProfile) {
+      try {
+        await updateProfile({
+          preferences: {
+            ...currentUser.preferences,
+            maxDistance: distance,
+          },
+        });
+        console.log(`✅ User maxDistance preference updated to ${distance}m`);
+      } catch (error) {
+        console.error('Error updating user maxDistance preference:', error);
+      }
+    }
+
     loadDiscoverProfiles(true);
   };
 
@@ -929,7 +948,7 @@ export default function SearchScreen() {
       <FilterModal
         visible={showFilterModal}
         onClose={() => setShowFilterModal(false)}
-        currentDistance={maxDistance / 1000} // Convert back to km for display
+        currentDistance={maxDistance} // Already in meters
         onDistanceChange={handleDistanceChange}
       />
 
