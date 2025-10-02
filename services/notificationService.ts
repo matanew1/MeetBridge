@@ -3,7 +3,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from './firebase/config';
 
 // Configure notification behavior
@@ -18,15 +18,11 @@ Notifications.setNotificationHandler({
 export interface NotificationSettings {
   enabled: boolean;
   matches: boolean;
-  messages: boolean;
-  likes: boolean;
 }
 
 const DEFAULT_SETTINGS: NotificationSettings = {
   enabled: true,
   matches: true,
-  messages: true,
-  likes: true,
 };
 
 const STORAGE_KEY = '@notification_settings';
@@ -123,14 +119,6 @@ class NotificationService {
           lightColor: '#FF69B4',
           sound: 'default',
         });
-
-        await Notifications.setNotificationChannelAsync('messages', {
-          name: 'Messages',
-          importance: Notifications.AndroidImportance.HIGH,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: '#4FC3F7',
-          sound: 'default',
-        });
       }
 
       return tokenData.data;
@@ -179,9 +167,6 @@ class NotificationService {
         if (data.type === 'match') {
           // Navigate to matches screen
           console.log('Navigate to match:', data.matchId);
-        } else if (data.type === 'message') {
-          // Navigate to chat
-          console.log('Navigate to chat:', data.conversationId);
         }
       });
   }
@@ -217,10 +202,11 @@ class NotificationService {
   }
 
   /**
-   * Send match notification
+   * Send match notification (broadcast to current user)
    */
   async sendMatchNotification(matchedUserName: string, matchId: string) {
     if (!this.settings.enabled || !this.settings.matches) {
+      console.log('Match notifications disabled, skipping notification');
       return;
     }
 
@@ -233,47 +219,72 @@ class NotificationService {
       },
       'matches'
     );
+
+    console.log(`📢 Match notification sent for ${matchedUserName}`);
   }
 
   /**
-   * Send message notification
+   * Broadcast match notification to a specific user via push token
+   * This is used to notify the other user when a match occurs
    */
-  async sendMessageNotification(
-    senderName: string,
-    messagePreview: string,
-    conversationId: string
+  async broadcastMatchNotification(
+    userId: string,
+    currentUserName: string,
+    matchId: string
   ) {
-    if (!this.settings.enabled || !this.settings.messages) {
-      return;
+    try {
+      // Get the user's push token from Firebase
+      const userRef = doc(db, 'users', userId);
+      const userDoc = await getDoc(userRef);
+
+      if (!userDoc.exists()) {
+        console.log('User not found for broadcast notification');
+        return;
+      }
+
+      const userData = userDoc.data();
+      const pushToken = userData.pushToken;
+      const notificationsEnabled = userData.notificationsEnabled;
+
+      if (!pushToken || !notificationsEnabled) {
+        console.log(
+          'Push token not available or notifications disabled for user'
+        );
+        return;
+      }
+
+      // Send push notification via Expo Push Notification service
+      const message = {
+        to: pushToken,
+        sound: 'default',
+        title: "It's a Match! 💕",
+        body: `You matched with ${currentUserName}! Start chatting now.`,
+        data: {
+          type: 'match',
+          matchId,
+        },
+        priority: 'high',
+        channelId: 'matches',
+      };
+
+      const response = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Accept-encoding': 'gzip, deflate',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(message),
+      });
+
+      const result = await response.json();
+      console.log(
+        `📢 Broadcast match notification sent to ${currentUserName}:`,
+        result
+      );
+    } catch (error) {
+      console.error('Error broadcasting match notification:', error);
     }
-
-    await this.sendLocalNotification(
-      senderName,
-      messagePreview,
-      {
-        type: 'message',
-        conversationId,
-      },
-      'messages'
-    );
-  }
-
-  /**
-   * Send like notification
-   */
-  async sendLikeNotification(likerName: string) {
-    if (!this.settings.enabled || !this.settings.likes) {
-      return;
-    }
-
-    await this.sendLocalNotification(
-      'New Like! 💖',
-      `${likerName} liked your profile`,
-      {
-        type: 'like',
-      },
-      'default'
-    );
   }
 
   /**

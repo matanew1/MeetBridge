@@ -467,7 +467,7 @@ export default function SearchScreen() {
             });
             setShowMatchAnimation(true);
 
-            // Send notification
+            // Send local notification to current user (this is for the user who receives the match via real-time listener)
             await notificationService.sendMatchNotification(
               matchedUser.name || 'Someone',
               change.doc.id
@@ -551,14 +551,21 @@ export default function SearchScreen() {
             });
             setShowMatchAnimation(true);
 
-            // Send notification
-            notificationService.sendMatchNotification(
-              result.matchedUser.name || 'Someone',
-              result.matchId
-            );
+            // Only broadcast notification to the OTHER user (not to ourselves)
+            // The current user will get their notification from the real-time listener
+            if (currentUser) {
+              notificationService.broadcastMatchNotification(
+                result.matchedUser.id,
+                currentUser.name || 'Someone',
+                result.matchId
+              );
+            }
 
             console.log(
               `✅ Match animation shown for: ${result.matchedUser.name} (from like action)`
+            );
+            console.log(
+              `📢 Broadcast notification sent to: ${result.matchedUser.name}`
             );
           }
         })
