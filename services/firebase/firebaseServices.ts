@@ -1400,12 +1400,18 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         if (matchDoc && matchDoc.data().unmatched) {
           // Reactivate unmatched
           matchRef = matchDoc.ref;
+          
+          // Set new expiration to 30 days from now
+          const expiresAt = new Date();
+          expiresAt.setDate(expiresAt.getDate() + 30);
+          
           batch.update(matchRef, {
             unmatched: false,
             unmatchedAt: null,
             unmatchedBy: null,
             conversationId,
             createdAt: serverTimestamp(),
+            expiresAt, // Reset expiration for reactivated match
           });
 
           // Update conversation with matchId
@@ -1415,6 +1421,11 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         } else {
           // Create new match
           matchRef = doc(collection(db, 'matches'));
+          
+          // Set expiration to 30 days from now
+          const expiresAt = new Date();
+          expiresAt.setDate(expiresAt.getDate() + 30);
+          
           batch.set(matchRef, {
             users: [userId, targetUserId],
             user1,
@@ -1423,6 +1434,7 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
             unmatched: false,
             animationPlayed: false, // Animation not yet shown
             createdAt: serverTimestamp(),
+            expiresAt, // Match expires in 30 days
           });
 
           // Update conversation with matchId
@@ -1594,6 +1606,7 @@ export class FirebaseMatchingService implements IMatchingService {
   ): Promise<ApiResponse<User[]>> {
     try {
       const pageSize = 20;
+      const now = new Date();
 
       // Query matches where user is user1
       const matchesQuery1 = query(
@@ -1620,12 +1633,30 @@ export class FirebaseMatchingService implements IMatchingService {
 
       const matchedUsers: User[] = [];
       const seenUserIds = new Set<string>();
+      const expiredMatchIds: string[] = [];
 
       // Process matches from both queries
       const allMatches = [...matchesSnapshot1.docs, ...matchesSnapshot2.docs];
 
       for (const matchDoc of allMatches) {
         const matchData = matchDoc.data();
+        
+        // Check if match has expired
+        if (matchData.expiresAt) {
+          const expiresAt = matchData.expiresAt.toDate
+            ? matchData.expiresAt.toDate()
+            : new Date(matchData.expiresAt);
+
+          // If expired, mark for deletion and skip
+          if (expiresAt <= now) {
+            console.log(
+              `⏰ Match ${matchDoc.id} has expired, will be deleted`
+            );
+            expiredMatchIds.push(matchDoc.id);
+            continue; // Skip this match
+          }
+        }
+
         const otherUserId =
           matchData.user1 === userId ? matchData.user2 : matchData.user1;
 
@@ -1642,6 +1673,17 @@ export class FirebaseMatchingService implements IMatchingService {
             } as User);
           }
         }
+      }
+
+      // Delete expired matches in the background
+      if (expiredMatchIds.length > 0) {
+        console.log(`🗑️ Deleting ${expiredMatchIds.length} expired matches`);
+        const deletePromises = expiredMatchIds.map((docId) =>
+          deleteDoc(doc(db, 'matches', docId))
+        );
+        Promise.all(deletePromises).catch((error) =>
+          console.error('Error deleting expired matches:', error)
+        );
       }
 
       // Sort by match creation date
@@ -1693,6 +1735,8 @@ export class FirebaseMatchingService implements IMatchingService {
   ): Promise<ApiResponse<User[]>> {
     try {
       const pageSize = 20;
+      const now = new Date();
+      
       const interactionsQuery = query(
         collection(db, 'interactions'),
         where('userId', '==', userId),
@@ -1703,6 +1747,7 @@ export class FirebaseMatchingService implements IMatchingService {
 
       const interactionsSnapshot = await getDocs(interactionsQuery);
       const likedUsers: User[] = [];
+      const expiredInteractionIds: string[] = [];
 
       // Get user's matches to filter them out
       const [user1, user2] = [userId, userId];
@@ -1723,19 +1768,63 @@ export class FirebaseMatchingService implements IMatchingService {
       ]);
 
       const matchedUserIds = new Set<string>();
+      const expiredMatchIds: string[] = [];
+      
       [...matchesSnapshot1.docs, ...matchesSnapshot2.docs].forEach(
         (matchDoc) => {
           const matchData = matchDoc.data();
+          
+          // Check if match has expired
+          if (matchData.expiresAt) {
+            const expiresAt = matchData.expiresAt.toDate
+              ? matchData.expiresAt.toDate()
+              : new Date(matchData.expiresAt);
+
+            if (expiresAt <= now) {
+              console.log(
+                `⏰ Match ${matchDoc.id} has expired, will be deleted`
+              );
+              expiredMatchIds.push(matchDoc.id);
+              return; // Skip adding to matchedUserIds
+            }
+          }
+          
           const otherId =
             matchData.user1 === userId ? matchData.user2 : matchData.user1;
           matchedUserIds.add(otherId);
         }
       );
 
+      // Delete expired matches in the background
+      if (expiredMatchIds.length > 0) {
+        console.log(`🗑️ Deleting ${expiredMatchIds.length} expired matches`);
+        const deletePromises = expiredMatchIds.map((docId) =>
+          deleteDoc(doc(db, 'matches', docId))
+        );
+        Promise.all(deletePromises).catch((error) =>
+          console.error('Error deleting expired matches:', error)
+        );
+      }
+
       // Fetch liked user profiles (excluding matched ones)
       for (const interactionDoc of interactionsSnapshot.docs) {
         const interactionData = interactionDoc.data();
         const targetUserId = interactionData.targetUserId;
+
+        // Check if interaction has expired
+        if (interactionData.expiresAt) {
+          const expiresAt = interactionData.expiresAt.toDate
+            ? interactionData.expiresAt.toDate()
+            : new Date(interactionData.expiresAt);
+
+          if (expiresAt <= now) {
+            console.log(
+              `⏰ Interaction ${interactionDoc.id} has expired, will be deleted`
+            );
+            expiredInteractionIds.push(interactionDoc.id);
+            continue; // Skip this interaction
+          }
+        }
 
         // Skip if already matched
         if (matchedUserIds.has(targetUserId)) continue;
@@ -1750,6 +1839,17 @@ export class FirebaseMatchingService implements IMatchingService {
             lastSeen: convertTimestamp(userData.lastSeen),
           } as User);
         }
+      }
+
+      // Delete expired interactions in the background
+      if (expiredInteractionIds.length > 0) {
+        console.log(`🗑️ Deleting ${expiredInteractionIds.length} expired interactions`);
+        const deletePromises = expiredInteractionIds.map((docId) =>
+          deleteDoc(doc(db, 'interactions', docId))
+        );
+        Promise.all(deletePromises).catch((error) =>
+          console.error('Error deleting expired interactions:', error)
+        );
       }
 
       return {
