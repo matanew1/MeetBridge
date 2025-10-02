@@ -19,6 +19,7 @@ import Animated, {
   withRepeat,
   withTiming,
   withSequence,
+  withSpring,
   interpolate,
   Easing,
 } from 'react-native-reanimated';
@@ -33,6 +34,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import { FirebaseDiscoveryService } from '../../services/firebase/firebaseServices';
 import { services } from '../../services';
+import notificationService from '../../services/notificationService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -69,14 +71,23 @@ const ProfileCard = ({
   const scale = useSharedValue(0.9);
 
   React.useEffect(() => {
-    opacity.value = withTiming(1, { duration: 400, easing: Easing.out(Easing.cubic) });
-    translateY.value = withTiming(0, { duration: 400, easing: Easing.out(Easing.cubic) });
+    opacity.value = withTiming(1, {
+      duration: 400,
+      easing: Easing.out(Easing.cubic),
+    });
+    translateY.value = withTiming(0, {
+      duration: 400,
+      easing: Easing.out(Easing.cubic),
+    });
     scale.value = withSpring(1, { damping: 12, stiffness: 150 });
   }, []);
 
   React.useEffect(() => {
     if (isAnimatingOut) {
-      opacity.value = withTiming(0, { duration: 400, easing: Easing.bezier(0.4, 0, 0.6, 1) });
+      opacity.value = withTiming(0, {
+        duration: 400,
+        easing: Easing.bezier(0.4, 0, 0.6, 1),
+      });
       translateY.value = withTiming(isLiked || !isDisliked ? -80 : 80, {
         duration: 400,
         easing: Easing.bezier(0.4, 0, 0.2, 1),
@@ -456,6 +467,12 @@ export default function SearchScreen() {
             });
             setShowMatchAnimation(true);
 
+            // Send notification
+            await notificationService.sendMatchNotification(
+              matchedUser.name || 'Someone',
+              change.doc.id
+            );
+
             console.log(
               `✅ Match animation triggered for: ${matchedUser.name}`
             );
@@ -533,6 +550,12 @@ export default function SearchScreen() {
               conversationId: result.conversationId,
             });
             setShowMatchAnimation(true);
+
+            // Send notification
+            notificationService.sendMatchNotification(
+              result.matchedUser.name || 'Someone',
+              result.matchId
+            );
 
             console.log(
               `✅ Match animation shown for: ${result.matchedUser.name} (from like action)`
@@ -702,23 +725,11 @@ export default function SearchScreen() {
 
   // Animated styles
   const pulseStyle = useAnimatedStyle(() => {
-    const scale = interpolate(
-      pulseAnimation.value,
-      [0, 1],
-      [1, 1.12]
-    );
+    const scale = interpolate(pulseAnimation.value, [0, 1], [1, 1.12]);
 
-    const opacity = interpolate(
-      pulseAnimation.value,
-      [0, 1],
-      [0.65, 1]
-    );
+    const opacity = interpolate(pulseAnimation.value, [0, 1], [0.65, 1]);
 
-    const rotate = interpolate(
-      pulseAnimation.value,
-      [0, 1],
-      [0, 5]
-    );
+    const rotate = interpolate(pulseAnimation.value, [0, 1], [0, 5]);
 
     return {
       transform: [{ scale }, { rotate: `${rotate}deg` }],

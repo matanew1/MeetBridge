@@ -219,7 +219,13 @@ export const useUserStore = create<UserState>((set, get) => ({
     }),
 
   triggerSearchAnimation: async () => {
-    const { searchFilters, discoverProfiles } = get();
+    const { searchFilters, discoverProfiles, currentUser } = get();
+
+    // Check if user is authenticated before triggering animation
+    if (!currentUser) {
+      console.log('No user logged in, skipping search animation');
+      return;
+    }
 
     set({ isSearching: true });
 
@@ -280,7 +286,17 @@ export const useUserStore = create<UserState>((set, get) => ({
   // Discovery Actions
   loadDiscoverProfiles: async (refresh = false) => {
     // get() is for accessing current state
-    const { searchFilters } = get();
+    const { searchFilters, currentUser } = get();
+
+    // Check if user is authenticated before loading profiles
+    if (!currentUser) {
+      console.log('No user logged in, skipping profile loading');
+      set({
+        isLoadingDiscover: false,
+        error: null,
+      });
+      return;
+    }
 
     set({
       isLoadingDiscover: true,

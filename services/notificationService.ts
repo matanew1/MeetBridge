@@ -1,0 +1,391 @@
+// services/notificationService.ts
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from './firebase/config';
+
+// Configure notification behavior
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
+
+export interface NotificationSettings {
+  enabled: boolean;
+  matches: boolean;
+  messages: boolean;
+  likes: boolean;
+}
+
+const DEFAULT_SETTINGS: NotificationSettings = {
+  enabled: true,
+  matches: true,
+  messages: true,
+  likes: true,
+};
+
+const STORAGE_KEY = '@notification_settings';
+
+class NotificationService {
+  private notificationListener: any;
+  private responseListener: any;
+  private settings: NotificationSettings = DEFAULT_SETTINGS;
+
+  /**
+   * Initialize notification service
+   */
+  async initialize(userId?: string) {
+    try {
+      // Load settings from storage
+      await this.loadSettings();
+
+      if (!this.settings.enabled) {
+        console.log('📴 Notifications are disabled by user');
+        return null;
+      }
+
+      // Request permissions
+      const token = await this.registerForPushNotifications();
+
+      if (token && userId) {
+        // Save token to Firebase user profile
+        await this.saveTokenToFirebase(userId, token);
+      }
+
+      // Set up notification listeners
+      this.setupNotificationListeners();
+
+      return token;
+    } catch (error) {
+      console.error('Error initializing notifications:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Register for push notifications and get token
+   */
+  async registerForPushNotifications(): Promise<string | null> {
+    try {
+      // On web, skip push notifications if VAPID key is not configured
+      if (Platform.OS === 'web') {
+        console.log(
+          'Web platform detected - push notifications require VAPID key configuration in app.json'
+        );
+        return null;
+      }
+
+      if (!Device.isDevice) {
+        console.warn('Push notifications only work on physical devices');
+        return null;
+      }
+
+      // Check existing permissions
+      const { status: existingStatus } =
+        await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+
+      // Request permissions if not granted
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+
+      if (finalStatus !== 'granted') {
+        console.warn('Push notification permissions not granted');
+        return null;
+      }
+
+      // Get push token
+      // projectId is automatically determined from app.json (expo.extra.eas.projectId or expo.slug)
+      const tokenData = await Notifications.getExpoPushTokenAsync();
+
+      console.log('📱 Push token obtained:', tokenData.data);
+
+      // Android-specific channel setup
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'Default',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#FF231F7C',
+        });
+
+        await Notifications.setNotificationChannelAsync('matches', {
+          name: 'Matches',
+          importance: Notifications.AndroidImportance.HIGH,
+          vibrationPattern: [0, 500, 250, 500],
+          lightColor: '#FF69B4',
+          sound: 'default',
+        });
+
+        await Notifications.setNotificationChannelAsync('messages', {
+          name: 'Messages',
+          importance: Notifications.AndroidImportance.HIGH,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#4FC3F7',
+          sound: 'default',
+        });
+      }
+
+      return tokenData.data;
+    } catch (error) {
+      console.error('Error registering for push notifications:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Save push token to Firebase user profile
+   */
+  async saveTokenToFirebase(userId: string, token: string) {
+    try {
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, {
+        pushToken: token,
+        notificationsEnabled: true,
+        lastTokenUpdate: new Date(),
+      });
+      console.log('✅ Push token saved to Firebase');
+    } catch (error) {
+      console.error('Error saving token to Firebase:', error);
+    }
+  }
+
+  /**
+   * Setup notification listeners
+   */
+  setupNotificationListeners() {
+    // Listener for notifications received while app is foregrounded
+    this.notificationListener = Notifications.addNotificationReceivedListener(
+      (notification) => {
+        console.log('🔔 Notification received:', notification);
+        // You can add custom handling here
+      }
+    );
+
+    // Listener for notification interactions (when user taps notification)
+    this.responseListener =
+      Notifications.addNotificationResponseReceivedListener((response) => {
+        console.log('👆 Notification tapped:', response);
+        const data = response.notification.request.content.data;
+
+        // Handle navigation based on notification type
+        if (data.type === 'match') {
+          // Navigate to matches screen
+          console.log('Navigate to match:', data.matchId);
+        } else if (data.type === 'message') {
+          // Navigate to chat
+          console.log('Navigate to chat:', data.conversationId);
+        }
+      });
+  }
+
+  /**
+   * Send local notification (for testing or immediate feedback)
+   */
+  async sendLocalNotification(
+    title: string,
+    body: string,
+    data?: any,
+    channelId: string = 'default'
+  ) {
+    try {
+      if (!this.settings.enabled) {
+        console.log('Notifications disabled, skipping local notification');
+        return;
+      }
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title,
+          body,
+          data,
+          sound: true,
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+        },
+        trigger: null, // Show immediately
+      });
+    } catch (error) {
+      console.error('Error sending local notification:', error);
+    }
+  }
+
+  /**
+   * Send match notification
+   */
+  async sendMatchNotification(matchedUserName: string, matchId: string) {
+    if (!this.settings.enabled || !this.settings.matches) {
+      return;
+    }
+
+    await this.sendLocalNotification(
+      "It's a Match! 💕",
+      `You matched with ${matchedUserName}! Start chatting now.`,
+      {
+        type: 'match',
+        matchId,
+      },
+      'matches'
+    );
+  }
+
+  /**
+   * Send message notification
+   */
+  async sendMessageNotification(
+    senderName: string,
+    messagePreview: string,
+    conversationId: string
+  ) {
+    if (!this.settings.enabled || !this.settings.messages) {
+      return;
+    }
+
+    await this.sendLocalNotification(
+      senderName,
+      messagePreview,
+      {
+        type: 'message',
+        conversationId,
+      },
+      'messages'
+    );
+  }
+
+  /**
+   * Send like notification
+   */
+  async sendLikeNotification(likerName: string) {
+    if (!this.settings.enabled || !this.settings.likes) {
+      return;
+    }
+
+    await this.sendLocalNotification(
+      'New Like! 💖',
+      `${likerName} liked your profile`,
+      {
+        type: 'like',
+      },
+      'default'
+    );
+  }
+
+  /**
+   * Load notification settings from storage
+   */
+  async loadSettings(): Promise<NotificationSettings> {
+    try {
+      const settingsJson = await AsyncStorage.getItem(STORAGE_KEY);
+      if (settingsJson) {
+        this.settings = JSON.parse(settingsJson);
+      } else {
+        this.settings = DEFAULT_SETTINGS;
+      }
+      return this.settings;
+    } catch (error) {
+      console.error('Error loading notification settings:', error);
+      return DEFAULT_SETTINGS;
+    }
+  }
+
+  /**
+   * Save notification settings to storage
+   */
+  async saveSettings(settings: NotificationSettings) {
+    try {
+      this.settings = settings;
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+      console.log('✅ Notification settings saved:', settings);
+    } catch (error) {
+      console.error('Error saving notification settings:', error);
+    }
+  }
+
+  /**
+   * Get current settings
+   */
+  getSettings(): NotificationSettings {
+    return this.settings;
+  }
+
+  /**
+   * Toggle notifications on/off
+   */
+  async toggleNotifications(userId?: string) {
+    const newSettings = {
+      ...this.settings,
+      enabled: !this.settings.enabled,
+    };
+    await this.saveSettings(newSettings);
+
+    // Update Firebase
+    if (userId) {
+      try {
+        const userRef = doc(db, 'users', userId);
+        await updateDoc(userRef, {
+          notificationsEnabled: newSettings.enabled,
+        });
+      } catch (error) {
+        console.error('Error updating notification status in Firebase:', error);
+      }
+    }
+
+    return newSettings.enabled;
+  }
+
+  /**
+   * Update specific notification type
+   */
+  async updateNotificationSetting(
+    key: keyof NotificationSettings,
+    value: boolean
+  ) {
+    const newSettings = {
+      ...this.settings,
+      [key]: value,
+    };
+    await this.saveSettings(newSettings);
+  }
+
+  /**
+   * Cleanup listeners
+   */
+  cleanup() {
+    if (this.notificationListener) {
+      Notifications.removeNotificationSubscription(this.notificationListener);
+    }
+    if (this.responseListener) {
+      Notifications.removeNotificationSubscription(this.responseListener);
+    }
+  }
+
+  /**
+   * Get badge count
+   */
+  async getBadgeCount(): Promise<number> {
+    return await Notifications.getBadgeCountAsync();
+  }
+
+  /**
+   * Set badge count
+   */
+  async setBadgeCount(count: number) {
+    await Notifications.setBadgeCountAsync(count);
+  }
+
+  /**
+   * Clear all notifications
+   */
+  async clearAllNotifications() {
+    await Notifications.dismissAllNotificationsAsync();
+    await this.setBadgeCount(0);
+  }
+}
+
+export default new NotificationService();

@@ -5,21 +5,18 @@ import {
   HeartHandshake,
   Moon,
   Sun,
+  Bell,
+  BellOff,
 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import ProfileModal from '../components/ProfileModal';
+import notificationService from '../../services/notificationService';
 import '../../i18n';
 
 export default function TabLayout() {
@@ -28,6 +25,16 @@ export default function TabLayout() {
   const { user } = useAuth();
   const theme = isDarkMode ? darkTheme : lightTheme;
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+
+  // Load notification settings on mount
+  useEffect(() => {
+    const loadNotificationSettings = async () => {
+      const settings = await notificationService.loadSettings();
+      setNotificationsEnabled(settings.enabled);
+    };
+    loadNotificationSettings();
+  }, []);
 
   const handleProfilePress = () => {
     setShowProfileModal(true);
@@ -37,6 +44,11 @@ export default function TabLayout() {
     setShowProfileModal(false);
   };
 
+  const handleToggleNotifications = async () => {
+    const newState = await notificationService.toggleNotifications(user?.id);
+    setNotificationsEnabled(newState);
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
@@ -44,6 +56,19 @@ export default function TabLayout() {
         style={[styles.header, { backgroundColor: theme.headerBackground }]}
       >
         <View style={styles.headerLeft}>
+          <TouchableOpacity
+            style={[
+              styles.notificationButton,
+              { backgroundColor: theme.primaryVariant },
+            ]}
+            onPress={handleToggleNotifications}
+          >
+            {notificationsEnabled ? (
+              <Bell size={20} color={theme.primary} />
+            ) : (
+              <BellOff size={20} color={theme.textSecondary} />
+            )}
+          </TouchableOpacity>
           <TouchableOpacity
             style={[
               styles.darkModeButton,
@@ -170,6 +195,13 @@ const styles = StyleSheet.create({
     height: 40,
   },
   darkModeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notificationButton: {
     width: 40,
     height: 40,
     borderRadius: 20,

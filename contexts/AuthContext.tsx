@@ -13,6 +13,7 @@ import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { services } from '../services';
 import { User } from '../store/types';
 import LocationService from '../services/locationService';
+import notificationService from '../services/notificationService';
 import * as Location from 'expo-location';
 
 interface AuthContextType {
@@ -84,11 +85,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  // Start continuous location tracking when user is authenticated
+  // Initialize notifications and start location tracking when user is authenticated
   useEffect(() => {
     if (!firebaseUser) return;
 
-    const startTracking = async () => {
+    const initializeServices = async () => {
+      // Initialize push notifications
+      console.log('🔔 Initializing push notifications...');
+      try {
+        await notificationService.initialize(firebaseUser.uid);
+        console.log('✅ Notifications initialized');
+      } catch (error) {
+        console.error('Error initializing notifications:', error);
+      }
+
+      // Start location tracking
       const hasPermission = await LocationService.hasLocationPermissions();
 
       if (!hasPermission) {
@@ -158,12 +169,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     };
 
-    startTracking();
+    initializeServices();
 
     // Cleanup on unmount or when user logs out
     return () => {
       console.log('🛑 Stopping location tracking...');
       LocationService.stopLocationWatcher();
+      console.log('🔕 Cleaning up notification listeners...');
+      notificationService.cleanup();
     };
   }, [firebaseUser]);
 
