@@ -23,6 +23,7 @@ export interface User {
   updatedAt?: Date | string;
   gender: 'male' | 'female' | 'other';
   lookingFor: 'male' | 'female' | 'both';
+  height?: number; // height in cm
   preferences?: {
     ageRange: [number, number];
     maxDistance: number;

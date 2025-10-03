@@ -9,7 +9,13 @@ import React, {
 import { Platform, AppState, AppStateStatus } from 'react-native';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db } from '../services/firebase/config';
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  doc,
+  getDoc,
+  updateDoc,
+  serverTimestamp,
+  setDoc,
+} from 'firebase/firestore';
 import { services } from '../services';
 import { User } from '../store/types';
 import LocationService from '../services/locationService';
@@ -209,10 +215,59 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               console.warn('Failed to update user online status:', updateError);
             }
           } else {
+            // User exists in Firebase Auth but not in Firestore - create basic profile
             console.warn(
-              '⚠️ User exists in Firebase Auth but not in Firestore database'
+              '⚠️ User exists in Firebase Auth but not in Firestore - Creating profile...'
             );
-            setUser(null);
+
+            try {
+              const basicUserData = {
+                id: firebaseUser.uid,
+                email: firebaseUser.email || '',
+                displayName: firebaseUser.displayName || 'User',
+                name: firebaseUser.displayName || 'User',
+                age: 18,
+                dateOfBirth: new Date(2000, 0, 1),
+                bio: '',
+                interests: [],
+                location: '',
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+                lastSeen: serverTimestamp(),
+                isOnline: true,
+                gender: 'other' as const,
+                lookingFor: 'both' as const,
+                height: 170,
+                preferences: {
+                  ageRange: [18, 99] as [number, number],
+                  maxDistance: 5000,
+                  interestedIn: 'both' as const,
+                },
+              };
+
+              await setDoc(doc(db, 'users', firebaseUser.uid), basicUserData);
+              console.log('✅ Created basic Firestore profile for user');
+
+              // Now fetch the newly created user
+              const newUserDoc = await getDoc(
+                doc(db, 'users', firebaseUser.uid)
+              );
+              if (newUserDoc.exists()) {
+                const userData = newUserDoc.data();
+                const fullUser: User = {
+                  id: newUserDoc.id,
+                  ...userData,
+                  lastSeen: convertTimestamp(userData.lastSeen),
+                } as User;
+                setUser(fullUser);
+              }
+            } catch (createError) {
+              console.error(
+                '❌ Failed to create Firestore profile:',
+                createError
+              );
+              setUser(null);
+            }
           }
         } catch (error) {
           console.error('Error loading user profile:', error);
@@ -420,7 +475,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await services.userProfile.updateProfile(userData);
 
       if (response.success) {
+        console.log('🔄 AuthContext: Setting updated user data:', {
+          preferences: response.data.preferences,
+        });
         setUser(response.data);
+        console.log('✅ AuthContext: User state updated');
         return {
           success: true,
           message: 'Profile updated successfully',

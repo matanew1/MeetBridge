@@ -22,6 +22,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
+import { PREDEFINED_INTERESTS } from '../../constants/interests';
 
 const { width, height } = Dimensions.get('window');
 
@@ -35,6 +36,7 @@ interface ProfileDetailProps {
     bio?: string;
     interests?: string[];
     location?: string;
+    height?: number;
   };
   onClose: () => void;
   onLike: (id: string) => void;
@@ -114,6 +116,14 @@ const ProfileDetail = ({
           <View style={styles.nameSection}>
             <Text style={[styles.nameText, { color: theme.text }]}>
               {user.name}
+              {user.height && (
+                <Text
+                  style={[styles.heightText, { color: theme.textSecondary }]}
+                >
+                  {' '}
+                  • {user.height}cm
+                </Text>
+              )}
             </Text>
             {user.location && (
               <View style={styles.distanceRow}>
@@ -145,11 +155,19 @@ const ProfileDetail = ({
                 {t('profile.interests')}
               </Text>
               <View style={styles.interestsGrid}>
-                {user.interests.map((interest, index) => (
-                  <View key={index} style={styles.interestChip}>
-                    <Text style={styles.interestText}>{interest}</Text>
-                  </View>
-                ))}
+                {user.interests.map((interest, index) => {
+                  const predefined = PREDEFINED_INTERESTS.find(
+                    (p) => p.label === interest
+                  );
+                  return (
+                    <View key={index} style={styles.interestChip}>
+                      <Text style={styles.interestText}>
+                        {predefined ? `${predefined.emoji} ` : ''}
+                        {interest}
+                      </Text>
+                    </View>
+                  );
+                })}
               </View>
             </View>
           )}
@@ -263,6 +281,10 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 8,
+  },
+  heightText: {
+    fontSize: 20,
+    fontWeight: 'normal',
   },
   distanceRow: {
     flexDirection: 'row',

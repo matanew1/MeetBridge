@@ -23,13 +23,16 @@ import {
   Calendar,
   Users,
   Heart,
+  Ruler,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import Slider from '@react-native-community/slider';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
+import InterestTagPicker from '../components/InterestTagPicker';
 
 const { width, height } = Dimensions.get('window');
 
@@ -41,6 +44,9 @@ const RegisterScreen = () => {
     confirmPassword: '',
     dateOfBirth: new Date(2000, 0, 1),
     gender: 'male' as 'male' | 'female' | 'other',
+    interestedIn: 'both' as 'male' | 'female' | 'both',
+    height: 170,
+    interests: [] as string[],
   });
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -110,10 +116,17 @@ const RegisterScreen = () => {
         age,
         dateOfBirth: formData.dateOfBirth,
         gender: formData.gender,
+        height: formData.height,
+        lookingFor: formData.interestedIn,
         bio: '',
-        interests: [],
+        interests: formData.interests,
         location: '',
         createdAt: new Date(),
+        preferences: {
+          ageRange: [18, 99] as [number, number],
+          maxDistance: 5000,
+          interestedIn: formData.interestedIn,
+        },
       };
 
       const result = await register(userData);
@@ -326,6 +339,88 @@ const RegisterScreen = () => {
                   </Picker>
                 </View>
               </View>
+            </View>
+
+            {/* Interested In Picker */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: theme.text }]}>
+                Interested In
+              </Text>
+              <View
+                style={[
+                  styles.inputContainer,
+                  {
+                    backgroundColor: theme.background,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <Heart size={20} color={theme.textSecondary} />
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={formData.interestedIn}
+                    onValueChange={(value) =>
+                      updateFormData('interestedIn', value)
+                    }
+                    style={[styles.picker, { color: theme.text }]}
+                    dropdownIconColor={theme.textSecondary}
+                  >
+                    <Picker.Item label="Men" value="male" />
+                    <Picker.Item label="Women" value="female" />
+                    <Picker.Item label="Everyone" value="both" />
+                  </Picker>
+                </View>
+              </View>
+            </View>
+
+            {/* Height Slider */}
+            <View style={styles.inputGroup}>
+              <View style={styles.sliderHeader}>
+                <View style={styles.sliderLabelContainer}>
+                  <Ruler size={20} color={theme.primary} />
+                  <Text style={[styles.inputLabel, { color: theme.text }]}>
+                    Height
+                  </Text>
+                </View>
+                <Text style={[styles.sliderValue, { color: theme.primary }]}>
+                  {formData.height} cm
+                </Text>
+              </View>
+              <Slider
+                style={styles.slider}
+                minimumValue={140}
+                maximumValue={220}
+                step={1}
+                value={formData.height}
+                onValueChange={(value) =>
+                  updateFormData('height', Math.round(value))
+                }
+                minimumTrackTintColor={theme.primary}
+                maximumTrackTintColor={theme.border}
+                thumbTintColor={theme.primary}
+              />
+              <View style={styles.sliderLabels}>
+                <Text
+                  style={[styles.sliderLabel, { color: theme.textSecondary }]}
+                >
+                  140cm
+                </Text>
+                <Text
+                  style={[styles.sliderLabel, { color: theme.textSecondary }]}
+                >
+                  220cm
+                </Text>
+              </View>
+            </View>
+
+            {/* Interests Picker */}
+            <View style={styles.inputGroup}>
+              <InterestTagPicker
+                selectedInterests={formData.interests}
+                onInterestsChange={(interests) =>
+                  updateFormData('interests', interests)
+                }
+              />
             </View>
 
             {/* Password Input */}
@@ -591,6 +686,33 @@ const styles = StyleSheet.create({
   },
   linkText: {
     fontWeight: '600',
+  },
+  sliderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  sliderLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sliderValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  slider: {
+    width: '100%',
+    height: 40,
+  },
+  sliderLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  sliderLabel: {
+    fontSize: 12,
   },
 });
 

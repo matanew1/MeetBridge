@@ -29,6 +29,7 @@ import { lightTheme, darkTheme } from '../../constants/theme';
 import { User } from '../../store/types';
 import { LinearGradient } from 'expo-linear-gradient';
 import AvatarUpload from './AvatarUpload';
+import InterestTagPicker from './InterestTagPicker';
 
 interface EditProfileModalProps {
   visible: boolean;
@@ -329,62 +330,12 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
           {/* Interests */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              Interests
-            </Text>
-
-            <View style={styles.inputContainer}>
-              <View style={styles.inputHeader}>
-                <Heart size={18} color={theme.primary} />
-                <Text style={[styles.inputLabel, { color: theme.text }]}>
-                  Add Interest
-                </Text>
-              </View>
-              <View style={styles.addInterestContainer}>
-                <TextInput
-                  style={[
-                    styles.addInterestInput,
-                    {
-                      backgroundColor: theme.surface,
-                      color: theme.text,
-                      borderColor: theme.border,
-                    },
-                  ]}
-                  value={newInterest}
-                  onChangeText={setNewInterest}
-                  placeholder="Type an interest..."
-                  placeholderTextColor={theme.textSecondary}
-                  onSubmitEditing={addInterest}
-                />
-                <TouchableOpacity
-                  style={[styles.addButton, { backgroundColor: theme.primary }]}
-                  onPress={addInterest}
-                >
-                  <Text style={styles.addButtonText}>Add</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {formData.interests.length > 0 && (
-              <View style={styles.interestsContainer}>
-                {formData.interests.map((interest, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={[
-                      styles.interestTag,
-                      { backgroundColor: theme.primaryVariant },
-                    ]}
-                    onPress={() => removeInterest(interest)}
-                  >
-                    <Text
-                      style={[styles.interestText, { color: theme.primary }]}
-                    >
-                      {interest} ✕
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
+            <InterestTagPicker
+              selectedInterests={formData.interests}
+              onInterestsChange={(interests) =>
+                setFormData((prev) => ({ ...prev, interests }))
+              }
+            />
           </View>
 
           {/* Dating Preferences */}

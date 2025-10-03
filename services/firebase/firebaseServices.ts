@@ -146,15 +146,34 @@ export class FirebaseUserProfileService implements IUserProfileService {
         }
       });
 
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        ...dataToUpdate,
-        updatedAt: serverTimestamp(),
+      // Handle nested preferences object - use dot notation for proper merging
+      const updateData: Record<string, any> = { updatedAt: serverTimestamp() };
+
+      Object.keys(dataToUpdate).forEach((key) => {
+        if (key === 'preferences' && typeof dataToUpdate[key] === 'object') {
+          // Use dot notation for nested preferences to merge instead of replace
+          const prefs = dataToUpdate[key] as Record<string, any>;
+          console.log('🔧 Processing preferences object:', prefs);
+          Object.keys(prefs).forEach((prefKey) => {
+            updateData[`preferences.${prefKey}`] = prefs[prefKey];
+            console.log(`🔧 Set preferences.${prefKey} =`, prefs[prefKey]);
+          });
+        } else {
+          updateData[key] = dataToUpdate[key];
+        }
       });
+
+      console.log('🔥 Final updateData being sent to Firebase:', updateData);
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, updateData);
+      console.log('✅ Firebase updateDoc completed successfully');
 
       // Get updated document
       const updatedDoc = await getDoc(userRef);
       const updatedUserData = updatedDoc.data();
+      console.log('📖 Document read from Firebase after update:', {
+        preferences: updatedUserData?.preferences,
+      });
 
       return {
         data: {

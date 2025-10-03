@@ -15,7 +15,6 @@ import {
   User as UserIcon,
   Mail,
   MapPin,
-  Calendar,
   Heart,
   Settings,
   LogOut,
@@ -32,6 +31,7 @@ import { lightTheme, darkTheme } from '../../constants/theme';
 import { User } from '../../store/types';
 import { LinearGradient } from 'expo-linear-gradient';
 import EditProfileModal from './EditProfileModal';
+import { PREDEFINED_INTERESTS } from '../../constants/interests';
 
 interface ProfileModalProps {
   visible: boolean;
@@ -121,16 +121,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     const today = new Date();
     const age = today.getFullYear() - birth.getFullYear();
     return `${age} years old`;
-  };
-
-  const getJoinedDate = (createdAt?: Date | string) => {
-    if (!createdAt) return 'Recently joined';
-    const joined = new Date(createdAt);
-    const options: Intl.DateTimeFormatOptions = {
-      year: 'numeric',
-      month: 'long',
-    };
-    return `Joined ${joined.toLocaleDateString(undefined, options)}`;
   };
 
   const getPreferencesDisplay = (preferences?: User['preferences']) => {
@@ -255,19 +245,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               { backgroundColor: theme.background },
             ]}
           >
-            <TouchableOpacity
-              style={styles.profileImageContainer}
-              onPress={handleChangePhoto}
-            >
-              <Image
-                source={
-                  user.image
-                    ? { uri: user.image }
-                    : require('../../assets/images/placeholder.png')
-                }
-                style={styles.profileImage}
-              />
-            </TouchableOpacity>
+            <Image
+              source={
+                user.image
+                  ? { uri: user.image }
+                  : require('../../assets/images/placeholder.png')
+              }
+              style={styles.profileImage}
+            />
 
             <Text style={[styles.userName, { color: theme.text }]}>
               {user.name || 'Unknown User'}
@@ -363,39 +348,33 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   </Text>
                 </View>
                 <View style={styles.interestsContainer}>
-                  {user.interests.map((interest, index) => (
-                    <View
-                      key={index}
-                      style={[
-                        styles.interestTag,
-                        { backgroundColor: theme.primaryVariant },
-                      ]}
-                    >
-                      <Text
-                        style={[styles.interestText, { color: theme.primary }]}
+                  {user.interests.map((interest, index) => {
+                    const predefined = PREDEFINED_INTERESTS.find(
+                      (p) => p.label === interest
+                    );
+                    return (
+                      <View
+                        key={index}
+                        style={[
+                          styles.interestTag,
+                          { backgroundColor: theme.primaryVariant },
+                        ]}
                       >
-                        {interest}
-                      </Text>
-                    </View>
-                  ))}
+                        <Text
+                          style={[
+                            styles.interestText,
+                            { color: theme.primary },
+                          ]}
+                        >
+                          {predefined ? `${predefined.emoji} ` : ''}
+                          {interest}
+                        </Text>
+                      </View>
+                    );
+                  })}
                 </View>
               </View>
             )}
-
-            {/* Member Since Card */}
-            <View style={[styles.infoCard, { backgroundColor: theme.surface }]}>
-              <View style={styles.cardHeader}>
-                <Calendar size={20} color={theme.primary} />
-                <Text style={[styles.cardTitle, { color: theme.text }]}>
-                  Member Since
-                </Text>
-              </View>
-              <Text
-                style={[styles.cardContent, { color: theme.textSecondary }]}
-              >
-                {getJoinedDate(user.createdAt)}
-              </Text>
-            </View>
 
             {/* Gender Card */}
             <View style={[styles.infoCard, { backgroundColor: theme.surface }]}>

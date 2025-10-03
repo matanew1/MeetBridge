@@ -121,20 +121,15 @@ const ProfileCard = ({
         disabled={isLiked || isDisliked || isAnimatingOut}
       >
         <View style={styles.imageContainer}>
-          {hasValidImage ? (
-            <Image
-              source={{ uri: imageUri }}
-              style={styles.cardImage}
-              resizeMode="cover"
-              defaultSource={require('../../assets/images/logo.png')}
-            />
-          ) : (
-            <View style={[styles.cardImage, styles.placeholderImage]}>
-              <Text style={styles.placeholderText}>
-                {user.name?.charAt(0)?.toUpperCase() || '?'}
-              </Text>
-            </View>
-          )}
+          <Image
+            source={
+              hasValidImage
+                ? { uri: imageUri }
+                : require('../../assets/images/placeholder.png')
+            }
+            style={styles.cardImage}
+            resizeMode="cover"
+          />
         </View>
         <View style={styles.cardInfo}>
           <Text style={[styles.cardText, { color: theme.text }]}>
@@ -281,6 +276,11 @@ export default function SearchScreen() {
     if (currentUser) {
       const maxDistanceMeters = currentUser.preferences?.maxDistance || 5000; // Already in meters
       const userAgeRange = currentUser.preferences?.ageRange || [18, 99];
+      console.log('📍 Updating preferences from user data:', {
+        maxDistance: maxDistanceMeters,
+        ageRange: userAgeRange,
+        rawPreferences: currentUser.preferences,
+      });
       setMaxDistance(maxDistanceMeters);
       setAgeRange(userAgeRange as [number, number]);
       updateSearchFilters({
@@ -665,21 +665,23 @@ export default function SearchScreen() {
 
   const handleDistanceChange = async (distance: number) => {
     // Distance is already in meters from FilterModal
+    console.log('🎯 handleDistanceChange called with:', distance);
     setMaxDistance(distance);
     updateSearchFilters({ maxDistance: distance });
 
-    // Update user preferences in database for bi-directional sync
+    // Update ONLY maxDistance field using dot notation (handled by firebaseServices)
     if (currentUser && updateProfile) {
       try {
         await updateProfile({
           preferences: {
-            ...currentUser.preferences,
-            maxDistance: distance,
+            maxDistance: distance, // Only send the field we're updating
           },
         });
-        console.log(`✅ User maxDistance preference updated to ${distance}m`);
+        console.log(`✅ maxDistance updated to ${distance}m in Firebase`);
+        // Reload current user to get fresh data
+        await loadCurrentUser();
       } catch (error) {
-        console.error('Error updating user maxDistance preference:', error);
+        console.error('❌ Error updating maxDistance:', error);
       }
     }
 
@@ -691,20 +693,21 @@ export default function SearchScreen() {
     setAgeRange(newAgeRange);
     updateSearchFilters({ ageRange: newAgeRange });
 
-    // Update user preferences in database for bi-directional sync
+    // Update ONLY ageRange field using dot notation (handled by firebaseServices)
     if (currentUser && updateProfile) {
       try {
         await updateProfile({
           preferences: {
-            ...currentUser.preferences,
-            ageRange: newAgeRange,
+            ageRange: newAgeRange, // Only send the field we're updating
           },
         });
         console.log(
-          `✅ User ageRange preference updated to [${newAgeRange[0]}, ${newAgeRange[1]}]`
+          `✅ ageRange updated to [${newAgeRange[0]}, ${newAgeRange[1]}] in Firebase`
         );
+        // Reload current user to get fresh data
+        await loadCurrentUser();
       } catch (error) {
-        console.error('Error updating user ageRange preference:', error);
+        console.error('❌ Error updating ageRange:', error);
       }
     }
 
@@ -1156,6 +1159,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '600',
   },
+  cardHeight: {
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 2,
+  },
   // Animation styles
   searchInterface: {
     flex: 1,
@@ -1231,10 +1239,6 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  placeholderText: {
-    fontSize: 24,
-    fontWeight: 'bold',
   },
   heartContainer: {
     position: 'absolute',

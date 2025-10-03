@@ -57,10 +57,21 @@ const FilterModal: React.FC<FilterModalProps> = React.memo(
       }
     }, [visible, currentDistance, currentAgeRange]);
 
-    const handleApply = () => {
-      // Apply all changes
-      onDistanceChange(tempDistance);
-      onAgeRangeChange([tempMinAge, tempMaxAge]);
+    const handleApply = async () => {
+      // Apply changes sequentially to avoid race condition
+      // Only call if value actually changed
+      const distanceChanged = tempDistance !== currentDistance;
+      const ageChanged =
+        tempMinAge !== currentAgeRange[0] || tempMaxAge !== currentAgeRange[1];
+
+      if (distanceChanged) {
+        await onDistanceChange(tempDistance);
+      }
+
+      if (ageChanged) {
+        await onAgeRangeChange([tempMinAge, tempMaxAge]);
+      }
+
       onClose();
     };
 
@@ -90,6 +101,8 @@ const FilterModal: React.FC<FilterModalProps> = React.memo(
         transparent
         animationType="slide"
         statusBarTranslucent
+        presentationStyle="overFullScreen"
+        onRequestClose={onClose}
       >
         <View style={styles.overlay}>
           <TouchableOpacity
@@ -177,8 +190,10 @@ const FilterModal: React.FC<FilterModalProps> = React.memo(
 
             {/* Tab Content */}
             <ScrollView
-              style={styles.contentContainer}
+              style={styles.scrollViewStyle}
+              contentContainerStyle={styles.contentContainer}
               showsVerticalScrollIndicator={false}
+              nestedScrollEnabled
             >
               {activeTab === 'distance' ? (
                 // Distance Slider
@@ -359,6 +374,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
+    zIndex: 9999,
+    elevation: 10,
   },
   overlayTouchable: {
     flex: 1,
@@ -368,7 +385,12 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     paddingTop: 20,
     paddingBottom: 20,
-    maxHeight: height * 0.75,
+    minHeight: 550,
+    maxHeight: height * 0.85,
+    zIndex: 10000,
+    elevation: 11,
+    display: 'flex',
+    flexDirection: 'column',
   },
   header: {
     flexDirection: 'row',
@@ -405,21 +427,28 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
-  contentContainer: {
+  scrollViewStyle: {
     flex: 1,
     paddingHorizontal: 20,
   },
+  contentContainer: {
+    flexGrow: 1,
+    paddingBottom: 20,
+  },
   tabContent: {
     paddingVertical: 8,
+    paddingBottom: 20,
+    minHeight: 250,
   },
   sliderSection: {
-    marginBottom: 8,
+    marginBottom: 20,
+    paddingVertical: 8,
   },
   valueDisplay: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   valueLabel: {
     fontSize: 15,
