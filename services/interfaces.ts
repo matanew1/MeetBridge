@@ -53,6 +53,7 @@ export interface IDiscoveryService {
   // Queue optimization methods
   syncDiscoveryQueue(userId: string): Promise<number>;
   cleanDuplicatesInQueue(userId: string): Promise<number>;
+  clearDiscoveryQueue(userId: string): Promise<void>;
 }
 
 // Matching Service

@@ -232,7 +232,7 @@ class LocationService {
   }
 
   /**
-   * Calculate distance between two coordinates in kilometers using geofire-common
+   * Calculate distance between two coordinates in METERS using geofire-common
    */
   calculateDistance(
     lat1: number,
@@ -240,8 +240,17 @@ class LocationService {
     lat2: number,
     lon2: number
   ): number {
-    const distance = distanceBetween([lat1, lon1], [lat2, lon2]);
-    return Math.round(distance * 100) / 100; // Distance in km, rounded to 2 decimals
+    // distanceBetween returns kilometers, convert to meters
+    const distanceKm = distanceBetween([lat1, lon1], [lat2, lon2]);
+    const distanceMeters = Math.round(distanceKm * 1000);
+
+    console.log(`📏 Distance calculation:`, {
+      from: { lat: lat1.toFixed(6), lon: lon1.toFixed(6) },
+      to: { lat: lat2.toFixed(6), lon: lon2.toFixed(6) },
+      distanceMeters: distanceMeters,
+    });
+
+    return distanceMeters;
   }
 
   /**
@@ -257,26 +266,77 @@ class LocationService {
   }
 
   /**
-   * Generate geohash from coordinates
+   * Generate geohash from coordinates with maximum accuracy
    */
-  generateGeohash(latitude: number, longitude: number): string {
-    return geohashForLocation([latitude, longitude]);
+  generateGeohash(
+    latitude: number,
+    longitude: number,
+    precision: number = 9
+  ): string {
+    // Use precision 9 (~4.8m accuracy) for most accurate location
+    // This is the optimal balance for dating app matching
+    const geohash = geohashForLocation([latitude, longitude], precision);
+
+    console.log(`🔷 Geohash generated:`, {
+      coords: { lat: latitude.toFixed(6), lon: longitude.toFixed(6) },
+      geohash,
+      precision,
+      accuracy: this.getGeohashAccuracy(precision),
+    });
+
+    return geohash;
+  }
+
+  /**
+   * Get approximate accuracy for geohash precision
+   */
+  private getGeohashAccuracy(precision: number): string {
+    const accuracies: Record<number, string> = {
+      1: '±2500km',
+      2: '±630km',
+      3: '±78km',
+      4: '±20km',
+      5: '±2.4km',
+      6: '±610m',
+      7: '±76m',
+      8: '±19m',
+      9: '±4.8m',
+      10: '±1.2m',
+      11: '±15cm',
+    };
+    return accuracies[precision] || 'unknown';
   }
 
   /**
    * Get query bounds for searching within a radius
    */
   getQueryBounds(center: Coordinates, radiusInKm: number): [string, string][] {
-    return geohashQueryBounds([center.latitude, center.longitude], radiusInKm);
+    const bounds = geohashQueryBounds(
+      [center.latitude, center.longitude],
+      radiusInKm
+    );
+
+    console.log(`🔍 Geohash query bounds:`, {
+      center: {
+        lat: center.latitude.toFixed(6),
+        lon: center.longitude.toFixed(6),
+      },
+      radiusKm: radiusInKm,
+      radiusMeters: Math.round(radiusInKm * 1000),
+      boundsCount: bounds.length,
+      bounds: bounds.map(([start, end]) => `${start}-${end}`),
+    });
+
+    return bounds;
   }
 
   /**
-   * Check if a location is within radius
+   * Check if a location is within radius (radiusInMeters)
    */
   isWithinRadius(
     center: Coordinates,
     target: Coordinates,
-    radiusInKm: number
+    radiusInMeters: number
   ): boolean {
     const distance = this.calculateDistance(
       center.latitude,
@@ -284,7 +344,7 @@ class LocationService {
       target.latitude,
       target.longitude
     );
-    return distance <= radiusInKm;
+    return distance <= radiusInMeters;
   }
 
   /**
@@ -311,13 +371,13 @@ class LocationService {
   }
 
   /**
-   * Format distance for display
+   * Format distance for display (meters)
    */
-  formatDistance(km: number): string {
-    if (km < 1) {
-      return `${Math.round(km * 1000)}m`;
+  formatDistance(meters: number): string {
+    if (meters >= 1000) {
+      return `${(meters / 1000).toFixed(1)}km`;
     }
-    return `${km.toFixed(1)}km`;
+    return `${Math.round(meters)}m`;
   }
 
   /**

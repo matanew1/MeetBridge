@@ -394,7 +394,7 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
       matches1.docs.forEach((doc) => matchedUserIds.add(doc.data().user2));
       matches2.docs.forEach((doc) => matchedUserIds.add(doc.data().user1));
 
-      // Get geohash query bounds
+      // Get geohash query bounds (filters.maxDistance is in METERS)
       const bounds = LocationService.getQueryBounds(
         userLocation,
         filters.maxDistance
@@ -446,6 +446,7 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
           // Calculate distance and score
           if (data.coordinates?.latitude && data.coordinates?.longitude) {
             try {
+              // distance is now in METERS
               const distance = LocationService.calculateDistance(
                 userLocation.latitude,
                 userLocation.longitude,
@@ -453,6 +454,7 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
                 data.coordinates.longitude
               );
 
+              // Both in METERS
               if (distance > filters.maxDistance) return;
 
               // Calculate compatibility score (0-100)
@@ -518,13 +520,13 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
   private calculateCompatibilityScore(
     currentUser: any,
     targetUser: any,
-    distance: number
+    distanceMeters: number
   ): number {
     let score = 100;
 
     // Distance factor (closer is better) - max 30 points deduction
-    const distanceKm = distance / 1000;
-    score -= Math.min(distanceKm * 2, 30);
+    // Penalize 2 points per km (0.002 points per meter)
+    score -= Math.min((distanceMeters / 1000) * 2, 30);
 
     // Age difference factor - max 20 points deduction
     const ageDiff = Math.abs((currentUser.age || 25) - (targetUser.age || 25));
@@ -754,7 +756,7 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
 
       await batch.commit();
       console.log(
-        `🧹 Cleared ${queueSnapshot.size} profiles from discovery queue`
+        `🧹 Cleared ${queueSnapshot.size} profiles from discovery queue for user ${userId}`
       );
     } catch (error) {
       console.error('Error clearing discovery queue:', error);
@@ -1042,6 +1044,19 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
       );
 
       // Get geohash query bounds for the search radius
+      // filters.maxDistance is in METERS
+      console.log(`🔍 Starting geohash-based discovery query:`, {
+        userLocation: {
+          lat: userLocation.latitude.toFixed(6),
+          lon: userLocation.longitude.toFixed(6),
+        },
+        maxDistanceMeters: filters.maxDistance,
+        filters: {
+          gender: filters.gender,
+          ageRange: filters.ageRange,
+        },
+      });
+
       const bounds = LocationService.getQueryBounds(
         userLocation,
         filters.maxDistance
@@ -1050,6 +1065,8 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
       const profiles: User[] = [];
       const pageSize = 20;
       const seenIds = new Set<string>([user.uid]); // Track seen profiles to avoid duplicates
+      let totalProcessed = 0;
+      let totalSkipped = 0;
 
       // Query each geohash range
       for (const bound of bounds) {
@@ -1097,6 +1114,7 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
           let distance: number | null = null;
           if (data.coordinates?.latitude && data.coordinates?.longitude) {
             try {
+              // distance is now in METERS
               distance = LocationService.calculateDistance(
                 userLocation.latitude,
                 userLocation.longitude,
@@ -1104,8 +1122,24 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
                 data.coordinates.longitude
               );
 
-              // Skip if beyond max distance
-              if (distance > filters.maxDistance) return;
+              totalProcessed++;
+
+              // Skip if beyond max distance (both in METERS)
+              if (distance > filters.maxDistance) {
+                totalSkipped++;
+                console.log(
+                  `⏭️  Skipping ${
+                    data.name || docSnapshot.id
+                  }: ${distance}m > ${filters.maxDistance}m`
+                );
+                return;
+              }
+
+              console.log(
+                `✅ Including ${
+                  data.name || docSnapshot.id
+                }: ${distance}m (within ${filters.maxDistance}m)`
+              );
             } catch (distError) {
               console.warn(
                 `Error calculating distance for ${docSnapshot.id}:`,
@@ -1132,6 +1166,17 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         uniqueProfiles,
         userLocation
       );
+
+      console.log(`📊 Discovery query summary:`, {
+        totalProcessed,
+        totalSkipped,
+        uniqueProfilesFound: uniqueProfiles.length,
+        sortedResults: sortedProfiles.length,
+        distances: sortedProfiles.slice(0, 5).map((p) => ({
+          name: p.name,
+          distanceMeters: p.distance || 'unknown',
+        })),
+      });
 
       return {
         data: sortedProfiles.slice(0, pageSize),

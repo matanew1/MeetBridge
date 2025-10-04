@@ -7,7 +7,9 @@
     "start": "npx expo start -c",
     "dev": "EXPO_NO_TELEMETRY=1 npx expo start",
     "build:web": "npx expo export --platform web",
-    "lint": "npx expo lint"
+    "lint": "npx expo lint",
+    "generate-mock-users": "ts-node scripts/generateMockUsers.ts",
+    "delete-mock-users": "ts-node scripts/deleteMockUsers.ts"
   },
   "dependencies": {
     "@expo/config-plugins": "^54.0.1",
@@ -61,8 +63,10 @@
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@babel/plugin-transform-template-literals": "^7.27.1",
+    "@types/node": "^24.6.2",
     "@types/react": "~19.1.10",
     "react-native-is-edge-to-edge": "^1.2.1",
+    "ts-node": "^10.9.2",
     "typescript": "~5.9.2"
   }
 }

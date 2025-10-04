@@ -134,7 +134,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               coordinates: {
                 latitude: location.latitude,
                 longitude: location.longitude,
-                lastUpdated: new Date(),
               },
               geohash,
               lastLocationUpdate: serverTimestamp(),
@@ -152,7 +151,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 coordinates: {
                   latitude: location.latitude,
                   longitude: location.longitude,
-                  lastUpdated: new Date(),
                 },
                 geohash,
               }));
@@ -224,7 +222,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               const basicUserData = {
                 id: firebaseUser.uid,
                 email: firebaseUser.email || '',
-                displayName: firebaseUser.displayName || 'User',
                 name: firebaseUser.displayName || 'User',
                 age: 18,
                 dateOfBirth: new Date(2000, 0, 1),
@@ -232,15 +229,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 interests: [],
                 location: '',
                 createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
                 lastSeen: serverTimestamp(),
                 isOnline: true,
                 gender: 'other' as const,
                 lookingFor: 'both' as const,
                 height: 170,
+                notificationsEnabled: true,
                 preferences: {
                   ageRange: [18, 99] as [number, number],
-                  maxDistance: 5000,
+                  maxDistance: 100, // Default to 100m for nearby search (5m-1000m range)
                   interestedIn: 'both' as const,
                 },
               };
@@ -525,10 +522,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         coordinates: {
           latitude: coordinates.latitude,
           longitude: coordinates.longitude,
-          lastUpdated: new Date(),
         },
         geohash,
-        updatedAt: serverTimestamp(),
+        lastLocationUpdate: serverTimestamp(),
       });
 
       if (user) {
@@ -538,7 +534,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           coordinates: {
             latitude: coordinates.latitude,
             longitude: coordinates.longitude,
-            lastUpdated: new Date(),
           },
           geohash,
         }));

@@ -16,7 +16,7 @@ export interface User {
     lastUpdated?: Date;
   };
   geohash?: string;
-  distance?: number;
+  distance?: number; // Distance in METERS
   isOnline?: boolean;
   lastSeen?: Date;
   createdAt: Date | string;
@@ -26,7 +26,7 @@ export interface User {
   height?: number; // height in cm
   preferences?: {
     ageRange: [number, number];
-    maxDistance: number;
+    maxDistance: number; // Max distance in METERS
     interestedIn: 'male' | 'female' | 'both';
   };
 }
@@ -44,7 +44,7 @@ export interface MatchProfile extends User {
 export interface SearchFilters {
   gender: 'male' | 'female' | 'both';
   ageRange: [number, number];
-  maxDistance: number;
+  maxDistance: number; // Max distance in METERS
   interests?: string[];
 }
 

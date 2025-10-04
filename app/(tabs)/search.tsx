@@ -201,7 +201,7 @@ export default function SearchScreen() {
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [matchedUser, setMatchedUser] = useState<any>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [maxDistance, setMaxDistance] = useState(5000); // Changed to 5000 meters default
+  const [maxDistance, setMaxDistance] = useState(100); // Default to 100m for nearby search
   const [ageRange, setAgeRange] = useState<[number, number]>([18, 99]); // Default age range
   const [showMatchAnimation, setShowMatchAnimation] = useState(false);
   const [matchData, setMatchData] = useState<{
@@ -274,7 +274,16 @@ export default function SearchScreen() {
   const updateUserPreferences = () => {
     // Update search filters based on user preferences
     if (currentUser) {
-      const maxDistanceMeters = currentUser.preferences?.maxDistance || 5000; // Already in meters
+      let maxDistanceMeters = currentUser.preferences?.maxDistance || 100; // Default to 100m for nearby search
+
+      // Safety check: If maxDistance is less than 5m (minimum), set to 100m default
+      if (maxDistanceMeters < 5) {
+        console.warn(
+          `⚠️ maxDistance too small (${maxDistanceMeters}m), using 100m default`
+        );
+        maxDistanceMeters = 100;
+      }
+
       const userAgeRange = currentUser.preferences?.ageRange || [18, 99];
       console.log('📍 Updating preferences from user data:', {
         maxDistance: maxDistanceMeters,
@@ -305,28 +314,39 @@ export default function SearchScreen() {
       // Load data sequentially to ensure user is loaded before profiles
       const loadData = async () => {
         await loadCurrentUser(); // Ensure we have a current user first
+        // Wait a bit for currentUser state to be set
+        await new Promise((resolve) => setTimeout(resolve, 100));
         loadConversations(); // Load existing conversations
-        loadDiscoverProfiles(true); // Load profiles after user is loaded
-
-        // Small delay to ensure profiles are loaded before starting animation
-        setTimeout(() => {
-          setShowAnimation(true);
-          triggerSearchAnimation();
-        }, 500);
+        // Don't load profiles here - let the currentUser useEffect handle it
       };
 
       loadData();
     }
   }, [isAuthenticated, isAuthLoading]); // Run when authentication state changes
 
+  // Handle when currentUser changes - update preferences and load profiles
+  useEffect(() => {
+    if (currentUser && isAuthenticated) {
+      updateUserPreferences();
+      // Load profiles after preferences are updated
+      setTimeout(() => {
+        loadDiscoverProfiles(true);
+        // Start animation after profiles load
+        setTimeout(() => {
+          setShowAnimation(true);
+          triggerSearchAnimation();
+        }, 500);
+      }, 200); // Small delay to ensure preferences are updated in store
+    }
+  }, [currentUser?.id]); // Only run when user ID changes (initial load)
+
   // Handle when isSearching changes (from button trigger or auto-trigger)
   useEffect(() => {
-    updateUserPreferences();
     if (!isSearching && showAnimation) {
       // Animation ended via trigger
       setShowAnimation(false);
     }
-  }, [isSearching, currentUser]);
+  }, [isSearching]);
 
   useEffect(() => {
     pulseAnimation.value = withRepeat(
@@ -678,6 +698,11 @@ export default function SearchScreen() {
           },
         });
         console.log(`✅ maxDistance updated to ${distance}m in Firebase`);
+
+        // Clear discovery queue when filters change to get fresh results
+        console.log('🧹 Clearing discovery queue due to filter change...');
+        await discoveryService.clearDiscoveryQueue(currentUser.id);
+
         // Reload current user to get fresh data
         await loadCurrentUser();
       } catch (error) {
@@ -704,6 +729,11 @@ export default function SearchScreen() {
         console.log(
           `✅ ageRange updated to [${newAgeRange[0]}, ${newAgeRange[1]}] in Firebase`
         );
+
+        // Clear discovery queue when filters change to get fresh results
+        console.log('🧹 Clearing discovery queue due to filter change...');
+        await discoveryService.clearDiscoveryQueue(currentUser.id);
+
         // Reload current user to get fresh data
         await loadCurrentUser();
       } catch (error) {
