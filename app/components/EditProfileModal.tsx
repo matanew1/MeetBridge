@@ -11,6 +11,7 @@ import {
   Dimensions,
   Image,
 } from 'react-native';
+import Slider from '@react-native-community/slider';
 import { router } from 'expo-router';
 import {
   X,
@@ -22,6 +23,7 @@ import {
   Users,
   Target,
   Camera,
+  Ruler,
 } from 'lucide-react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -54,6 +56,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     location: user?.location || '',
     coordinates: user?.coordinates || undefined,
     age: user?.age?.toString() || '',
+    height: user?.height || 170, // Default to 170cm
     gender: user?.gender || 'other',
     image: user?.image || '',
     interests: user?.interests ? [...user.interests] : [],
@@ -83,6 +86,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       location: formData.location.trim(),
       coordinates: formData.coordinates,
       age: Number(formData.age),
+      height: formData.height,
       gender: formData.gender as 'male' | 'female' | 'other',
       image: formData.image,
       interests: formData.interests,
@@ -221,6 +225,36 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 placeholderTextColor={theme.textSecondary}
                 keyboardType="numeric"
               />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <View style={styles.inputHeader}>
+                <Ruler size={18} color={theme.primary} />
+                <Text style={[styles.inputLabel, { color: theme.text }]}>
+                  Height: {formData.height} cm
+                </Text>
+              </View>
+              <View style={styles.sliderContainer}>
+                <Text style={[styles.sliderLabel, { color: theme.textSecondary }]}>
+                  140 cm
+                </Text>
+                <Slider
+                  style={styles.slider}
+                  minimumValue={140}
+                  maximumValue={220}
+                  step={1}
+                  value={formData.height}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({ ...prev, height: value }))
+                  }
+                  minimumTrackTintColor={theme.primary}
+                  maximumTrackTintColor={theme.border}
+                  thumbTintColor={theme.primary}
+                />
+                <Text style={[styles.sliderLabel, { color: theme.textSecondary }]}>
+                  220 cm
+                </Text>
+              </View>
             </View>
 
             <View style={styles.inputContainer}>
@@ -492,6 +526,20 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
+  },
+  sliderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 8,
+  },
+  slider: {
+    flex: 1,
+    height: 40,
+  },
+  sliderLabel: {
+    fontSize: 12,
+    fontWeight: '500',
   },
   textArea: {
     borderWidth: 1,
