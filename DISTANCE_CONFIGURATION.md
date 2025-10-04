@@ -8,9 +8,9 @@ The entire app now works exclusively with **METERS** for all distance calculatio
 
 ### Filter Range (FilterModal.tsx)
 
-- **Minimum Distance**: 50m
+- **Minimum Distance**: 5m (ultra-precise for close proximity)
 - **Maximum Distance**: 5000m (5km)
-- **Step**: 50m
+- **Step**: 5m (fine-grained control)
 - **Default**: 100m
 
 ### User Preferences
@@ -21,18 +21,25 @@ The entire app now works exclusively with **METERS** for all distance calculatio
 
 ### Mock Users (generateMockUsers.ts)
 
-All 10 mock users are created with distances in **METERS**:
+All 10 mock users are created with **precise distances in METERS** for accurate testing:
 
-- Sarah: 50m (minimum filter distance)
-- Dan: 100m
-- Yael: 150m
-- Ori: 250m
-- Maya: 300m
-- Avi: 400m
-- Noa: 500m
-- Tom: 600m
-- Tamar: 750m
-- Eitan: 900m
+**Female Users:**
+
+- Sarah: 5m (ultra close - tests minimum range)
+- Yael: 10m
+- Maya: 20m
+- Noa: 50m (minimum filter distance)
+- Tamar: 100m
+
+**Male Users:**
+
+- Dan: 10m
+- Ori: 20m
+- Avi: 200m
+- Tom: 500m
+- Eitan: 1000m (1km)
+
+**Distance spread**: 5m, 10m, 20m, 50m, 100m, 200m, 500m, 1000m
 
 Mock user preferences: `maxDistance: 1000m`
 
@@ -113,12 +120,15 @@ All debug logs show distances in meters:
 
 ## Testing
 
-To test the distance filtering:
+To test the distance filtering with precise increments:
 
-1. Set filter to 100m → Should see Sarah (50m) and Dan (100m)
-2. Set filter to 300m → Should see Sarah, Dan, Yael, Ori, Maya
-3. Set filter to 1000m → Should see all 10 mock users
-4. Set filter to 50m → Should see only Sarah (50m)
+1. **Set filter to 50m** → Should see Sarah (5m), Yael (10m), Dan (10m), Maya (20m), Ori (20m), Noa (50m)
+2. **Set filter to 100m** → Should see all from above + Tamar (100m)
+3. **Set filter to 200m** → Should see all from above + Avi (200m)
+4. **Set filter to 500m** → Should see all from above + Tom (500m)
+5. **Set filter to 1000m** → Should see all 10 mock users (including Eitan at 1000m)
+6. **Set filter to 5m** → Should see only Sarah (5m) - tests ultra-close range
+7. **Set filter to 20m** → Should see Sarah (5m), Yael (10m), Dan (10m), Maya (20m), Ori (20m)
 
 ## Migration Complete
 

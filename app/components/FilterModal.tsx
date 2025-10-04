@@ -218,9 +218,9 @@ const FilterModal: React.FC<FilterModalProps> = React.memo(
                     </View>
                     <Slider
                       style={styles.slider}
-                      minimumValue={50}
+                      minimumValue={5}
                       maximumValue={5000}
-                      step={50}
+                      step={5}
                       value={tempDistance}
                       onValueChange={setTempDistance}
                       minimumTrackTintColor={theme.primary}
@@ -234,7 +234,7 @@ const FilterModal: React.FC<FilterModalProps> = React.memo(
                           { color: theme.textSecondary },
                         ]}
                       >
-                        50m
+                        5m
                       </Text>
                       <Text
                         style={[

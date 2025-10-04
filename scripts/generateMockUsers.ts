@@ -81,7 +81,7 @@ function getRandomPlaceholderImage(
 
 // Mock user data - All distances in METERS
 // Filter range: 50m-5000m (configured in FilterModal.tsx)
-// These users are spread from 50m to 900m for testing
+// Precise distances: 5m, 10m, 20m, 50m, 100m, 200m, 500m, 1000m for accurate testing
 const mockUsers = [
   {
     name: 'Sarah',
@@ -91,7 +91,7 @@ const mockUsers = [
     bio: 'Love hiking and beach volleyball 🏐',
     interests: ['Sports', 'Nature', 'Travel', 'Music'],
     height: 168,
-    distanceMeters: 50, // 50m away - minimum filter distance
+    distanceMeters: 5, // 5m away - ultra close!
   },
   {
     name: 'Yael',
@@ -101,7 +101,7 @@ const mockUsers = [
     bio: 'Foodie and coffee enthusiast ☕',
     interests: ['Food', 'Photography', 'Art', 'Music'],
     height: 165,
-    distanceMeters: 150, // 150m away
+    distanceMeters: 10, // 10m away
   },
   {
     name: 'Maya',
@@ -111,7 +111,7 @@ const mockUsers = [
     bio: 'Yoga instructor & wellness coach 🧘‍♀️',
     interests: ['Fitness', 'Nature', 'Wellness', 'Meditation'],
     height: 170,
-    distanceMeters: 300, // 300m away
+    distanceMeters: 20, // 20m away
   },
   {
     name: 'Noa',
@@ -121,7 +121,7 @@ const mockUsers = [
     bio: 'Tech enthusiast and gamer 🎮',
     interests: ['Gaming', 'Technology', 'Movies', 'Anime'],
     height: 162,
-    distanceMeters: 500, // 500m away
+    distanceMeters: 50, // 50m away - minimum filter distance
   },
   {
     name: 'Tamar',
@@ -131,7 +131,7 @@ const mockUsers = [
     bio: 'Artist and dreamer 🎨',
     interests: ['Art', 'Music', 'Theater', 'Photography'],
     height: 172,
-    distanceMeters: 750, // 750m away
+    distanceMeters: 100, // 100m away
   },
   {
     name: 'Dan',
@@ -141,7 +141,7 @@ const mockUsers = [
     bio: 'Entrepreneur and adventure seeker 🚀',
     interests: ['Business', 'Travel', 'Sports', 'Technology'],
     height: 180,
-    distanceMeters: 100, // 100m away
+    distanceMeters: 10, // 10m away
   },
   {
     name: 'Ori',
@@ -151,7 +151,7 @@ const mockUsers = [
     bio: 'Music producer and DJ 🎧',
     interests: ['Music', 'Nightlife', 'Travel', 'Art'],
     height: 178,
-    distanceMeters: 250, // 250m away
+    distanceMeters: 20, // 20m away
   },
   {
     name: 'Avi',
@@ -161,7 +161,7 @@ const mockUsers = [
     bio: 'Chef and food lover 👨‍🍳',
     interests: ['Food', 'Cooking', 'Wine', 'Travel'],
     height: 182,
-    distanceMeters: 400, // 400m away
+    distanceMeters: 200, // 200m away
   },
   {
     name: 'Tom',
@@ -171,7 +171,7 @@ const mockUsers = [
     bio: 'Software engineer and book nerd 📚',
     interests: ['Technology', 'Reading', 'Gaming', 'Science'],
     height: 175,
-    distanceMeters: 600, // 600m away
+    distanceMeters: 500, // 500m away
   },
   {
     name: 'Eitan',
@@ -181,7 +181,7 @@ const mockUsers = [
     bio: 'Fitness trainer and sports enthusiast 💪',
     interests: ['Fitness', 'Sports', 'Health', 'Nature'],
     height: 185,
-    distanceMeters: 900, // 900m away
+    distanceMeters: 1000, // 1000m away (1km)
   },
 ];
 

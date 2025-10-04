@@ -10,6 +10,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Heart, X, Filter, RefreshCw } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
@@ -744,10 +745,42 @@ export default function SearchScreen() {
     loadDiscoverProfiles(true);
   };
 
-  const handleSearchButton = () => {
-    // Trigger the search animation (which now includes refresh functionality)
-    setShowAnimation(true);
-    triggerSearchAnimation();
+  const handleSearchButton = async () => {
+    // Clear discovery queue and refresh profiles
+    if (currentUser) {
+      try {
+        console.log('🔄 Refresh button pressed - clearing discovery queue...');
+
+        // Haptic feedback
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+        // Clear the queue
+        await discoveryService.clearDiscoveryQueue(currentUser.id);
+        console.log('✅ Discovery queue cleared');
+
+        // Trigger the search animation
+        setShowAnimation(true);
+        triggerSearchAnimation();
+
+        // Reload profiles with current filters
+        console.log('🔄 Reloading discovery profiles...');
+        await loadDiscoverProfiles(true);
+        console.log('✅ Discovery profiles reloaded - Queue refreshed!');
+
+        // Success haptic feedback
+        await Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Success
+        );
+      } catch (error) {
+        console.error('❌ Error refreshing discovery queue:', error);
+        // Error haptic feedback
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
+    } else {
+      // Just trigger animation if no user
+      setShowAnimation(true);
+      triggerSearchAnimation();
+    }
   };
 
   const handleMessage = (userId: string) => {
