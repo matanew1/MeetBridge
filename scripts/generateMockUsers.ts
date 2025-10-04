@@ -3,6 +3,20 @@ import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { geohashForLocation } from 'geofire-common';
 
+//TODO: remove unused fields
+//TODO: add to mock more images to view them later
+//TODO: when unmatch remove the chats in both users
+//TODO: add view images
+//TODO: fix height not to be 170 cm default
+//TODO: on match make sure image occur in both users animations
+//TODO: notification for message received
+//TODO: when there is a chat already  - dont show the default text "it's a match! say hi", show the last message that received
+//TODO: make sure everything is LTR
+//TODO: when there is a suggestion for email, dont skip fields that has already value ( jump to password  field)
+//TODO: zodiac sign
+//TODO: toggle button switch offline/online
+//TODO: add edit and delete only my posts in missed connections
+
 // Firebase configuration
 const firebaseConfig = {
   apiKey: 'AIzaSyBPdV1BiL67xJes80Gv_tozl1E1ZAqslbk',

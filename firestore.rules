@@ -10,5 +10,43 @@ service cloud.firestore {
     match /discovery_queue/{queueId} {
       allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
     }
+
+    // Missed Connections - anyone can read, only authenticated users can create
+    match /missed_connections/{connectionId} {
+      // Anyone authenticated can read connections
+      allow read: if request.auth != null;
+      
+      // Only authenticated users can create connections
+      allow create: if request.auth != null 
+        && request.auth.uid == request.resource.data.userId;
+      
+      // Owner can update their connection OR any authenticated user can update likes/views
+      allow update: if request.auth != null && (
+        request.auth.uid == resource.data.userId ||
+        // Allow updating likes, likedBy, views, viewedBy, comments
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedBy', 'views', 'viewedBy', 'comments'])
+      );
+      
+      // Only the owner can delete their connection
+      allow delete: if request.auth != null 
+        && request.auth.uid == resource.data.userId;
+    }
+
+    // Missed Connection Claims
+    match /missed_connection_claims/{claimId} {
+      // Connection owner and claimer can read
+      allow read: if request.auth != null;
+      
+      // Only authenticated users can create claims
+      allow create: if request.auth != null 
+        && request.auth.uid == request.resource.data.claimerId;
+      
+      // Only the claimer or connection owner can update
+      allow update: if request.auth != null;
+      
+      // Only the claimer can delete their claim
+      allow delete: if request.auth != null 
+        && request.auth.uid == resource.data.claimerId;
+    }
   }
 }

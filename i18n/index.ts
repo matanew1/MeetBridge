@@ -9,6 +9,7 @@ const resources = {
       tabs: {
         discover: 'Liked',
         search: 'Search',
+        connections: 'Connections',
         chat: 'Chat',
       },
 

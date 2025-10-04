@@ -33,30 +33,6 @@
             ]
         },
         {
-            "collectionGroup": "users",
-            "queryScope": "COLLECTION",
-            "fields": [
-                {
-                    "fieldPath": "geohash",
-                    "order": "ASCENDING"
-                }
-            ]
-        },
-        {
-            "collectionGroup": "users",
-            "queryScope": "COLLECTION",
-            "fields": [
-                {
-                    "fieldPath": "geohash",
-                    "order": "ASCENDING"
-                },
-                {
-                    "fieldPath": "age",
-                    "order": "ASCENDING"
-                }
-            ]
-        },
-        {
             "collectionGroup": "interactions",
             "queryScope": "COLLECTION",
             "fields": [
@@ -162,6 +138,76 @@
                 },
                 {
                     "fieldPath": "updatedAt",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "missed_connections",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "location.category",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "createdAt",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "missed_connections",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "userId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "createdAt",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "missed_connections",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "savedBy",
+                    "arrayConfig": "CONTAINS"
+                },
+                {
+                    "fieldPath": "createdAt",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "missed_connection_claims",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "connectionId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "createdAt",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "missed_connection_claims",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "claimerId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "createdAt",
                     "order": "DESCENDING"
                 }
             ]

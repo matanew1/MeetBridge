@@ -70,7 +70,13 @@ class LocationService {
         canAskAgain: foregroundStatus.canAskAgain,
       };
     } catch (error) {
-      console.error('Error requesting location permissions:', error);
+      // Silently handle permission errors (e.g., Info.plist not configured)
+      // This is expected in development or when location is not configured
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      if (!errorMessage.includes('NSLocation')) {
+        console.log('Location permissions unavailable:', errorMessage);
+      }
       return { granted: false, canAskAgain: false };
     }
   }
@@ -95,9 +101,15 @@ class LocationService {
     try {
       const hasPermission = await this.hasLocationPermissions();
       if (!hasPermission) {
-        const permissionResult = await this.requestLocationPermissions();
-        if (!permissionResult.granted) {
-          throw new Error('Location permission denied');
+        try {
+          const permissionResult = await this.requestLocationPermissions();
+          if (!permissionResult.granted) {
+            return null;
+          }
+        } catch (permError) {
+          // Permission request failed (e.g., Info.plist not configured)
+          console.log('Location permissions not available:', permError);
+          return null;
         }
       }
 

@@ -7,6 +7,7 @@ import {
   Sun,
   Bell,
   BellOff,
+  Binoculars,
 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
@@ -150,6 +151,15 @@ export default function TabLayout() {
             title: t('tabs.chat'),
             tabBarIcon: ({ size, color }) => (
               <MessageCircleMore size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="connections"
+          options={{
+            title: 'Connections',
+            tabBarIcon: ({ size, color }) => (
+              <Binoculars size={size} color={color} />
             ),
           }}
         />
