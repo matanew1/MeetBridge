@@ -180,25 +180,29 @@ const ConnectionItem: React.FC<ConnectionItemProps> = ({
                 </Text>
               </View>
             </View>
-            <View style={styles.timeContainer}>
-              <Clock size={11} color={theme.textSecondary} />
-              <Text
-                style={[styles.timeTextSmall, { color: theme.textSecondary }]}
-              >
-                {formatRelativeTime(connection.createdAt)}
-                {connection.isEdited && ' (edited)'}
-              </Text>
+            <View style={styles.rightColumn}>
+              <View style={styles.timeContainer}>
+                <Clock size={11} color={theme.textSecondary} />
+                <Text
+                  style={[styles.timeTextSmall, { color: theme.textSecondary }]}
+                >
+                  {formatRelativeTime(connection.createdAt)}
+                  {connection.isEdited && ' (edited)'}
+                </Text>
+              </View>
+              {connection.likes > 5 && (
+                <View
+                  style={[
+                    styles.hotBadgeInline,
+                    { backgroundColor: theme.error },
+                  ]}
+                >
+                  <Zap size={10} color="#FFF" />
+                  <Text style={styles.hotBadgeText}>Hot</Text>
+                </View>
+              )}
             </View>
           </View>
-
-          {connection.likes > 5 && (
-            <View
-              style={[styles.hotBadgeTop, { backgroundColor: theme.error }]}
-            >
-              <Zap size={10} color="#FFF" />
-              <Text style={styles.hotBadgeText}>Hot</Text>
-            </View>
-          )}
 
           {/* Tags - First */}
           {connection.tags && connection.tags.length > 0 && (
@@ -1757,6 +1761,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     gap: 10,
   },
+  avatarContainer: {
+    position: 'relative',
+  },
   userAvatar: {
     width: 40,
     height: 40,
@@ -1787,6 +1794,10 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     flexShrink: 1,
   },
+  rightColumn: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
   timeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1799,7 +1810,7 @@ const styles = StyleSheet.create({
   hotBadgeTop: {
     position: 'absolute',
     top: 8,
-    right: 8,
+    left: 8,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
@@ -1808,12 +1819,25 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   hotBadge: {
+    position: 'absolute',
+    bottom: -5,
+    right: -8,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#2C2C2E',
+  },
+  hotBadgeInline: {
+    flexDirection: 'row',
+    alignItems: 'end',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
   },
   hotBadgeText: {
     color: '#FFF',

@@ -1,6 +1,14 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  serverTimestamp,
+  collection,
+  addDoc,
+  getDoc,
+} from 'firebase/firestore';
 import { geohashForLocation } from 'geofire-common';
 
 //TODO: remove unused fields
@@ -11,9 +19,9 @@ import { geohashForLocation } from 'geofire-common';
 //TODO: on match make sure image occur in both users animations
 //TODO: notification for message received
 //TODO: when there is a chat already  - dont show the default text "it's a match! say hi", show the last message that received
-//TODO: make sure everything is LTR
+//TODO: make sure everything is LTR on english and RTL on hebrew
 //TODO: when there is a suggestion for email, dont skip fields that has already value ( jump to password  field)
-//TODO: zodiac sign
+//TODO: add zodiac sign
 //TODO: toggle button switch offline/online
 //TODO: add edit and delete only my posts in missed connections
 
@@ -199,6 +207,73 @@ const mockUsers = [
   },
 ];
 
+// Mock posts data - will be created by random users
+const mockPosts = [
+  {
+    description:
+      "Saw someone reading 'The Great Gatsby' at the coffee shop today ☕📚. We made eye contact and smiled. Would love to chat about books!",
+    tags: ['books', 'coffee', 'meeting'],
+    locationIcon: '☕',
+    locationName: 'Cafe Noir',
+  },
+  {
+    description:
+      'Amazing dance performance at the street festival today! 💃🎵 The energy was incredible. Anyone else there?',
+    tags: ['dance', 'festival', 'music'],
+    locationIcon: '🎪',
+    locationName: 'Rothschild Boulevard',
+  },
+  {
+    description:
+      'Beautiful sunset at the beach 🌅 Shared a moment with someone special. Hope to see you again!',
+    tags: ['beach', 'sunset', 'romance'],
+    locationIcon: '🏖️',
+    locationName: 'Tel Aviv Beach',
+  },
+  {
+    description:
+      'Late night pizza run 🍕 Laughed so hard at the jokes. Best random encounter ever!',
+    tags: ['food', 'nightlife', 'funny'],
+    locationIcon: '🍕',
+    locationName: 'Pizza Paradise',
+  },
+  {
+    description:
+      'Morning yoga in the park 🧘‍♀️ Peaceful vibes. Caught your eye a few times 😊',
+    tags: ['yoga', 'park', 'wellness'],
+    locationIcon: '🌳',
+    locationName: 'Yarkon Park',
+  },
+  {
+    description:
+      'Bumped into you at the bookstore 📖 We were reaching for the same book! Fate? 😄',
+    tags: ['books', 'fate', 'reading'],
+    locationIcon: '📚',
+    locationName: 'Central Library',
+  },
+  {
+    description:
+      'That eye contact on the train 🚊 My stop came too soon. Still thinking about it...',
+    tags: ['train', 'commute', 'missed'],
+    locationIcon: '🚊',
+    locationName: 'Light Rail Station',
+  },
+];
+
+// Mock comments for posts
+const mockComments = [
+  'That was me! Would love to reconnect! 😊',
+  'I think I saw you there too!',
+  'Beautiful story, hope you find them! ❤️',
+  'This is so sweet!',
+  'Good luck! 🍀',
+  'Was this yesterday?',
+  'I was there too! Amazing vibe!',
+  'Hope this works out for you!',
+  'Love this! Keep us updated 😍',
+  'Sending positive vibes! ✨',
+];
+
 async function createMockUser(userData: (typeof mockUsers)[0], index: number) {
   const email = `mock${index + 1}@meetbridge.test`;
   const password = 'Test1234!';
@@ -292,11 +367,134 @@ async function createMockUser(userData: (typeof mockUsers)[0], index: number) {
     console.log(`   �️  Image: ${placeholderImage}`);
     console.log(`   �📧 Email: ${email} | Password: ${password}`);
 
-    return { success: true, email, password, userId };
+    return {
+      success: true,
+      email,
+      password,
+      userId,
+      userName: userData.name,
+      userImage: placeholderImage,
+    };
   } catch (error: any) {
     console.error(`❌ Error creating ${userData.name}:`, error.message);
     return { success: false, error: error.message };
   }
+}
+
+// Create mock posts
+async function createMockPosts(
+  users: Array<{ userId: string; userName: string; userImage: string }>
+) {
+  console.log('\n\n📝 Creating mock posts...');
+  const createdPosts: string[] = [];
+
+  for (let i = 0; i < mockPosts.length; i++) {
+    const postData = mockPosts[i];
+    const randomUser = users[Math.floor(Math.random() * users.length)];
+
+    // Generate location near base
+    const location = generateNearbyLocation(Math.random() * 500); // Within 500m
+
+    try {
+      const connectionData = {
+        userId: randomUser.userId,
+        userName: randomUser.userName,
+        userImage: randomUser.userImage,
+        location: {
+          lat: location.latitude,
+          lng: location.longitude,
+          landmark: postData.locationName,
+          category: 'general',
+          icon: postData.locationIcon,
+        },
+        description: postData.description,
+        tags: postData.tags,
+        timeOccurred: new Date(),
+        createdAt: serverTimestamp(),
+        likes: Math.floor(Math.random() * 10), // Random likes 0-9
+        likedBy: [],
+        views: Math.floor(Math.random() * 20), // Random views 0-19
+        viewedBy: [],
+        claims: 0,
+        comments: 0,
+        claimed: false,
+        verified: true,
+        isAnonymous: false,
+        isEdited: false,
+      };
+
+      const docRef = await addDoc(
+        collection(db, 'missed_connections'),
+        connectionData
+      );
+
+      createdPosts.push(docRef.id);
+      console.log(
+        `✅ Post ${i + 1}/${mockPosts.length} created by ${randomUser.userName}`
+      );
+    } catch (error: any) {
+      console.error(`❌ Error creating post ${i + 1}:`, error.message);
+    }
+
+    // Small delay
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  return createdPosts;
+}
+
+// Create mock comments on posts
+async function createMockComments(
+  postIds: string[],
+  users: Array<{ userId: string; userName: string; userImage: string }>
+) {
+  console.log('\n\n💬 Creating mock comments...');
+  let totalComments = 0;
+
+  for (const postId of postIds) {
+    // Random number of comments per post (1-4)
+    const numComments = Math.floor(Math.random() * 4) + 1;
+
+    for (let i = 0; i < numComments; i++) {
+      const randomUser = users[Math.floor(Math.random() * users.length)];
+      const randomComment =
+        mockComments[Math.floor(Math.random() * mockComments.length)];
+
+      try {
+        const commentData = {
+          connectionId: postId,
+          userId: randomUser.userId,
+          userName: randomUser.userName,
+          userImage: randomUser.userImage,
+          text: randomComment,
+          createdAt: serverTimestamp(),
+        };
+
+        await addDoc(
+          collection(db, 'missed_connections', postId, 'comments'),
+          commentData
+        );
+
+        // Update comment count
+        const connectionRef = doc(db, 'missed_connections', postId);
+        const connectionDoc = await getDoc(connectionRef);
+        const currentComments = connectionDoc.data()?.comments || 0;
+        await setDoc(
+          connectionRef,
+          { comments: currentComments + 1 },
+          { merge: true }
+        );
+
+        totalComments++;
+      } catch (error: any) {
+        console.error(`❌ Error creating comment:`, error.message);
+      }
+    }
+  }
+
+  console.log(
+    `✅ Created ${totalComments} comments across ${postIds.length} posts`
+  );
 }
 
 async function generateAllMockUsers() {
@@ -305,6 +503,7 @@ async function generateAllMockUsers() {
 
   const results = [];
 
+  // Step 1: Create users
   for (let i = 0; i < mockUsers.length; i++) {
     const result = await createMockUser(mockUsers[i], i);
     results.push(result);
@@ -313,7 +512,7 @@ async function generateAllMockUsers() {
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 
-  console.log('\n\n📊 Summary:');
+  console.log('\n\n📊 User Creation Summary:');
   console.log('='.repeat(50));
   const successful = results.filter((r) => r.success).length;
   console.log(
@@ -334,6 +533,30 @@ async function generateAllMockUsers() {
     );
     console.log('User preferences maxDistance: 1000m');
     console.log('✅ All users are within discoverable range!');
+
+    // Step 2: Create posts
+    const successfulUsers = results
+      .filter((r) => r.success)
+      .map((r) => ({
+        userId: r.userId!,
+        userName: r.userName!,
+        userImage: r.userImage!,
+      }));
+
+    if (successfulUsers.length > 0) {
+      const postIds = await createMockPosts(successfulUsers);
+
+      // Step 3: Create comments
+      if (postIds.length > 0) {
+        await createMockComments(postIds, successfulUsers);
+      }
+
+      console.log('\n\n🎉 All Done!');
+      console.log('='.repeat(50));
+      console.log(`✅ Created ${successful} users`);
+      console.log(`✅ Created ${postIds.length} posts`);
+      console.log(`✅ Comments added to posts`);
+    }
   }
 
   process.exit(0);
