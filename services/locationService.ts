@@ -226,8 +226,20 @@ class LocationService {
    */
   async stopLocationWatcher(): Promise<void> {
     if (this.locationWatcher) {
-      this.locationWatcher.remove();
-      this.locationWatcher = null;
+      try {
+        // The subscription object from watchPositionAsync has a remove() method
+        // Check if the method exists before calling it
+        if (typeof this.locationWatcher.remove === 'function') {
+          this.locationWatcher.remove();
+          console.log('✅ Location watcher stopped');
+        } else {
+          console.warn('⚠️ Location watcher remove method not available');
+        }
+      } catch (error) {
+        console.warn('⚠️ Error stopping location watcher:', error);
+      } finally {
+        this.locationWatcher = null;
+      }
     }
   }
 

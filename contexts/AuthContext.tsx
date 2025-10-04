@@ -282,7 +282,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    const handleAppStateChange = async () => {
+    const handleAppStateChange = async (nextAppState: AppStateStatus) => {
+      if (firebaseUser && user) {
+        try {
+          const isGoingOnline = nextAppState === 'active';
+          const isGoingOffline =
+            nextAppState === 'background' || nextAppState === 'inactive';
+
+          if (isGoingOnline) {
+            console.log('👁️ App became active - setting user online');
+            await updateDoc(doc(db, 'users', firebaseUser.uid), {
+              lastSeen: serverTimestamp(),
+              isOnline: true,
+            });
+          } else if (isGoingOffline) {
+            console.log('👁️ App going to background - setting user offline');
+            await updateDoc(doc(db, 'users', firebaseUser.uid), {
+              lastSeen: serverTimestamp(),
+              isOnline: false,
+            });
+          }
+        } catch (error) {
+          console.warn('Failed to update presence status:', error);
+        }
+      }
+    };
+
+    const handleBeforeUnload = async () => {
       if (firebaseUser && user) {
         try {
           await updateDoc(doc(db, 'users', firebaseUser.uid), {
@@ -299,26 +325,52 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     if (Platform.OS === 'web') {
       if (typeof window !== 'undefined') {
-        window.addEventListener('beforeunload', handleAppStateChange);
+        window.addEventListener('beforeunload', handleBeforeUnload);
       }
     } else {
-      subscription = AppState.addEventListener(
-        'change',
-        (nextAppState: AppStateStatus) => {
-          if (nextAppState === 'background' || nextAppState === 'inactive') {
-            handleAppStateChange();
-          }
-        }
-      );
+      subscription = AppState.addEventListener('change', handleAppStateChange);
     }
 
     return () => {
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        window.removeEventListener('beforeunload', handleAppStateChange);
+        window.removeEventListener('beforeunload', handleBeforeUnload);
       } else if (subscription) {
         subscription.remove();
       }
-      handleAppStateChange();
+      handleBeforeUnload();
+    };
+  }, [firebaseUser, user]);
+
+  // Presence heartbeat - update lastSeen every 60 seconds while app is active
+  useEffect(() => {
+    if (!firebaseUser || !user) return;
+
+    console.log('💓 Starting presence heartbeat');
+
+    const updatePresence = async () => {
+      try {
+        const currentAppState = AppState.currentState;
+        if (currentAppState === 'active') {
+          await updateDoc(doc(db, 'users', firebaseUser.uid), {
+            lastSeen: serverTimestamp(),
+            isOnline: true,
+          });
+          console.log('💓 Heartbeat: Updated presence');
+        }
+      } catch (error) {
+        console.warn('Failed to update heartbeat:', error);
+      }
+    };
+
+    // Update immediately
+    updatePresence();
+
+    // Then update every 60 seconds
+    const heartbeatInterval = setInterval(updatePresence, 60000);
+
+    return () => {
+      console.log('💓 Stopping presence heartbeat');
+      clearInterval(heartbeatInterval);
     };
   }, [firebaseUser, user]);
 

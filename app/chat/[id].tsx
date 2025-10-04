@@ -500,6 +500,56 @@ const ChatScreen = () => {
     };
   }, [conversation?.matchId, router, t]);
 
+  // Real-time presence listener for other user's online status
+  useEffect(() => {
+    if (!otherUserId) return;
+
+    console.log('👁️ Setting up real-time presence listener for:', otherUserId);
+
+    const { doc, onSnapshot } = require('firebase/firestore');
+    const { db } = require('../../services/firebase/config');
+
+    const userDocRef = doc(db, 'users', otherUserId);
+
+    const unsubscribe = onSnapshot(
+      userDocRef,
+      (snapshot: any) => {
+        if (snapshot.exists()) {
+          const userData = snapshot.data();
+          const isOnline = userData.isOnline || false;
+          const lastSeen =
+            userData.lastSeen?.toDate?.() ||
+            (userData.lastSeen?.seconds
+              ? new Date(userData.lastSeen.seconds * 1000)
+              : null);
+
+          console.log(`👁️ Presence update for ${otherUserId}:`, {
+            isOnline,
+            lastSeen: lastSeen?.toISOString(),
+          });
+
+          // Update otherUser state with fresh presence data
+          setOtherUser((prev: any) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              isOnline,
+              lastSeen,
+            };
+          });
+        }
+      },
+      (error) => {
+        console.error('❌ Error in presence listener:', error);
+      }
+    );
+
+    return () => {
+      console.log('🔕 Cleaning up presence listener');
+      unsubscribe();
+    };
+  }, [otherUserId]);
+
   // Memoized animation styles
   const headerStyle = useAnimatedStyle(
     () => ({

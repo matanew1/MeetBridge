@@ -441,6 +441,13 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
           const matchesAge =
             data.age >= filters.ageRange[0] && data.age <= filters.ageRange[1];
 
+          // DEBUG: Log gender filtering in queue population
+          if (!matchesGender) {
+            console.log(
+              `⚠️ QUEUE: Gender mismatch - ${data.name} (${data.gender}) filtered. Looking for: ${filters.gender}`
+            );
+          }
+
           if (!matchesGender || !matchesAge) return;
 
           // Calculate distance and score
@@ -600,10 +607,15 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
           return this.getDiscoverProfilesDirect(filters, page);
         }
 
-        return this.getProfilesFromQueue(newQueueSnapshot, pageSize, page);
+        return this.getProfilesFromQueue(
+          newQueueSnapshot,
+          pageSize,
+          page,
+          filters
+        );
       }
 
-      return this.getProfilesFromQueue(queueSnapshot, pageSize, page);
+      return this.getProfilesFromQueue(queueSnapshot, pageSize, page, filters);
     } catch (error) {
       console.error('Error getting discover profiles:', error);
       return {
@@ -621,7 +633,8 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
   private async getProfilesFromQueue(
     queueSnapshot: any,
     pageSize: number,
-    page: number
+    page: number,
+    filters: SearchFilters
   ): Promise<ApiResponse<User[]>> {
     const profiles: User[] = [];
     const seenProfileIds = new Set<string>();
@@ -647,13 +660,43 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         return true;
       });
 
-    // Fetch actual profile data
+    console.log(
+      `🔍 QUEUE FILTER: Applying gender filter - Looking for: ${filters.gender}`
+    );
+
+    // Fetch actual profile data and apply current filters
     for (const profileId of profileIds) {
       try {
         const profileDoc = await getDoc(doc(db, 'users', profileId));
         if (profileDoc.exists()) {
           const data = profileDoc.data();
           const queueData = queueDataMap.get(profileId);
+
+          // CRITICAL: Apply gender filter from current user preferences
+          const matchesGender =
+            filters.gender === 'both' || data.gender === filters.gender;
+          const matchesAge =
+            data.age >= filters.ageRange[0] && data.age <= filters.ageRange[1];
+
+          // DEBUG: Log filtering decisions
+          if (!matchesGender) {
+            console.log(
+              `⚠️ QUEUE RETRIEVAL: Gender mismatch - ${data.name} (${data.gender}) filtered out. Looking for: ${filters.gender}`
+            );
+            continue; // Skip this profile
+          }
+
+          if (!matchesAge) {
+            console.log(
+              `⚠️ QUEUE RETRIEVAL: Age mismatch - ${data.name} (${data.age}) filtered out. Age range: ${filters.ageRange[0]}-${filters.ageRange[1]}`
+            );
+            continue; // Skip this profile
+          }
+
+          // Profile passes all filters
+          console.log(
+            `✅ QUEUE RETRIEVAL: ${data.name} (${data.gender}, ${data.age}) passes filters`
+          );
 
           profiles.push({
             id: profileDoc.id,
@@ -666,6 +709,14 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         console.warn(`Error fetching profile ${profileId}:`, error);
       }
     }
+
+    console.log(`📊 QUEUE RETRIEVAL SUMMARY:`, {
+      totalInQueue: profileIds.length,
+      afterFiltering: profiles.length,
+      filtered: profileIds.length - profiles.length,
+      lookingFor: filters.gender,
+      profiles: profiles.map((p) => `${p.name} (${p.gender})`),
+    });
 
     return {
       data: profiles,
@@ -1057,6 +1108,16 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         },
       });
 
+      console.log(`👤 GENDER FILTER DEBUG:`, {
+        lookingFor: filters.gender,
+        description:
+          filters.gender === 'male'
+            ? 'Looking for MALE profiles'
+            : filters.gender === 'female'
+            ? 'Looking for FEMALE profiles'
+            : 'Looking for ALL profiles',
+      });
+
       const bounds = LocationService.getQueryBounds(
         userLocation,
         filters.maxDistance
@@ -1107,6 +1168,13 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
             filters.gender === 'both' || data.gender === filters.gender;
           const matchesAge =
             data.age >= filters.ageRange[0] && data.age <= filters.ageRange[1];
+
+          // DEBUG: Log gender filtering
+          if (!matchesGender) {
+            console.log(
+              `⚠️ GENDER MISMATCH: ${data.name} (${data.gender}) filtered out. Looking for: ${filters.gender}`
+            );
+          }
 
           if (!matchesGender || !matchesAge) return;
 
