@@ -129,6 +129,51 @@ export class FirebaseUserProfileService implements IUserProfileService {
         }
       }
 
+      // Handle additional images array upload
+      if (
+        Array.isArray(dataToUpdate.images) &&
+        dataToUpdate.images.length > 0
+      ) {
+        console.log('📤 Uploading additional images to Cloudinary...');
+        const uploadedImages: string[] = [];
+
+        for (const imageUri of dataToUpdate.images) {
+          // Check if it's a local file that needs uploading
+          if (
+            typeof imageUri === 'string' &&
+            (imageUri.startsWith('file://') ||
+              imageUri.startsWith('content://') ||
+              imageUri.startsWith('data:') ||
+              imageUri.startsWith('/'))
+          ) {
+            console.log('📤 Uploading additional image:', imageUri);
+            const uploadResult = await storageService.uploadImage(imageUri);
+
+            if (uploadResult.success && uploadResult.secureUrl) {
+              uploadedImages.push(uploadResult.secureUrl);
+              console.log(
+                '✅ Additional image uploaded:',
+                uploadResult.secureUrl
+              );
+            } else {
+              console.error('❌ Failed to upload image:', uploadResult.message);
+              throw new Error(
+                uploadResult.message || 'Additional image upload failed'
+              );
+            }
+          } else {
+            // Already a Cloudinary URL, keep it
+            uploadedImages.push(imageUri);
+          }
+        }
+
+        dataToUpdate.images = uploadedImages;
+        console.log(
+          '✅ All additional images processed:',
+          uploadedImages.length
+        );
+      }
+
       // Handle geohash update if coordinates changed
       if (dataToUpdate.coordinates) {
         const { latitude, longitude } = dataToUpdate.coordinates;

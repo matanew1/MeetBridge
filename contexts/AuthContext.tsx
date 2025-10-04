@@ -232,7 +232,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 lastSeen: serverTimestamp(),
                 isOnline: true,
                 gender: 'other' as const,
-                lookingFor: 'both' as const,
                 height: 170,
                 notificationsEnabled: true,
                 preferences: {

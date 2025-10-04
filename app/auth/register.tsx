@@ -117,7 +117,6 @@ const RegisterScreen = () => {
         dateOfBirth: formData.dateOfBirth,
         gender: formData.gender,
         height: formData.height,
-        lookingFor: formData.interestedIn,
         bio: '',
         interests: formData.interests,
         location: '',

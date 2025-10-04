@@ -39,10 +39,6 @@
                 {
                     "fieldPath": "geohash",
                     "order": "ASCENDING"
-                },
-                {
-                    "fieldPath": "lookingFor",
-                    "order": "ASCENDING"
                 }
             ]
         },
@@ -52,10 +48,6 @@
             "fields": [
                 {
                     "fieldPath": "geohash",
-                    "order": "ASCENDING"
-                },
-                {
-                    "fieldPath": "lookingFor",
                     "order": "ASCENDING"
                 },
                 {

@@ -10,6 +10,7 @@ import {
   Alert,
   Dimensions,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { router } from 'expo-router';
@@ -24,7 +25,11 @@ import {
   Target,
   Camera,
   Ruler,
+  Plus,
+  Trash2,
+  Image as ImageIcon,
 } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
@@ -59,6 +64,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     height: user?.height || 170, // Default to 170cm
     gender: user?.gender || 'other',
     image: user?.image || '',
+    images: user?.images ? [...user.images] : [],
     interests: user?.interests ? [...user.interests] : [],
     preferences: user?.preferences || {
       ageRange: [18, 35] as [number, number],
@@ -68,33 +74,45 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   });
 
   const [newInterest, setNewInterest] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSave = () => {
-    if (!formData.name.trim()) {
-      Alert.alert('Error', 'Name is required');
-      return;
+  const handleSave = async () => {
+    if (isSaving) return;
+
+    setIsSaving(true);
+    try {
+      if (!formData.name.trim()) {
+        Alert.alert('Error', 'Name is required');
+        return;
+      }
+
+      if (!formData.age || isNaN(Number(formData.age))) {
+        Alert.alert('Error', 'Please enter a valid age');
+        return;
+      }
+
+      const updatedData: Partial<User> = {
+        name: formData.name.trim(),
+        bio: formData.bio.trim(),
+        location: formData.location.trim(),
+        coordinates: formData.coordinates,
+        age: Number(formData.age),
+        height: formData.height,
+        gender: formData.gender as 'male' | 'female' | 'other',
+        image: formData.image,
+        images: formData.images,
+        interests: formData.interests,
+        preferences: formData.preferences,
+      };
+
+      await onSave(updatedData);
+      onClose();
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      Alert.alert('Error', 'Failed to save profile. Please try again.');
+    } finally {
+      setIsSaving(false);
     }
-
-    if (!formData.age || isNaN(Number(formData.age))) {
-      Alert.alert('Error', 'Please enter a valid age');
-      return;
-    }
-
-    const updatedData: Partial<User> = {
-      name: formData.name.trim(),
-      bio: formData.bio.trim(),
-      location: formData.location.trim(),
-      coordinates: formData.coordinates,
-      age: Number(formData.age),
-      height: formData.height,
-      gender: formData.gender as 'male' | 'female' | 'other',
-      image: formData.image,
-      interests: formData.interests,
-      preferences: formData.preferences,
-    };
-
-    onSave(updatedData);
-    onClose();
   };
 
   const addInterest = () => {
@@ -119,6 +137,43 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
   const handleImageSelected = (imageUri: string) => {
     setFormData((prev) => ({ ...prev, image: imageUri }));
+  };
+
+  const pickAdditionalImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission Required',
+        'Please grant camera roll permissions to upload photos.'
+      );
+      return;
+    }
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 5],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+        setFormData((prev) => ({
+          ...prev,
+          images: [...prev.images, imageUri],
+        }));
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to pick image');
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index),
+    }));
   };
 
   return (
@@ -151,11 +206,19 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           <TouchableOpacity
             style={[
               styles.saveButton,
-              { backgroundColor: 'rgba(255, 255, 255, 0.2)' },
+              {
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                opacity: isSaving ? 0.5 : 1,
+              },
             ]}
             onPress={handleSave}
+            disabled={isSaving}
           >
-            <Save size={20} color="white" />
+            {isSaving ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <Save size={20} color="white" />
+            )}
           </TouchableOpacity>
         </LinearGradient>
 
@@ -168,6 +231,71 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
               size={120}
               showUploadButton={true}
             />
+          </View>
+
+          {/* Additional Photos Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <ImageIcon size={20} color={theme.primary} />
+              <Text
+                style={[
+                  styles.sectionTitle,
+                  { color: theme.text, marginBottom: 0, marginLeft: 8 },
+                ]}
+              >
+                Additional Photos
+              </Text>
+            </View>
+            <Text
+              style={[styles.sectionSubtitle, { color: theme.textSecondary }]}
+            >
+              Add up to 5 more photos to your profile
+            </Text>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.photosScrollView}
+              contentContainerStyle={styles.photosContainer}
+            >
+              {formData.images.map((imageUri, index) => (
+                <View key={index} style={styles.photoItem}>
+                  <Image source={{ uri: imageUri }} style={styles.photoImage} />
+                  <TouchableOpacity
+                    style={[
+                      styles.removePhotoButton,
+                      { backgroundColor: theme.error || '#FF3B30' },
+                    ]}
+                    onPress={() => removeImage(index)}
+                  >
+                    <Trash2 size={16} color="white" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+
+              {formData.images.length < 5 && (
+                <TouchableOpacity
+                  style={[
+                    styles.addPhotoButton,
+                    {
+                      backgroundColor: theme.surface,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                  onPress={pickAdditionalImage}
+                >
+                  <Plus size={32} color={theme.primary} />
+                  <Text
+                    style={[
+                      styles.addPhotoText,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    Add Photo
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </ScrollView>
           </View>
 
           {/* Basic Information */}
@@ -235,7 +363,9 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 </Text>
               </View>
               <View style={styles.sliderContainer}>
-                <Text style={[styles.sliderLabel, { color: theme.textSecondary }]}>
+                <Text
+                  style={[styles.sliderLabel, { color: theme.textSecondary }]}
+                >
                   140 cm
                 </Text>
                 <Slider
@@ -251,7 +381,9 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   maximumTrackTintColor={theme.border}
                   thumbTintColor={theme.primary}
                 />
-                <Text style={[styles.sliderLabel, { color: theme.textSecondary }]}>
+                <Text
+                  style={[styles.sliderLabel, { color: theme.textSecondary }]}
+                >
                   220 cm
                 </Text>
               </View>
@@ -616,6 +748,56 @@ const styles = StyleSheet.create({
   locationInfoSubtext: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    marginBottom: 16,
+  },
+  photosScrollView: {
+    marginTop: 8,
+  },
+  photosContainer: {
+    gap: 12,
+    paddingRight: 20,
+  },
+  photoItem: {
+    position: 'relative',
+    width: 120,
+    height: 150,
+  },
+  photoImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
+  },
+  removePhotoButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addPhotoButton: {
+    width: 120,
+    height: 150,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addPhotoText: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 8,
   },
 });
 
