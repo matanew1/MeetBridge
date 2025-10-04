@@ -1729,6 +1729,8 @@ const styles = StyleSheet.create({
   connectionList: {
     flex: 1,
     paddingHorizontal: 20,
+    paddingBottom: 100,
+    marginBottom: 55,
   },
   connectionItem: {
     flexDirection: 'row',

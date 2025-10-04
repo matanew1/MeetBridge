@@ -24,6 +24,8 @@ import { geohashForLocation } from 'geofire-common';
 //TODO: add zodiac sign
 //TODO: toggle button switch offline/online
 //TODO: add edit and delete only my posts in missed connections
+//TODO: add search by name in connections tab
+//TODO: when user login it is reseting to default values (User, 170 and etc...)
 
 // Firebase configuration
 const firebaseConfig = {
