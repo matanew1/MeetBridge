@@ -15,7 +15,6 @@ import { geohashForLocation } from 'geofire-common';
 //TODO: add to mock more images to view them later
 //TODO: when unmatch remove the chats in both users
 //TODO: add view images
-//TODO: fix height not to be 170 cm default
 //TODO: on match make sure image occur in both users animations
 //TODO: notification for message received
 //TODO: when there is a chat already  - dont show the default text "it's a match! say hi", show the last message that received
@@ -23,9 +22,7 @@ import { geohashForLocation } from 'geofire-common';
 //TODO: when there is a suggestion for email, dont skip fields that has already value ( jump to password  field)
 //TODO: add zodiac sign
 //TODO: toggle button switch offline/online
-//TODO: add edit and delete only my posts in missed connections
 //TODO: add search by name in connections tab
-//TODO: when user login it is reseting to default values (User, 170 and etc...)
 
 // Firebase configuration
 const firebaseConfig = {

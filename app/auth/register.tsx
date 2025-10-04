@@ -45,7 +45,7 @@ const RegisterScreen = () => {
     dateOfBirth: new Date(2000, 0, 1),
     gender: 'male' as 'male' | 'female' | 'other',
     interestedIn: 'both' as 'male' | 'female' | 'both',
-    height: 170,
+    height: 0, // 0 means not set yet - force user to set their height
     interests: [] as string[],
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -98,6 +98,10 @@ const RegisterScreen = () => {
     }
     if (age > 100) {
       Alert.alert('Error', 'Please enter a valid date of birth');
+      return false;
+    }
+    if (formData.height < 140 || formData.height > 220) {
+      Alert.alert('Error', 'Please set your height using the slider');
       return false;
     }
     return true;
@@ -381,8 +385,20 @@ const RegisterScreen = () => {
                     Height
                   </Text>
                 </View>
-                <Text style={[styles.sliderValue, { color: theme.primary }]}>
-                  {formData.height} cm
+                <Text
+                  style={[
+                    styles.sliderValue,
+                    {
+                      color:
+                        formData.height === 0
+                          ? theme.textSecondary
+                          : theme.primary,
+                    },
+                  ]}
+                >
+                  {formData.height === 0
+                    ? 'Set your height'
+                    : `${formData.height} cm`}
                 </Text>
               </View>
               <Slider
@@ -390,7 +406,7 @@ const RegisterScreen = () => {
                 minimumValue={140}
                 maximumValue={220}
                 step={1}
-                value={formData.height}
+                value={formData.height === 0 ? 170 : formData.height}
                 onValueChange={(value) =>
                   updateFormData('height', Math.round(value))
                 }

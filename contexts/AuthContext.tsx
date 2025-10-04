@@ -213,57 +213,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               console.warn('Failed to update user online status:', updateError);
             }
           } else {
-            // User exists in Firebase Auth but not in Firestore - create basic profile
-            console.warn(
-              '⚠️ User exists in Firebase Auth but not in Firestore - Creating profile...'
+            // User exists in Firebase Auth but not in Firestore
+            // This should ONLY happen in rare cases - DO NOT auto-create defaults for existing users
+            console.error(
+              '❌ CRITICAL: User exists in Firebase Auth but not in Firestore:',
+              firebaseUser.uid
+            );
+            console.error(
+              '❌ User should register properly. Not creating default profile to prevent data loss.'
             );
 
-            try {
-              const basicUserData = {
-                id: firebaseUser.uid,
-                email: firebaseUser.email || '',
-                name: firebaseUser.displayName || 'User',
-                age: 18,
-                dateOfBirth: new Date(2000, 0, 1),
-                bio: '',
-                interests: [],
-                location: '',
-                createdAt: serverTimestamp(),
-                lastSeen: serverTimestamp(),
-                isOnline: true,
-                gender: 'other' as const,
-                height: 170,
-                notificationsEnabled: true,
-                preferences: {
-                  ageRange: [18, 99] as [number, number],
-                  maxDistance: 100, // Default to 100m for nearby search (5m-1000m range)
-                  interestedIn: 'both' as const,
-                },
-              };
-
-              await setDoc(doc(db, 'users', firebaseUser.uid), basicUserData);
-              console.log('✅ Created basic Firestore profile for user');
-
-              // Now fetch the newly created user
-              const newUserDoc = await getDoc(
-                doc(db, 'users', firebaseUser.uid)
-              );
-              if (newUserDoc.exists()) {
-                const userData = newUserDoc.data();
-                const fullUser: User = {
-                  id: newUserDoc.id,
-                  ...userData,
-                  lastSeen: convertTimestamp(userData.lastSeen),
-                } as User;
-                setUser(fullUser);
-              }
-            } catch (createError) {
-              console.error(
-                '❌ Failed to create Firestore profile:',
-                createError
-              );
-              setUser(null);
-            }
+            // Sign out the user to force proper registration
+            await auth.signOut();
+            setUser(null);
+            setFirebaseUser(null);
           }
         } catch (error) {
           console.error('Error loading user profile:', error);

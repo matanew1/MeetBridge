@@ -2747,30 +2747,15 @@ export class FirebaseAuthService implements IAuthService {
           isOnline: true,
         });
       } else {
-        // Create basic user profile if it doesn't exist
-        userData = {
-          id: firebaseUser.uid,
-          name: firebaseUser.displayName || 'Unknown User',
-          age: 25,
-          image: firebaseUser.photoURL || '',
-          gender: 'other' as const,
-          bio: '',
-          interests: [],
-          location: '',
-          preferences: {
-            ageRange: [20, 35] as [number, number],
-            maxDistance: 5000, // meters (5 km default)
-            interestedIn: 'both' as const,
-          },
-        };
-
-        await setDoc(doc(db, 'users', firebaseUser.uid), {
-          ...userData,
-          email: firebaseUser.email,
-          createdAt: serverTimestamp(),
-          lastSeen: serverTimestamp(),
-          isOnline: true,
-        });
+        // User exists in Auth but not in Firestore - this should not happen normally
+        // Throw error instead of creating defaults to prevent data loss
+        console.error(
+          '❌ CRITICAL: User exists in Auth but not in Firestore:',
+          firebaseUser.uid
+        );
+        throw new Error(
+          'User profile not found. Please contact support or try registering again.'
+        );
       }
 
       const token = await firebaseUser.getIdToken();
