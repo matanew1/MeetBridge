@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -18,11 +18,13 @@ import {
   Instagram,
   Music,
   Facebook,
+  Images,
 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import { PREDEFINED_INTERESTS } from '../../constants/interests';
+import { ImageGallery } from './ImageGallery';
 
 const { width, height } = Dimensions.get('window');
 
@@ -33,6 +35,7 @@ interface ProfileDetailProps {
     age: number;
     distance?: number;
     image: string;
+    images?: string[];
     bio?: string;
     interests?: string[];
     location?: string;
@@ -60,6 +63,16 @@ const ProfileDetail = ({
   const { t } = useTranslation();
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
+  const [showGallery, setShowGallery] = useState(false);
+  const [galleryIndex, setGalleryIndex] = useState(0);
+
+  const userImages =
+    user.images && user.images.length > 0 ? user.images : [user.image];
+
+  const handleImagePress = (index: number = 0) => {
+    setGalleryIndex(index);
+    setShowGallery(true);
+  };
 
   const socialIcons = [
     { icon: Instagram, color: '#E4405F' },
@@ -95,12 +108,29 @@ const ProfileDetail = ({
         showsVerticalScrollIndicator={false}
       >
         {/* Profile Image */}
-        <View style={styles.imageSection}>
+        <TouchableOpacity
+          style={styles.imageSection}
+          onPress={() => handleImagePress(0)}
+          activeOpacity={0.9}
+        >
           <Image
             source={{ uri: user.image }}
             style={styles.profileImage}
             resizeMode="cover"
           />
+
+          {/* Gallery indicator */}
+          {userImages.length > 1 && (
+            <View
+              style={[
+                styles.galleryBadge,
+                { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
+              ]}
+            >
+              <Images size={16} color="#FFF" />
+              <Text style={styles.galleryText}>{userImages.length}</Text>
+            </View>
+          )}
 
           {/* Age badge */}
           <View style={[styles.ageBadge, { backgroundColor: theme.surface }]}>
@@ -108,7 +138,7 @@ const ProfileDetail = ({
               {user.age} y/o
             </Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* Profile Info */}
         <View style={styles.profileInfo}>
@@ -210,6 +240,14 @@ const ProfileDetail = ({
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Image Gallery */}
+      <ImageGallery
+        visible={showGallery}
+        images={userImages}
+        initialIndex={galleryIndex}
+        onClose={() => setShowGallery(false)}
+      />
     </SafeAreaView>
   );
 };
@@ -250,6 +288,22 @@ const styles = StyleSheet.create({
     height: width * 0.75,
     borderRadius: 20,
     maxHeight: 300,
+  },
+  galleryBadge: {
+    position: 'absolute',
+    top: 30,
+    left: width * 0.15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 15,
+  },
+  galleryText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFF',
   },
   ageBadge: {
     position: 'absolute',

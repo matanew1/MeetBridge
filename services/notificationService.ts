@@ -167,6 +167,10 @@ class NotificationService {
         if (data.type === 'match') {
           // Navigate to matches screen
           console.log('Navigate to match:', data.matchId);
+        } else if (data.type === 'message') {
+          // Navigate to chat conversation
+          console.log('Navigate to conversation:', data.conversationId);
+          // The navigation will be handled by the app's navigation system
         }
       });
   }
@@ -284,6 +288,77 @@ class NotificationService {
       );
     } catch (error) {
       console.error('Error broadcasting match notification:', error);
+    }
+  }
+
+  /**
+   * Broadcast message notification to a specific user via push token
+   * This is used to notify the other user when a message is received
+   */
+  async broadcastMessageNotification(
+    userId: string,
+    senderName: string,
+    messageText: string,
+    conversationId: string
+  ) {
+    try {
+      // Get the user's push token from Firebase
+      const userRef = doc(db, 'users', userId);
+      const userDoc = await getDoc(userRef);
+
+      if (!userDoc.exists()) {
+        console.log('User not found for broadcast notification');
+        return;
+      }
+
+      const userData = userDoc.data();
+      const pushToken = userData.pushToken;
+      const notificationsEnabled = userData.notificationsEnabled;
+
+      if (!pushToken || !notificationsEnabled) {
+        console.log(
+          'Push token not available or notifications disabled for user'
+        );
+        return;
+      }
+
+      // Truncate message if too long
+      const displayText =
+        messageText.length > 100
+          ? messageText.substring(0, 100) + '...'
+          : messageText;
+
+      // Send push notification via Expo Push Notification service
+      const message = {
+        to: pushToken,
+        sound: 'default',
+        title: senderName,
+        body: displayText,
+        data: {
+          type: 'message',
+          conversationId,
+        },
+        priority: 'high',
+        channelId: 'default',
+      };
+
+      const response = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Accept-encoding': 'gzip, deflate',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(message),
+      });
+
+      const result = await response.json();
+      console.log(
+        `📢 Broadcast message notification sent to ${senderName}:`,
+        result
+      );
+    } catch (error) {
+      console.error('Error broadcasting message notification:', error);
     }
   }
 

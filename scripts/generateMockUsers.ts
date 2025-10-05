@@ -17,7 +17,6 @@ import { geohashForLocation } from 'geofire-common';
 //TODO: add view images
 //TODO: on match make sure image occur in both users animations
 //TODO: notification for message received
-//TODO: when there is a chat already  - dont show the default text "it's a match! say hi", show the last message that received
 //TODO: make sure everything is LTR on english and RTL on hebrew
 //TODO: when there is a suggestion for email, dont skip fields that has already value ( jump to password  field)
 //TODO: add zodiac sign

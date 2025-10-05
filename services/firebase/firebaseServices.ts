@@ -44,6 +44,7 @@ import {
 } from '../../store/types';
 import storageService from '../storageService';
 import LocationService from '../locationService';
+import notificationService from '../notificationService';
 
 // ============================================
 // Utility Functions
@@ -2429,25 +2430,22 @@ export class FirebaseChatService implements IChatService {
       for (const convDoc of conversationsSnapshot.docs) {
         const convData = convDoc.data();
 
-        const messagesQuery = query(
-          collection(db, 'conversations', convDoc.id, 'messages'),
-          orderBy('timestamp', 'desc'),
-          limit(1)
-        );
-
-        const messagesSnapshot = await getDocs(messagesQuery);
-        const lastMessage = messagesSnapshot.docs[0]?.data();
+        // Use lastMessage from conversation document (more efficient)
+        const lastMessage = convData.lastMessage
+          ? {
+              id: 'last',
+              senderId: convData.lastMessage.senderId,
+              text: convData.lastMessage.text,
+              timestamp: convertTimestamp(convData.lastMessage.createdAt),
+              isRead: true,
+            }
+          : undefined;
 
         conversations.push({
           id: convDoc.id,
           participants: convData.participants,
           messages: [],
-          lastMessage: lastMessage
-            ? ({
-                ...lastMessage,
-                timestamp: convertTimestamp(lastMessage.timestamp),
-              } as ChatMessage)
-            : undefined,
+          lastMessage,
           createdAt: convertTimestamp(convData.createdAt),
           updatedAt: convertTimestamp(convData.updatedAt),
           unreadCount: convData.unreadCount || 0,
@@ -2600,6 +2598,32 @@ export class FirebaseChatService implements IChatService {
       }
 
       await updateDoc(doc(db, 'conversations', conversationId), updates);
+
+      // Send push notification to recipient
+      if (recipientId) {
+        try {
+          // Get sender's name
+          const senderDoc = await getDoc(doc(db, 'users', message.senderId));
+          const senderName = senderDoc.exists()
+            ? senderDoc.data().name
+            : 'Someone';
+
+          // Send notification asynchronously (don't wait for it)
+          notificationService
+            .broadcastMessageNotification(
+              recipientId,
+              senderName,
+              message.text,
+              conversationId
+            )
+            .catch((err) =>
+              console.error('Failed to send message notification:', err)
+            );
+        } catch (notifError) {
+          // Don't fail the message send if notification fails
+          console.error('Error sending notification:', notifError);
+        }
+      }
 
       const newMessage: ChatMessage = {
         id: messageRef.id,

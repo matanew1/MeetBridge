@@ -262,6 +262,8 @@ export default function ChatScreen() {
           return null;
         }
 
+        console.log('Mapped chat item:', conversation);
+
         // Show conversation even without messages (new matches)
         return {
           id: conversation.id,
