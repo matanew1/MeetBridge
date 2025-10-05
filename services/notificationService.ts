@@ -119,6 +119,14 @@ class NotificationService {
           lightColor: '#FF69B4',
           sound: 'default',
         });
+
+        await Notifications.setNotificationChannelAsync('messages', {
+          name: 'Messages',
+          importance: Notifications.AndroidImportance.HIGH,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#4A90E2',
+          sound: 'default',
+        });
       }
 
       return tokenData.data;
@@ -237,6 +245,12 @@ class NotificationService {
     matchId: string
   ) {
     try {
+      // Skip notifications on web platform (CORS issues + not supported)
+      if (Platform.OS === 'web') {
+        console.log('⚠️ Push notifications are not supported on web platform');
+        return;
+      }
+
       // Get the user's push token from Firebase
       const userRef = doc(db, 'users', userId);
       const userDoc = await getDoc(userRef);
@@ -302,6 +316,12 @@ class NotificationService {
     conversationId: string
   ) {
     try {
+      // Skip notifications on web platform (CORS issues + not supported)
+      if (Platform.OS === 'web') {
+        console.log('⚠️ Push notifications are not supported on web platform');
+        return;
+      }
+
       // Get the user's push token from Firebase
       const userRef = doc(db, 'users', userId);
       const userDoc = await getDoc(userRef);
@@ -328,6 +348,12 @@ class NotificationService {
           ? messageText.substring(0, 100) + '...'
           : messageText;
 
+      console.log(`📨 Preparing message notification:`, {
+        to: pushToken.substring(0, 20) + '...',
+        from: senderName,
+        conversationId,
+      });
+
       // Send push notification via Expo Push Notification service
       const message = {
         to: pushToken,
@@ -339,7 +365,7 @@ class NotificationService {
           conversationId,
         },
         priority: 'high',
-        channelId: 'default',
+        channelId: 'messages', // Use dedicated messages channel
       };
 
       const response = await fetch('https://exp.host/--/api/v2/push/send', {
@@ -353,10 +379,19 @@ class NotificationService {
       });
 
       const result = await response.json();
-      console.log(
-        `📢 Broadcast message notification sent to ${senderName}:`,
-        result
-      );
+
+      if (result.data?.status === 'ok') {
+        console.log(
+          `✅ Message notification sent successfully to ${senderName}`
+        );
+      } else {
+        console.error(
+          `❌ Message notification failed:`,
+          JSON.stringify(result, null, 2)
+        );
+      }
+
+      console.log(`📢 Full notification result:`, result);
     } catch (error) {
       console.error('Error broadcasting message notification:', error);
     }

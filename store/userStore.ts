@@ -73,6 +73,7 @@ interface UserState {
   // Actions - Discover
   loadDiscoverProfiles: (refresh?: boolean) => Promise<void>;
   loadMoreProfiles: () => Promise<void>;
+  loadMatches: () => Promise<void>; // Load existing matches from Firestore
   likeProfile: (profileId: string) => Promise<{
     isMatch: boolean;
     matchId?: string;
@@ -382,6 +383,42 @@ export const useUserStore = create<UserState>((set, get) => ({
 
     set({ currentPage: currentPage + 1 });
     await get().loadDiscoverProfiles();
+  },
+
+  loadMatches: async () => {
+    const { currentUser } = get();
+    if (!currentUser) {
+      console.log('No user logged in, skipping matches loading');
+      return;
+    }
+
+    console.log('🔄 Loading existing matches from Firestore...');
+    set({ isLoadingDiscover: true, error: null });
+
+    try {
+      const response = await matchingService.getMatches(currentUser.id);
+
+      if (response.success) {
+        const matchedUsers = response.data;
+        console.log(
+          `✅ Loaded ${matchedUsers.length} matches:`,
+          matchedUsers.map((u) => u.id)
+        );
+
+        set({
+          matchedProfiles: matchedUsers.map((u) => u.id),
+          matchedProfilesData: matchedUsers,
+        });
+      } else {
+        console.error('❌ Failed to load matches:', response.message);
+        set({ error: response.message || 'Failed to load matches' });
+      }
+    } catch (error) {
+      console.error('❌ Error loading matches:', error);
+      set({ error: 'Failed to load matches' });
+    } finally {
+      set({ isLoadingDiscover: false });
+    }
   },
 
   likeProfile: async (profileId) => {

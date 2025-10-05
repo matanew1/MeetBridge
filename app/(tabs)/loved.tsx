@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  FlatList,
   Image,
   TouchableOpacity,
   Alert,
   Animated,
+  ListRenderItemInfo,
 } from 'react-native';
 import { Heart, MessageCircle, Users, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
@@ -35,183 +36,196 @@ interface LikedProfileCardProps {
   index: number;
 }
 
-const LikedProfileCard = ({
-  user,
-  onMessage,
-  onPress,
-  onUnmatch,
-  isMatch = false,
-  theme,
-  index,
-}: LikedProfileCardProps) => {
-  const { t } = useTranslation();
-  const slideAnim = React.useRef(new Animated.Value(50)).current;
-  const fadeAnim = React.useRef(new Animated.Value(0)).current;
-  const scaleAnim = React.useRef(new Animated.Value(0.9)).current;
-  const heartAnim = React.useRef(new Animated.Value(1)).current;
+// Memoized card component for better performance
+const LikedProfileCard = React.memo(
+  ({
+    user,
+    onMessage,
+    onPress,
+    onUnmatch,
+    isMatch = false,
+    theme,
+    index,
+  }: LikedProfileCardProps) => {
+    const { t } = useTranslation();
+    const slideAnim = React.useRef(new Animated.Value(50)).current;
+    const fadeAnim = React.useRef(new Animated.Value(0)).current;
+    const scaleAnim = React.useRef(new Animated.Value(0.9)).current;
+    const heartAnim = React.useRef(new Animated.Value(1)).current;
 
-  useEffect(() => {
-    // Staggered entrance animation
-    Animated.parallel([
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 500,
-        delay: index * 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 500,
-        delay: index * 100,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        tension: 50,
-        friction: 7,
-        delay: index * 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    useEffect(() => {
+      // Reduced animation durations for snappier feel
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          delay: index * 50, // Reduced delay
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          delay: index * 50,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 60,
+          friction: 8,
+          delay: index * 50,
+          useNativeDriver: true,
+        }),
+      ]).start();
 
-    // Heart pulse animation for matches
-    if (isMatch) {
-      const pulse = () => {
-        Animated.sequence([
-          Animated.timing(heartAnim, {
-            toValue: 1.2,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-          Animated.timing(heartAnim, {
-            toValue: 1,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-        ]).start(() => pulse());
-      };
-      pulse();
-    }
-  }, [index, isMatch]);
+      // Heart pulse animation for matches
+      if (isMatch) {
+        const pulse = () => {
+          Animated.sequence([
+            Animated.timing(heartAnim, {
+              toValue: 1.2,
+              duration: 600, // Slightly faster
+              useNativeDriver: true,
+            }),
+            Animated.timing(heartAnim, {
+              toValue: 1,
+              duration: 600,
+              useNativeDriver: true,
+            }),
+          ]).start(() => pulse());
+        };
+        pulse();
+      }
+    }, [index, isMatch]);
 
-  const handleUnmatchPress = (e: any) => {
-    e.stopPropagation();
-    console.log('Unmatch button pressed for user:', user.id);
-    if (onUnmatch) {
-      onUnmatch(user.id);
-    }
-  };
+    const handleUnmatchPress = (e: any) => {
+      e.stopPropagation();
+      console.log('Unmatch button pressed for user:', user.id);
+      if (onUnmatch) {
+        onUnmatch(user.id);
+      }
+    };
 
-  const handleMessagePress = (e: any) => {
-    e.stopPropagation();
-    if (onMessage) {
-      onMessage(user.id);
-    }
-  };
+    const handleMessagePress = (e: any) => {
+      e.stopPropagation();
+      if (onMessage) {
+        onMessage(user.id);
+      }
+    };
 
-  return (
-    <Animated.View
-      style={[
-        styles.cardContainer,
-        {
-          transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
-          opacity: fadeAnim,
-        },
-      ]}
-    >
-      <TouchableOpacity
-        style={[styles.card, { backgroundColor: theme.cardBackground }]}
-        onPress={() => onPress?.(user)}
-        activeOpacity={0.8}
+    return (
+      <Animated.View
+        style={[
+          styles.cardContainer,
+          {
+            transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
+            opacity: fadeAnim,
+          },
+        ]}
       >
-        <View style={styles.imageContainer}>
-          <Image
-            source={{ uri: user.image }}
-            style={styles.cardImage}
-            resizeMode="cover"
-          />
-          <Animated.View
-            style={[
-              styles.heartOverlay,
-              { backgroundColor: theme.surface },
-              isMatch && [
-                styles.matchOverlay,
-                { backgroundColor: theme.success + '20' },
-              ],
-              {
-                transform: [{ scale: heartAnim }],
-              },
-            ]}
-          >
-            {isMatch ? (
-              <Users size={16} color={theme.success} />
-            ) : (
-              <Heart size={16} color="#FF69B4" fill="#FF69B4" />
-            )}
-          </Animated.View>
-        </View>
-        <View style={styles.cardInfo}>
-          <Text style={[styles.cardTitle, { color: theme.text }]}>
-            {user.name}, {user.age}
-          </Text>
-          {user.distance && (
-            <Text style={[styles.distanceText, { color: theme.textSecondary }]}>
-              {user.distance} {t('search.distance')} {t('profile.distance')}
-            </Text>
-          )}
-          {user.bio && (
-            <Text
-              style={[styles.bioText, { color: theme.textSecondary }]}
-              numberOfLines={2}
-            >
-              {user.bio}
-            </Text>
-          )}
-        </View>
-
-        {/* Action buttons for matches */}
-        {isMatch && (
-          <View style={styles.matchActions}>
-            <TouchableOpacity
+        <TouchableOpacity
+          style={[styles.card, { backgroundColor: theme.cardBackground }]}
+          onPress={() => onPress?.(user)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.imageContainer}>
+            <Image
+              source={{ uri: user.image }}
+              style={styles.cardImage}
+              resizeMode="cover"
+            />
+            <Animated.View
               style={[
-                styles.messageButton,
-                styles.matchMessageButton,
-                { backgroundColor: theme.success + '20' },
-              ]}
-              onPress={handleMessagePress}
-            >
-              <MessageCircle size={20} color={theme.success} />
-              <Text
-                style={[
-                  styles.messageText,
-                  styles.matchMessageText,
-                  { color: theme.success },
-                ]}
-              >
-                {t('loved.message')}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.unmatchButton,
+                styles.heartOverlay,
+                { backgroundColor: theme.surface },
+                isMatch && [
+                  styles.matchOverlay,
+                  { backgroundColor: theme.success + '20' },
+                ],
                 {
-                  backgroundColor: theme.errorBackground,
-                  borderColor: theme.error + '40',
+                  transform: [{ scale: heartAnim }],
                 },
               ]}
-              onPress={handleUnmatchPress}
             >
-              <Text style={[styles.unmatchText, { color: theme.error }]}>
-                {t('loved.unmatch')}
-              </Text>
-            </TouchableOpacity>
+              {isMatch ? (
+                <Users size={16} color={theme.success} />
+              ) : (
+                <Heart size={16} color="#FF69B4" fill="#FF69B4" />
+              )}
+            </Animated.View>
           </View>
-        )}
-      </TouchableOpacity>
-    </Animated.View>
-  );
-};
+          <View style={styles.cardInfo}>
+            <Text style={[styles.cardTitle, { color: theme.text }]}>
+              {user.name}, {user.age}
+            </Text>
+            {user.distance && (
+              <Text
+                style={[styles.distanceText, { color: theme.textSecondary }]}
+              >
+                {user.distance} {t('search.distance')} {t('profile.distance')}
+              </Text>
+            )}
+            {user.bio && (
+              <Text
+                style={[styles.bioText, { color: theme.textSecondary }]}
+                numberOfLines={2}
+              >
+                {user.bio}
+              </Text>
+            )}
+          </View>
+
+          {/* Action buttons for matches */}
+          {isMatch && (
+            <View style={styles.matchActions}>
+              <TouchableOpacity
+                style={[
+                  styles.messageButton,
+                  styles.matchMessageButton,
+                  { backgroundColor: theme.success + '20' },
+                ]}
+                onPress={handleMessagePress}
+              >
+                <MessageCircle size={20} color={theme.success} />
+                <Text
+                  style={[
+                    styles.messageText,
+                    styles.matchMessageText,
+                    { color: theme.success },
+                  ]}
+                >
+                  {t('loved.message')}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.unmatchButton,
+                  {
+                    backgroundColor: theme.errorBackground,
+                    borderColor: theme.error + '40',
+                  },
+                ]}
+                onPress={handleUnmatchPress}
+              >
+                <Text style={[styles.unmatchText, { color: theme.error }]}>
+                  {t('loved.unmatch')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  },
+  (prevProps, nextProps) => {
+    // Custom comparison for optimal re-rendering
+    return (
+      prevProps.user.id === nextProps.user.id &&
+      prevProps.isMatch === nextProps.isMatch &&
+      prevProps.theme === nextProps.theme
+    );
+  }
+);
 
 export default function LovedScreen() {
   const { t } = useTranslation();
@@ -222,8 +236,8 @@ export default function LovedScreen() {
     discoverProfiles,
     likedProfiles,
     matchedProfiles,
-    getLikedProfiles,
-    getMatchedProfiles,
+    likedProfilesData: likedProfilesDataRaw,
+    matchedProfilesData: matchedProfilesDataRaw,
     likeProfile,
     dislikeProfile,
     unmatchProfile,
@@ -293,6 +307,11 @@ export default function LovedScreen() {
 
     loadCurrentUser(); // Ensure current user is loaded for actions
     loadConversations(); // Load existing conversations
+
+    // Load existing matches from Firestore
+    const { loadMatches } = useUserStore.getState();
+    loadMatches();
+
     if (discoverProfiles.length === 0) {
       loadDiscoverProfiles(true);
     }
@@ -381,45 +400,63 @@ export default function LovedScreen() {
     };
   }, [selectedProfile]);
 
-  // Get liked and matched profiles from store
-  const likedProfilesDataRaw = getLikedProfiles();
-  const matchedProfilesDataRaw = getMatchedProfiles();
+  // Get liked and matched profiles from store with useMemo for performance
+  const likedProfilesData = useMemo(() => {
+    console.log(
+      '📋 Raw liked profiles:',
+      likedProfilesDataRaw.length,
+      likedProfilesDataRaw.map((p) => p.id)
+    );
+    // Deduplicate profiles by ID to prevent duplicate key errors
+    return likedProfilesDataRaw.filter(
+      (profile, index, self) =>
+        index === self.findIndex((p) => p.id === profile.id)
+    );
+  }, [likedProfilesDataRaw]);
 
-  // Deduplicate profiles by ID to prevent duplicate key errors
-  const likedProfilesData = likedProfilesDataRaw.filter(
-    (profile, index, self) =>
-      index === self.findIndex((p) => p.id === profile.id)
-  );
-
-  const matchedProfilesData = matchedProfilesDataRaw.filter(
-    (profile, index, self) =>
-      index === self.findIndex((p) => p.id === profile.id)
-  );
+  const matchedProfilesData = useMemo(() => {
+    console.log(
+      '💑 Raw matched profiles:',
+      matchedProfilesDataRaw.length,
+      matchedProfilesDataRaw.map((p) => p.id)
+    );
+    // Deduplicate profiles by ID to prevent duplicate key errors
+    return matchedProfilesDataRaw.filter(
+      (profile, index, self) =>
+        index === self.findIndex((p) => p.id === profile.id)
+    );
+  }, [matchedProfilesDataRaw]);
 
   // Get only liked profiles that are not matches
-  const onlyLikedProfiles = likedProfilesData.filter(
-    (profile) => !matchedProfilesData.some((match) => match.id === profile.id)
+  const onlyLikedProfiles = useMemo(() => {
+    return likedProfilesData.filter(
+      (profile) => !matchedProfilesData.some((match) => match.id === profile.id)
+    );
+  }, [likedProfilesData, matchedProfilesData]);
+
+  // Memoized handlers for better performance
+  const handleMessage = useCallback(
+    async (profileId: string) => {
+      console.log('Creating/finding conversation for:', profileId);
+
+      // Create conversation if it doesn't exist
+      await createConversation(profileId);
+
+      // Navigate to chat tab when message button is clicked
+      router.push('/chat');
+    },
+    [createConversation, router]
   );
 
-  const handleMessage = async (profileId: string) => {
-    console.log('Creating/finding conversation for:', profileId);
-
-    // Create conversation if it doesn't exist
-    await createConversation(profileId);
-
-    // Navigate to chat tab when message button is clicked
-    router.push('/chat');
-  };
-
-  const handleUnmatch = (profileId: string) => {
+  const handleUnmatch = useCallback((profileId: string) => {
     console.log('handleUnmatch called with profileId:', profileId);
 
     // Use custom modal instead of Alert.alert
     setUnmatchProfileId(profileId);
     setShowUnmatchConfirm(true);
-  };
+  }, []);
 
-  const confirmUnmatch = () => {
+  const confirmUnmatch = useCallback(() => {
     if (unmatchProfileId) {
       console.log('Confirming unmatch for:', unmatchProfileId);
       unmatchProfile(unmatchProfileId);
@@ -427,67 +464,91 @@ export default function LovedScreen() {
     }
     setShowUnmatchConfirm(false);
     setUnmatchProfileId(null);
-  };
+  }, [unmatchProfileId, unmatchProfile]);
 
-  const cancelUnmatch = () => {
+  const cancelUnmatch = useCallback(() => {
     setShowUnmatchConfirm(false);
     setUnmatchProfileId(null);
-  };
+  }, []);
 
-  const handleProfilePress = (user: any) => {
+  const handleProfilePress = useCallback((user: any) => {
     setSelectedProfile(user);
     setShowProfileDetail(true);
-  };
+  }, []);
 
-  const handleCloseProfile = () => {
+  const handleCloseProfile = useCallback(() => {
     setShowProfileDetail(false);
     setSelectedProfile(null);
-  };
+  }, []);
 
-  const handleLike = (profileId: string) => {
-    likeProfile(profileId);
-    handleCloseProfile();
-  };
-
-  const handleDislike = (profileId: string) => {
-    dislikeProfile(profileId);
-    handleCloseProfile();
-  };
-
-  const renderEmptyState = (type: 'loved' | 'matches') => (
-    <View style={styles.emptyState}>
-      {type === 'loved' ? (
-        <Heart size={60} color={theme.textSecondary} />
-      ) : (
-        <Users size={60} color={theme.textSecondary} />
-      )}
-      <Text style={[styles.emptyTitle, { color: theme.text }]}>
-        {type === 'loved' ? t('loved.noLiked') : t('loved.noMatches')}
-      </Text>
-      <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-        {type === 'loved' ? t('loved.keepSwiping') : t('loved.startSwiping')}
-      </Text>
-    </View>
+  const handleLike = useCallback(
+    (profileId: string) => {
+      likeProfile(profileId);
+      handleCloseProfile();
+    },
+    [likeProfile]
   );
 
-  const renderProfileGrid = (profiles: any[], isMatch: boolean = false) => (
-    <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-      <View style={styles.grid}>
-        {profiles.map((user, index) => (
-          <View key={user.id} style={styles.gridItem}>
-            <LikedProfileCard
-              user={user}
-              onMessage={handleMessage}
-              onPress={handleProfilePress}
-              onUnmatch={handleUnmatch}
-              isMatch={isMatch}
-              theme={theme}
-              index={index}
-            />
-          </View>
-        ))}
+  const handleDislike = useCallback(
+    (profileId: string) => {
+      dislikeProfile(profileId);
+      handleCloseProfile();
+    },
+    [dislikeProfile]
+  );
+
+  // Memoized empty state component
+  const renderEmptyState = useCallback(
+    (type: 'loved' | 'matches') => (
+      <View style={styles.emptyState}>
+        {type === 'loved' ? (
+          <Heart size={60} color={theme.textSecondary} />
+        ) : (
+          <Users size={60} color={theme.textSecondary} />
+        )}
+        <Text style={[styles.emptyTitle, { color: theme.text }]}>
+          {type === 'loved' ? t('loved.noLiked') : t('loved.noMatches')}
+        </Text>
+        <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+          {type === 'loved' ? t('loved.keepSwiping') : t('loved.startSwiping')}
+        </Text>
       </View>
-    </ScrollView>
+    ),
+    [theme, t]
+  );
+
+  // FlatList render item with useCallback for optimal performance
+  const renderItem = useCallback(
+    ({ item, index }: ListRenderItemInfo<any>) => {
+      const isMatch = activeTab === 'matches';
+      return (
+        <View style={styles.gridItem}>
+          <LikedProfileCard
+            user={item}
+            onMessage={handleMessage}
+            onPress={handleProfilePress}
+            onUnmatch={handleUnmatch}
+            isMatch={isMatch}
+            theme={theme}
+            index={index}
+          />
+        </View>
+      );
+    },
+    [activeTab, handleMessage, handleProfilePress, handleUnmatch, theme]
+  );
+
+  // Key extractor for FlatList
+  const keyExtractor = useCallback((item: any) => item.id, []);
+
+  // Get item layout for better scroll performance
+  const getItemLayout = useCallback(
+    (data: any, index: number) => ({
+      length: 190, // Approximate height of card + margin
+      offset: 190 * index,
+      index,
+    }),
+    []
   );
 
   return (
@@ -576,7 +637,7 @@ export default function LovedScreen() {
         </TouchableOpacity>
       </Animated.View>
 
-      {/* Tab Content */}
+      {/* Tab Content with FlatList */}
       <Animated.View
         style={[
           styles.contentContainer,
@@ -586,13 +647,41 @@ export default function LovedScreen() {
           },
         ]}
       >
-        {activeTab === 'loved'
-          ? onlyLikedProfiles.length === 0
-            ? renderEmptyState('loved')
-            : renderProfileGrid(onlyLikedProfiles, false)
-          : matchedProfilesData.length === 0
-          ? renderEmptyState('matches')
-          : renderProfileGrid(matchedProfilesData, true)}
+        {activeTab === 'loved' ? (
+          onlyLikedProfiles.length === 0 ? (
+            renderEmptyState('loved')
+          ) : (
+            <FlatList
+              data={onlyLikedProfiles}
+              renderItem={renderItem}
+              keyExtractor={keyExtractor}
+              getItemLayout={getItemLayout}
+              contentContainerStyle={styles.flatListContent}
+              showsVerticalScrollIndicator={false}
+              removeClippedSubviews={true}
+              maxToRenderPerBatch={10}
+              updateCellsBatchingPeriod={50}
+              windowSize={5}
+              initialNumToRender={6}
+            />
+          )
+        ) : matchedProfilesData.length === 0 ? (
+          renderEmptyState('matches')
+        ) : (
+          <FlatList
+            data={matchedProfilesData}
+            renderItem={renderItem}
+            keyExtractor={keyExtractor}
+            getItemLayout={getItemLayout}
+            contentContainerStyle={styles.flatListContent}
+            showsVerticalScrollIndicator={false}
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={10}
+            updateCellsBatchingPeriod={50}
+            windowSize={5}
+            initialNumToRender={6}
+          />
+        )}
       </Animated.View>
 
       {/* Profile Detail Modal */}
@@ -748,10 +837,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
-  scrollView: {
-    flex: 1,
-  },
-  grid: {
+  flatListContent: {
     paddingHorizontal: 16,
     paddingBottom: 100,
   },
@@ -798,6 +884,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 2,
   },
+  matchOverlay: {
+    // Additional styling for match badge
+  },
   cardInfo: {
     alignItems: 'center',
     marginBottom: 16,
@@ -828,10 +917,16 @@ const styles = StyleSheet.create({
   matchActions: {
     width: '100%',
   },
+  matchMessageButton: {
+    // Additional styling for match message button
+  },
   messageText: {
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  matchMessageText: {
+    // Additional styling for match message text
   },
   unmatchButton: {
     paddingVertical: 8,

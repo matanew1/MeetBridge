@@ -2602,11 +2602,19 @@ export class FirebaseChatService implements IChatService {
       // Send push notification to recipient
       if (recipientId) {
         try {
+          console.log(
+            `🔔 Attempting to send notification to recipient: ${recipientId}`
+          );
+
           // Get sender's name
           const senderDoc = await getDoc(doc(db, 'users', message.senderId));
           const senderName = senderDoc.exists()
             ? senderDoc.data().name
             : 'Someone';
+
+          console.log(
+            `📤 Sending notification from ${senderName} to recipient ${recipientId}`
+          );
 
           // Send notification asynchronously (don't wait for it)
           notificationService
@@ -2616,13 +2624,20 @@ export class FirebaseChatService implements IChatService {
               message.text,
               conversationId
             )
-            .catch((err) =>
-              console.error('Failed to send message notification:', err)
-            );
+            .then(() => {
+              console.log(
+                `✅ Notification request completed for ${senderName}`
+              );
+            })
+            .catch((err) => {
+              console.error('❌ Failed to send message notification:', err);
+            });
         } catch (notifError) {
           // Don't fail the message send if notification fails
-          console.error('Error sending notification:', notifError);
+          console.error('❌ Error preparing notification:', notifError);
         }
+      } else {
+        console.warn('⚠️ No recipientId found, skipping notification');
       }
 
       const newMessage: ChatMessage = {

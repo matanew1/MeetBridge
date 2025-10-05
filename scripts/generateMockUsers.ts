@@ -12,11 +12,9 @@ import {
 import { geohashForLocation } from 'geofire-common';
 
 //TODO: remove unused fields
-//TODO: add to mock more images to view them later
-//TODO: when unmatch remove the chats in both users
-//TODO: add view images
-//TODO: on match make sure image occur in both users animations
-//TODO: notification for message received
+//CHECK: when unmatch make sure to remove from both users related collections the chats in both users ✅ (Implemented in unmatchProfile - deletes match, conversation, all messages, creates 24h ban both directions)
+//CHECK: on match make sure image occur in both users animations ✅ (matchedUser data includes image field, used in EnhancedMatchAnimation)
+//CHECK: notification for message received ✅ (Implemented in sendMessage with broadcastMessageNotification)
 //TODO: make sure everything is LTR on english and RTL on hebrew
 //TODO: when there is a suggestion for email, dont skip fields that has already value ( jump to password  field)
 //TODO: add zodiac sign
@@ -69,33 +67,26 @@ function getRandomPlaceholderImage(
   gender: 'male' | 'female',
   seed: number
 ): string {
-  // Using UI Avatars as placeholder - generates random avatars based on name
-  // Alternative services: RandomUser.me, Pravatar.cc, UIFaces.com
-  const backgrounds = [
-    '8b5cf6',
-    'ec4899',
-    '3b82f6',
-    '10b981',
-    'f59e0b',
-    'ef4444',
-  ];
-  const bgColor = backgrounds[seed % backgrounds.length];
-
   // Using a more diverse set of placeholder images
+  // Each service has different image IDs to maximize variety
   if (gender === 'female') {
     const femaleImages = [
-      `https://i.pravatar.cc/400?img=${44 + seed}`, // pravatar female images
-      `https://randomuser.me/api/portraits/women/${seed + 1}.jpg`,
-      `https://xsgames.co/randomusers/assets/avatars/female/${seed}.jpg`,
+      `https://i.pravatar.cc/400?img=${44 + (seed % 25)}`, // pravatar female images (44-68)
+      `https://randomuser.me/api/portraits/women/${(seed % 96) + 1}.jpg`, // randomuser (1-96)
+      `https://xsgames.co/randomusers/assets/avatars/female/${seed % 78}.jpg`, // xsgames (0-77)
     ];
-    return femaleImages[seed % femaleImages.length];
+    // Distribute seed across different services for variety
+    const serviceIndex = Math.floor(seed / 30) % 3;
+    return femaleImages[serviceIndex];
   } else {
     const maleImages = [
-      `https://i.pravatar.cc/400?img=${10 + seed}`, // pravatar male images
-      `https://randomuser.me/api/portraits/men/${seed + 1}.jpg`,
-      `https://xsgames.co/randomusers/assets/avatars/male/${seed}.jpg`,
+      `https://i.pravatar.cc/400?img=${10 + (seed % 33)}`, // pravatar male images (10-42)
+      `https://randomuser.me/api/portraits/men/${(seed % 96) + 1}.jpg`, // randomuser (1-96)
+      `https://xsgames.co/randomusers/assets/avatars/male/${seed % 78}.jpg`, // xsgames (0-77)
     ];
-    return maleImages[seed % maleImages.length];
+    // Distribute seed across different services for variety
+    const serviceIndex = Math.floor(seed / 30) % 3;
+    return maleImages[serviceIndex];
   }
 }
 
@@ -312,8 +303,20 @@ async function createMockUser(userData: (typeof mockUsers)[0], index: number) {
     const birthYear = today.getFullYear() - userData.age;
     const dateOfBirth = new Date(birthYear, 0, 1);
 
-    // Generate random placeholder image
-    const placeholderImage = getRandomPlaceholderImage(userData.gender, index);
+    // Generate multiple random placeholder images (2-5 images per user)
+    const imageCount = Math.floor(Math.random() * 4) + 2; // Random 2-5 images
+    const placeholderImages: string[] = [];
+
+    for (let imgIndex = 0; imgIndex < imageCount; imgIndex++) {
+      const img = getRandomPlaceholderImage(
+        userData.gender,
+        index * 10 + imgIndex
+      );
+      placeholderImages.push(img);
+    }
+
+    // Ensure the main 'image' field is always the first image in the 'images' array
+    const placeholderImage = placeholderImages[0]; // Main image (first in array)
 
     // Create Firestore document
     const userDoc = {
@@ -328,8 +331,8 @@ async function createMockUser(userData: (typeof mockUsers)[0], index: number) {
       bio: userData.bio,
       interests: userData.interests,
       height: userData.height,
-      image: placeholderImage,
-      images: [placeholderImage],
+      image: placeholderImage, // First image (images[0])
+      images: placeholderImages, // Full array including the first image
       location: 'Tel Aviv, Israel',
       coordinates: {
         latitude: location.latitude,

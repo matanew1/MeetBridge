@@ -1,5 +1,5 @@
 // app/(tabs)/search.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import {
   View,
   Text,
@@ -7,8 +7,9 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
-  ScrollView,
+  FlatList,
   ActivityIndicator,
+  ListRenderItemInfo,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Heart, X, Filter, RefreshCw } from 'lucide-react-native';
@@ -46,6 +47,7 @@ interface ProfileCardProps {
     age: number;
     distance?: number | null;
     image: string;
+    images?: string[];
   };
   onLike: (id: string) => void;
   onDislike: (id: string) => void;
@@ -56,130 +58,214 @@ interface ProfileCardProps {
   theme: any;
 }
 
-const ProfileCard = ({
-  user,
-  onLike,
-  onDislike,
-  onPress,
-  isLiked,
-  isDisliked,
-  isAnimatingOut,
-  theme,
-}: ProfileCardProps) => {
-  const { t } = useTranslation();
-  const opacity = useSharedValue(0);
-  const translateY = useSharedValue(20);
-  const scale = useSharedValue(0.9);
+const ProfileCard = memo(
+  ({
+    user,
+    onLike,
+    onDislike,
+    onPress,
+    isLiked,
+    isDisliked,
+    isAnimatingOut,
+    theme,
+  }: ProfileCardProps) => {
+    const { t } = useTranslation();
+    const opacity = useSharedValue(0);
+    const translateY = useSharedValue(20);
+    const scale = useSharedValue(0.9);
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-  React.useEffect(() => {
-    opacity.value = withTiming(1, {
-      duration: 250,
-      easing: Easing.out(Easing.ease),
-    });
-    translateY.value = withTiming(0, {
-      duration: 250,
-      easing: Easing.out(Easing.ease),
-    });
-    scale.value = withSpring(1, { damping: 15, stiffness: 200 });
-  }, []);
+    // Get user images always user.image and if images > 0 then use images array (which already includes user.image as first item)
+    const userImages = useMemo(
+      () =>
+        user.images && user.images.length > 0 ? user.images : [user.image],
+      [user.images, user.image]
+    );
 
-  React.useEffect(() => {
-    if (isAnimatingOut) {
-      opacity.value = withTiming(0, {
-        duration: 200,
-        easing: Easing.in(Easing.ease),
+    React.useEffect(() => {
+      opacity.value = withTiming(1, {
+        duration: 250,
+        easing: Easing.out(Easing.ease),
       });
-      translateY.value = withTiming(isLiked || !isDisliked ? -100 : 100, {
-        duration: 200,
-        easing: Easing.in(Easing.ease),
+      translateY.value = withTiming(0, {
+        duration: 250,
+        easing: Easing.out(Easing.ease),
       });
-      scale.value = withSequence(
-        withTiming(1.03, { duration: 60, easing: Easing.out(Easing.ease) }),
-        withTiming(0.8, { duration: 140, easing: Easing.in(Easing.ease) })
-      );
-    }
-  }, [isAnimatingOut, isLiked, isDisliked]);
+      scale.value = withSpring(1, { damping: 15, stiffness: 200 });
+    }, []);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: translateY.value }, { scale: scale.value }],
-  }));
+    React.useEffect(() => {
+      if (isAnimatingOut) {
+        opacity.value = withTiming(0, {
+          duration: 200,
+          easing: Easing.in(Easing.ease),
+        });
+        translateY.value = withTiming(isLiked || !isDisliked ? -100 : 100, {
+          duration: 200,
+          easing: Easing.in(Easing.ease),
+        });
+        scale.value = withSequence(
+          withTiming(1.03, { duration: 60, easing: Easing.out(Easing.ease) }),
+          withTiming(0.8, { duration: 140, easing: Easing.in(Easing.ease) })
+        );
+      }
+    }, [isAnimatingOut, isLiked, isDisliked]);
 
-  // Safely get image URI
-  const imageUri = user.image || '';
-  const hasValidImage = imageUri && imageUri.trim().length > 0;
+    const animatedStyle = useAnimatedStyle(() => ({
+      opacity: opacity.value,
+      transform: [{ translateY: translateY.value }, { scale: scale.value }],
+    }));
 
-  return (
-    <Animated.View style={[styles.cardContainer, animatedStyle]}>
-      <TouchableOpacity
-        style={[
-          styles.card,
-          { backgroundColor: theme.cardBackground },
-          isLiked && styles.likedCard,
-          isDisliked && styles.dislikedCard,
-        ]}
-        onPress={() => onPress(user)}
-        disabled={isLiked || isDisliked || isAnimatingOut}
-      >
-        <View style={styles.imageContainer}>
-          <Image
-            source={
-              hasValidImage
-                ? { uri: imageUri }
-                : require('../../assets/images/placeholder.png')
-            }
-            style={styles.cardImage}
-            resizeMode="cover"
-          />
-        </View>
-        <View style={styles.cardInfo}>
-          <Text style={[styles.cardText, { color: theme.text }]}>
-            {user.name || 'Unknown'}, {user.age || 0}
-          </Text>
-        </View>
+    // Navigate to previous image
+    const handlePreviousImage = (e: any) => {
+      e.stopPropagation(); // Prevent opening profile
+      if (currentImageIndex > 0) {
+        setCurrentImageIndex(currentImageIndex - 1);
+      }
+    };
 
-        {/* Action buttons */}
-        <View style={styles.cardActions}>
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.dislikeBtn]}
-            onPress={(e) => {
-              e.stopPropagation();
-              onDislike(user.id);
-            }}
-            disabled={isDisliked || isLiked}
-          >
-            <X size={16} color="#FF6B6B" />
-          </TouchableOpacity>
+    // Navigate to next image
+    const handleNextImage = (e: any) => {
+      e.stopPropagation(); // Prevent opening profile
+      if (currentImageIndex < userImages.length - 1) {
+        setCurrentImageIndex(currentImageIndex + 1);
+      }
+    };
 
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.likeBtn]}
-            onPress={(e) => {
-              e.stopPropagation();
-              onLike(user.id);
-            }}
-            disabled={isLiked || isDisliked}
-          >
-            <Heart
-              size={16}
-              color="#FF69B4"
-              fill={isLiked ? '#FF69B4' : 'transparent'}
+    // Safely get image URI
+    const currentImageUri = userImages[currentImageIndex] || '';
+    const hasValidImage = currentImageUri && currentImageUri.trim().length > 0;
+
+    return (
+      <Animated.View style={[styles.cardContainer, animatedStyle]}>
+        <TouchableOpacity
+          style={[
+            styles.card,
+            { backgroundColor: theme.cardBackground },
+            isLiked && styles.likedCard,
+            isDisliked && styles.dislikedCard,
+          ]}
+          onPress={() => onPress(user)}
+          disabled={isLiked || isDisliked || isAnimatingOut}
+          activeOpacity={0.7}
+        >
+          <View style={styles.imageContainer}>
+            <Image
+              source={
+                hasValidImage
+                  ? { uri: currentImageUri }
+                  : require('../../assets/images/placeholder.png')
+              }
+              style={styles.cardImage}
+              resizeMode="cover"
             />
-          </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
 
-      {user.distance !== null && user.distance !== undefined && (
-        <View style={styles.distanceContainer}>
-          <Text style={styles.distanceText}>
-            {user.distance >= 1000
-              ? `${(user.distance / 1000).toFixed(1)}km`
-              : `${Math.round(user.distance)}m`}
-          </Text>
-        </View>
-      )}
-    </Animated.View>
-  );
-};
+            {/* Image navigation zones - only show if multiple images */}
+            {userImages.length > 1 && (
+              <>
+                {/* Left tap zone - previous image */}
+                {currentImageIndex > 0 && (
+                  <TouchableOpacity
+                    style={styles.imageNavLeft}
+                    onPress={handlePreviousImage}
+                    activeOpacity={1}
+                  />
+                )}
+
+                {/* Right tap zone - next image */}
+                {currentImageIndex < userImages.length - 1 && (
+                  <TouchableOpacity
+                    style={styles.imageNavRight}
+                    onPress={handleNextImage}
+                    activeOpacity={1}
+                  />
+                )}
+              </>
+            )}
+
+            {/* White dots indicator */}
+            {userImages.length > 1 && (
+              <View style={styles.cardDotsContainer}>
+                {userImages.map((_, index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.cardDot,
+                      {
+                        backgroundColor:
+                          index === currentImageIndex
+                            ? '#FFF'
+                            : 'rgba(255, 255, 255, 0.5)',
+                        width: index === currentImageIndex ? 7 : 5,
+                        height: index === currentImageIndex ? 7 : 5,
+                      },
+                    ]}
+                  />
+                ))}
+              </View>
+            )}
+          </View>
+          <View style={styles.cardInfo}>
+            <Text style={[styles.cardText, { color: theme.text }]}>
+              {user.name || 'Unknown'}, {user.age || 0}
+            </Text>
+          </View>
+
+          {/* Action buttons */}
+          <View style={styles.cardActions}>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.dislikeBtn]}
+              onPress={(e) => {
+                e.stopPropagation();
+                onDislike(user.id);
+              }}
+              disabled={isDisliked || isLiked}
+            >
+              <X size={16} color="#FF6B6B" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.likeBtn]}
+              onPress={(e) => {
+                e.stopPropagation();
+                onLike(user.id);
+              }}
+              disabled={isLiked || isDisliked}
+            >
+              <Heart
+                size={16}
+                color="#FF69B4"
+                fill={isLiked ? '#FF69B4' : 'transparent'}
+              />
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+
+        {user.distance !== null && user.distance !== undefined && (
+          <View style={styles.distanceContainer}>
+            <Text style={styles.distanceText}>
+              {user.distance >= 1000
+                ? `${(user.distance / 1000).toFixed(1)}km`
+                : `${Math.round(user.distance)}m`}
+            </Text>
+          </View>
+        )}
+      </Animated.View>
+    );
+  },
+  (prevProps, nextProps) => {
+    // Custom comparison function for memo - only re-render if these props change
+    return (
+      prevProps.user.id === nextProps.user.id &&
+      prevProps.isLiked === nextProps.isLiked &&
+      prevProps.isDisliked === nextProps.isDisliked &&
+      prevProps.isAnimatingOut === nextProps.isAnimatingOut &&
+      prevProps.user.image === nextProps.user.image &&
+      JSON.stringify(prevProps.user.images) ===
+        JSON.stringify(nextProps.user.images)
+    );
+  }
+);
 
 // Create discovery service instance outside component to avoid recreating
 const discoveryService = new FirebaseDiscoveryService();
@@ -250,24 +336,33 @@ export default function SearchScreen() {
 
   // Sort profiles by distance and filter out matched/liked/disliked profiles (handle null distances)
   // Also deduplicate by ID to prevent duplicate key errors
-  const sortedDiscoverProfiles = [...discoverProfiles]
-    .filter((profile) => !matchedProfiles.includes(profile.id)) // Exclude matched profiles
-    .filter((profile) => !likedProfiles.includes(profile.id)) // Exclude liked profiles
-    .filter((profile) => !dislikedProfiles.includes(profile.id)) // Exclude disliked profiles (24h block)
-    .filter((profile) => {
-      // Filter by age range (client-side safety check)
-      const profileAge = profile.age || 0;
-      return profileAge >= ageRange[0] && profileAge <= ageRange[1];
-    })
-    .filter(
-      (profile, index, self) =>
-        index === self.findIndex((p) => p.id === profile.id)
-    ) // Deduplicate by ID
-    .sort((a, b) => {
-      const distA = a.distance ?? Number.MAX_SAFE_INTEGER;
-      const distB = b.distance ?? Number.MAX_SAFE_INTEGER;
-      return distA - distB;
-    });
+  // Memoized for performance - only recalculate when dependencies change
+  const sortedDiscoverProfiles = useMemo(() => {
+    return [...discoverProfiles]
+      .filter((profile) => !matchedProfiles.includes(profile.id)) // Exclude matched profiles
+      .filter((profile) => !likedProfiles.includes(profile.id)) // Exclude liked profiles
+      .filter((profile) => !dislikedProfiles.includes(profile.id)) // Exclude disliked profiles (24h block)
+      .filter((profile) => {
+        // Filter by age range (client-side safety check)
+        const profileAge = profile.age || 0;
+        return profileAge >= ageRange[0] && profileAge <= ageRange[1];
+      })
+      .filter(
+        (profile, index, self) =>
+          index === self.findIndex((p) => p.id === profile.id)
+      ) // Deduplicate by ID
+      .sort((a, b) => {
+        const distA = a.distance ?? Number.MAX_SAFE_INTEGER;
+        const distB = b.distance ?? Number.MAX_SAFE_INTEGER;
+        return distA - distB;
+      });
+  }, [
+    discoverProfiles,
+    matchedProfiles,
+    likedProfiles,
+    dislikedProfiles,
+    ageRange,
+  ]);
 
   // Animation values
   const pulseAnimation = useSharedValue(0);
@@ -550,96 +645,152 @@ export default function SearchScreen() {
     };
   }, [currentUser?.id]);
 
-  const handleLike = (profileId: string) => {
-    console.log('handleLike called for profile:', profileId);
+  const handleLike = useCallback(
+    (profileId: string) => {
+      console.log('handleLike called for profile:', profileId);
 
-    // Find the user data before we remove it from the store
-    const userToLike = discoverProfiles.find((p) => p.id === profileId);
+      // Find the user data before we remove it from the store
+      const userToLike = discoverProfiles.find((p) => p.id === profileId);
 
-    // Add to animating cards immediately for UI feedback
-    setAnimatingOutCards((prev) => new Set([...prev, profileId]));
+      // Add to animating cards immediately for UI feedback
+      setAnimatingOutCards((prev) => new Set([...prev, profileId]));
 
-    // Delay the actual like action to allow animation to play
-    setTimeout(() => {
-      likeProfile(profileId)
-        .then((result) => {
-          // Remove from animating cards
-          setAnimatingOutCards((prev) => {
-            const newSet = new Set(prev);
-            newSet.delete(profileId);
-            return newSet;
-          });
-
-          // Check if it's a match using the new result structure
-          if (result.isMatch && result.matchedUser && result.matchId) {
-            // Mark this match as processed to prevent duplicate animation from real-time listener
-            processedMatchesRef.current.add(result.matchId);
-
-            // Use the new enhanced match animation
-            setMatchData({
-              user: result.matchedUser,
-              matchId: result.matchId,
-              conversationId: result.conversationId,
+      // Delay the actual like action to allow animation to play
+      setTimeout(() => {
+        likeProfile(profileId)
+          .then((result) => {
+            // Remove from animating cards
+            setAnimatingOutCards((prev) => {
+              const newSet = new Set(prev);
+              newSet.delete(profileId);
+              return newSet;
             });
-            setShowMatchAnimation(true);
 
-            // Only broadcast notification to the OTHER user (not to ourselves)
-            // The current user will get their notification from the real-time listener
-            if (currentUser) {
-              notificationService.broadcastMatchNotification(
-                result.matchedUser.id,
-                currentUser.name || 'Someone',
-                result.matchId
+            // Check if it's a match using the new result structure
+            if (result.isMatch && result.matchedUser && result.matchId) {
+              // Mark this match as processed to prevent duplicate animation from real-time listener
+              processedMatchesRef.current.add(result.matchId);
+
+              // Use the new enhanced match animation
+              setMatchData({
+                user: result.matchedUser,
+                matchId: result.matchId,
+                conversationId: result.conversationId,
+              });
+              setShowMatchAnimation(true);
+
+              // Only broadcast notification to the OTHER user (not to ourselves)
+              // The current user will get their notification from the real-time listener
+              if (currentUser) {
+                notificationService.broadcastMatchNotification(
+                  result.matchedUser.id,
+                  currentUser.name || 'Someone',
+                  result.matchId
+                );
+              }
+
+              console.log(
+                `✅ Match animation shown for: ${result.matchedUser.name} (from like action)`
+              );
+              console.log(
+                `📢 Broadcast notification sent to: ${result.matchedUser.name}`
               );
             }
-
-            console.log(
-              `✅ Match animation shown for: ${result.matchedUser.name} (from like action)`
-            );
-            console.log(
-              `📢 Broadcast notification sent to: ${result.matchedUser.name}`
-            );
-          }
-        })
-        .catch((error) => {
-          console.error('Error in handleLike:', error);
-          // Remove from animating cards even on error
-          setAnimatingOutCards((prev) => {
-            const newSet = new Set(prev);
-            newSet.delete(profileId);
-            return newSet;
+          })
+          .catch((error) => {
+            console.error('Error in handleLike:', error);
+            // Remove from animating cards even on error
+            setAnimatingOutCards((prev) => {
+              const newSet = new Set(prev);
+              newSet.delete(profileId);
+              return newSet;
+            });
           });
+      }, 200); // Reduced from 300ms to 200ms for faster animation
+    },
+    [discoverProfiles, likeProfile, currentUser, dislikeProfile]
+  );
+
+  const handleDislike = useCallback(
+    (profileId: string) => {
+      console.log('handleDislike called for profile:', profileId);
+
+      // Add to animating cards immediately for UI feedback
+      setAnimatingOutCards((prev) => new Set([...prev, profileId]));
+
+      // Delay the actual dislike action to allow animation to play
+      setTimeout(() => {
+        dislikeProfile(profileId);
+        // Remove from animating cards
+        setAnimatingOutCards((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(profileId);
+          return newSet;
         });
-    }, 200); // Reduced from 300ms to 200ms for faster animation
-  };
+      }, 200); // Reduced from 300ms to 200ms for faster animation
+    },
+    [dislikeProfile]
+  );
 
-  const handleDislike = (profileId: string) => {
-    console.log('handleDislike called for profile:', profileId);
-
-    // Add to animating cards immediately for UI feedback
-    setAnimatingOutCards((prev) => new Set([...prev, profileId]));
-
-    // Delay the actual dislike action to allow animation to play
-    setTimeout(() => {
-      dislikeProfile(profileId);
-      // Remove from animating cards
-      setAnimatingOutCards((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(profileId);
-        return newSet;
-      });
-    }, 200); // Reduced from 300ms to 200ms for faster animation
-  };
-
-  const handleProfilePress = (user: any) => {
+  const handleProfilePress = useCallback((user: any) => {
     setSelectedProfile(user);
     setShowProfileDetail(true);
-  };
+  }, []);
 
-  const handleCloseProfile = () => {
+  const handleCloseProfile = useCallback(() => {
     setShowProfileDetail(false);
     setSelectedProfile(null);
-  };
+  }, []);
+
+  // FlatList optimization callbacks (defined after handlers to avoid hoisting issues)
+  const keyExtractor = useCallback((item: any) => item.id, []);
+
+  const getItemLayout = useCallback((_data: any, index: number) => {
+    const itemWidth = (width - 48) / 2; // 2 columns with padding
+    const row = Math.floor(index / 2);
+    return {
+      length: itemWidth + 20, // item height + margin
+      offset: (itemWidth + 20) * row,
+      index,
+    };
+  }, []);
+
+  const renderItem = useCallback(
+    ({ item }: ListRenderItemInfo<any>) => (
+      <View style={styles.gridItem}>
+        <ProfileCard
+          user={item}
+          onLike={handleLike}
+          onDislike={handleDislike}
+          onPress={handleProfilePress}
+          isLiked={likedProfiles.includes(item.id)}
+          isDisliked={dislikedProfiles.includes(item.id)}
+          isAnimatingOut={animatingOutCards.has(item.id)}
+          theme={theme}
+        />
+      </View>
+    ),
+    [
+      handleLike,
+      handleDislike,
+      handleProfilePress,
+      likedProfiles,
+      dislikedProfiles,
+      animatingOutCards,
+      theme,
+    ]
+  );
+
+  const ListEmptyComponent = useCallback(
+    () => (
+      <View style={styles.emptyState}>
+        <Text style={[styles.emptyText, { color: theme.text }]}>
+          {t('search.noProfiles')}
+        </Text>
+      </View>
+    ),
+    [theme.text, t]
+  );
 
   const handleUnmatch = (profileId: string) => {
     console.log('handleUnmatch called with profileId:', profileId);
@@ -939,35 +1090,22 @@ export default function SearchScreen() {
         </View>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
+      <FlatList
+        data={sortedDiscoverProfiles}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        numColumns={2}
         showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.grid}>
-          {sortedDiscoverProfiles.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={[styles.emptyText, { color: theme.text }]}>
-                {t('search.noProfiles')}
-              </Text>
-            </View>
-          ) : (
-            sortedDiscoverProfiles.map((user) => (
-              <View key={user.id} style={styles.gridItem}>
-                <ProfileCard
-                  user={user}
-                  onLike={handleLike}
-                  onDislike={handleDislike}
-                  onPress={handleProfilePress}
-                  isLiked={likedProfiles.includes(user.id)}
-                  isDisliked={dislikedProfiles.includes(user.id)}
-                  isAnimatingOut={animatingOutCards.has(user.id)}
-                  theme={theme}
-                />
-              </View>
-            ))
-          )}
-        </View>
-      </ScrollView>
+        contentContainerStyle={styles.flatListContent}
+        columnWrapperStyle={styles.columnWrapper}
+        ListEmptyComponent={ListEmptyComponent}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={6}
+        updateCellsBatchingPeriod={50}
+        initialNumToRender={6}
+        windowSize={5}
+        getItemLayout={getItemLayout}
+      />
 
       {/* Profile Detail Modal */}
       {showProfileDetail && selectedProfile && (
@@ -1113,19 +1251,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 10,
   },
-  scrollView: {
-    flex: 1,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  flatListContent: {
     paddingHorizontal: 16,
     paddingTop: 20,
     paddingBottom: 100,
   },
+  columnWrapper: {
+    justifyContent: 'space-between',
+    gap: 16, // Add 16px gap between columns
+  },
   gridItem: {
-    width: '50%',
-    paddingHorizontal: 8,
+    width: (width - 48) / 2, // 2 columns with 16px padding on each side and 16px gap
     marginBottom: 20,
   },
   cardContainer: {
@@ -1162,10 +1298,51 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderWidth: 3,
     borderColor: 'rgba(255,255,255,0.8)',
+    position: 'relative',
+    marginRight: 8,
   },
   cardImage: {
     width: '100%',
     height: '100%',
+  },
+  imageNavLeft: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: '30%',
+    zIndex: 10,
+  },
+  imageNavRight: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: '30%',
+    zIndex: 10,
+  },
+  cardDotsContainer: {
+    position: 'absolute',
+    bottom: 4,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    borderRadius: 10,
+    alignSelf: 'center',
+  },
+  cardDot: {
+    borderRadius: 3,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 1,
   },
   cardActions: {
     flexDirection: 'row',

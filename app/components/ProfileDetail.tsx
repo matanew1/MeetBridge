@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,9 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Dimensions,
+  FlatList,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
 } from 'react-native';
 import {
   ArrowRight,
@@ -18,13 +21,11 @@ import {
   Instagram,
   Music,
   Facebook,
-  Images,
 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import { PREDEFINED_INTERESTS } from '../../constants/interests';
-import { ImageGallery } from './ImageGallery';
 
 const { width, height } = Dimensions.get('window');
 
@@ -63,15 +64,16 @@ const ProfileDetail = ({
   const { t } = useTranslation();
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
-  const [showGallery, setShowGallery] = useState(false);
-  const [galleryIndex, setGalleryIndex] = useState(0);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const imageScrollRef = useRef<FlatList>(null);
 
   const userImages =
-    user.images && user.images.length > 0 ? user.images : [user.image];
+    user.images && user.images.length > 0 ? [user.image, ...user.images] : [user.image];
 
-  const handleImagePress = (index: number = 0) => {
-    setGalleryIndex(index);
-    setShowGallery(true);
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const index = Math.round(offsetX / (width * 0.75));
+    setCurrentImageIndex(index);
   };
 
   const socialIcons = [
@@ -107,28 +109,51 @@ const ProfileDetail = ({
         style={[styles.scrollView, { backgroundColor: theme.background }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Profile Image */}
-        <TouchableOpacity
-          style={styles.imageSection}
-          onPress={() => handleImagePress(0)}
-          activeOpacity={0.9}
-        >
-          <Image
-            source={{ uri: user.image }}
-            style={styles.profileImage}
-            resizeMode="cover"
+        {/* Profile Image Slider */}
+        <View style={styles.imageSection}>
+          <FlatList
+            ref={imageScrollRef}
+            data={userImages}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
+            decelerationRate="fast"
+            snapToInterval={width * 0.75}
+            snapToAlignment="center"
+            contentContainerStyle={styles.imageSliderContent}
+            renderItem={({ item }) => (
+              <View style={styles.imageSlide}>
+                <Image
+                  source={{ uri: item }}
+                  style={styles.profileImage}
+                  resizeMode="cover"
+                />
+              </View>
+            )}
+            keyExtractor={(item, index) => `image-${index}`}
           />
 
-          {/* Gallery indicator */}
+          {/* White Dots Indicator */}
           {userImages.length > 1 && (
-            <View
-              style={[
-                styles.galleryBadge,
-                { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
-              ]}
-            >
-              <Images size={16} color="#FFF" />
-              <Text style={styles.galleryText}>{userImages.length}</Text>
+            <View style={styles.dotsContainer}>
+              {userImages.map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.dot,
+                    {
+                      backgroundColor:
+                        index === currentImageIndex
+                          ? '#FFF'
+                          : 'rgba(255, 255, 255, 0.5)',
+                      width: index === currentImageIndex ? 8 : 6,
+                      height: index === currentImageIndex ? 8 : 6,
+                    },
+                  ]}
+                />
+              ))}
             </View>
           )}
 
@@ -138,7 +163,7 @@ const ProfileDetail = ({
               {user.age} y/o
             </Text>
           </View>
-        </TouchableOpacity>
+        </View>
 
         {/* Profile Info */}
         <View style={styles.profileInfo}>
@@ -240,14 +265,6 @@ const ProfileDetail = ({
           </TouchableOpacity>
         </View>
       )}
-
-      {/* Image Gallery */}
-      <ImageGallery
-        visible={showGallery}
-        images={userImages}
-        initialIndex={galleryIndex}
-        onClose={() => setShowGallery(false)}
-      />
     </SafeAreaView>
   );
 };
@@ -282,6 +299,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 20,
     paddingBottom: 20,
+    width: '100%',
+  },
+  imageSliderContent: {
+    alignItems: 'center',
+    paddingHorizontal: (width - width * 0.75) / 2,
+  },
+  imageSlide: {
+    width: width * 0.75,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   profileImage: {
     width: width * 0.75,
@@ -289,21 +316,25 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     maxHeight: 300,
   },
-  galleryBadge: {
+  dotsContainer: {
     position: 'absolute',
-    top: 30,
-    left: width * 0.15,
+    bottom: 30,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 15,
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
-  galleryText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#FFF',
+  dot: {
+    borderRadius: 4,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
   },
   ageBadge: {
     position: 'absolute',
