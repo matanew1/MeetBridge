@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, memo } from 'react';
 import {
   View,
   Text,
@@ -6,8 +6,9 @@ import {
   SafeAreaView,
   TouchableOpacity,
   Image,
-  ScrollView,
+  FlatList,
   Animated,
+  ListRenderItemInfo,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MessageCircle } from 'lucide-react-native';
@@ -28,140 +29,153 @@ interface ChatItem {
   isOnline?: boolean;
 }
 
-const ChatItem = ({
-  chat,
-  theme,
-  index,
-  onPress,
-}: {
-  chat: ChatItem;
-  theme: any;
-  index: number;
-  onPress: () => void;
-}) => {
-  const slideAnim = React.useRef(new Animated.Value(50)).current;
-  const fadeAnim = React.useRef(new Animated.Value(0)).current;
-  const scaleAnim = React.useRef(new Animated.Value(0.95)).current;
-  const pulseAnim = React.useRef(new Animated.Value(1)).current;
+const ChatItem = memo(
+  ({
+    chat,
+    theme,
+    index,
+    onPress,
+  }: {
+    chat: ChatItem;
+    theme: any;
+    index: number;
+    onPress: () => void;
+  }) => {
+    const slideAnim = React.useRef(new Animated.Value(50)).current;
+    const fadeAnim = React.useRef(new Animated.Value(0)).current;
+    const scaleAnim = React.useRef(new Animated.Value(0.95)).current;
+    const pulseAnim = React.useRef(new Animated.Value(1)).current;
 
-  useEffect(() => {
-    // Staggered entrance animation
-    Animated.parallel([
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 300,
-        delay: index * 50,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        delay: index * 50,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        tension: 50,
-        friction: 7,
-        delay: index * 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    useEffect(() => {
+      // Faster staggered entrance animation
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 200, // Reduced from 300ms
+          delay: index * 30, // Reduced from 50ms
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200, // Reduced from 300ms
+          delay: index * 30,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 70, // Increased from 50
+          friction: 7,
+          delay: index * 30, // Reduced from 100ms
+          useNativeDriver: true,
+        }),
+      ]).start();
 
-    // Online indicator pulse animation
-    if (chat.isOnline) {
-      const pulse = () => {
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.2,
-            duration: 1000,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 1000,
-            useNativeDriver: true,
-          }),
-        ]).start(() => pulse());
-      };
-      pulse();
-    }
-  }, [index, chat.isOnline]);
+      // Online indicator pulse animation
+      if (chat.isOnline) {
+        const pulse = () => {
+          Animated.sequence([
+            Animated.timing(pulseAnim, {
+              toValue: 1.2,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+            Animated.timing(pulseAnim, {
+              toValue: 1,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+          ]).start(() => pulse());
+        };
+        pulse();
+      }
+    }, [index, chat.isOnline]);
 
-  return (
-    <Animated.View
-      style={[
-        {
-          transform: [{ translateX: slideAnim }, { scale: scaleAnim }],
-          opacity: fadeAnim,
-        },
-      ]}
-    >
-      <TouchableOpacity
+    return (
+      <Animated.View
         style={[
-          styles.chatItem,
           {
-            backgroundColor: theme.cardBackground,
-            borderBottomColor: theme.borderLight,
-            shadowColor: theme.shadow,
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.05,
-            shadowRadius: 2,
-            elevation: 1,
+            transform: [{ translateX: slideAnim }, { scale: scaleAnim }],
+            opacity: fadeAnim,
           },
         ]}
-        activeOpacity={0.7}
-        onPress={onPress}
       >
-        <View style={styles.avatarContainer}>
-          <Image source={{ uri: chat.image }} style={styles.chatAvatar} />
-          {chat.isOnline && (
+        <TouchableOpacity
+          style={[
+            styles.chatItem,
+            {
+              backgroundColor: theme.cardBackground,
+              borderBottomColor: theme.borderLight,
+              shadowColor: theme.shadow,
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.05,
+              shadowRadius: 2,
+              elevation: 1,
+            },
+          ]}
+          activeOpacity={0.7}
+          onPress={onPress}
+        >
+          <View style={styles.avatarContainer}>
+            <Image source={{ uri: chat.image }} style={styles.chatAvatar} />
+            {chat.isOnline && (
+              <Animated.View
+                style={[
+                  styles.onlineIndicator,
+                  {
+                    backgroundColor: theme.success,
+                    borderColor: theme.surface,
+                    transform: [{ scale: pulseAnim }],
+                  },
+                ]}
+              />
+            )}
+          </View>
+          <View style={styles.chatContent}>
+            <View style={styles.chatHeader}>
+              <Text style={[styles.chatName, { color: theme.text }]}>
+                {chat.name}, {chat.age}
+              </Text>
+              <Text style={[styles.chatTime, { color: theme.textSecondary }]}>
+                {chat.time}
+              </Text>
+            </View>
+            <Text
+              style={[
+                styles.chatMessage,
+                { color: theme.textSecondary },
+                chat.unread && styles.unreadMessage,
+              ]}
+            >
+              {chat.lastMessage}
+            </Text>
+          </View>
+          {chat.unread && (
             <Animated.View
               style={[
-                styles.onlineIndicator,
+                styles.unreadDot,
                 {
-                  backgroundColor: theme.success,
-                  borderColor: theme.surface,
+                  backgroundColor: theme.primary,
                   transform: [{ scale: pulseAnim }],
                 },
               ]}
             />
           )}
-        </View>
-        <View style={styles.chatContent}>
-          <View style={styles.chatHeader}>
-            <Text style={[styles.chatName, { color: theme.text }]}>
-              {chat.name}, {chat.age}
-            </Text>
-            <Text style={[styles.chatTime, { color: theme.textSecondary }]}>
-              {chat.time}
-            </Text>
-          </View>
-          <Text
-            style={[
-              styles.chatMessage,
-              { color: theme.textSecondary },
-              chat.unread && styles.unreadMessage,
-            ]}
-          >
-            {chat.lastMessage}
-          </Text>
-        </View>
-        {chat.unread && (
-          <Animated.View
-            style={[
-              styles.unreadDot,
-              {
-                backgroundColor: theme.primary,
-                transform: [{ scale: pulseAnim }],
-              },
-            ]}
-          />
-        )}
-      </TouchableOpacity>
-    </Animated.View>
-  );
-};
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  },
+  (prevProps, nextProps) => {
+    // Optimize re-renders - only update if these props change
+    return (
+      prevProps.chat.id === nextProps.chat.id &&
+      prevProps.chat.lastMessage === nextProps.chat.lastMessage &&
+      prevProps.chat.unread === nextProps.chat.unread &&
+      prevProps.chat.isOnline === nextProps.chat.isOnline &&
+      prevProps.chat.time === nextProps.chat.time &&
+      prevProps.theme === nextProps.theme // IMPORTANT: Check theme changes for dark/light mode
+    );
+  }
+);
 
 export default function ChatScreen() {
   const { t } = useTranslation();
@@ -221,88 +235,193 @@ export default function ChatScreen() {
 
     loadCurrentUser();
     loadConversations();
+
+    // Load matches to ensure we have profile data for chat participants
+    const { loadMatches } = useUserStore.getState();
+    loadMatches();
+
     if (discoverProfiles.length === 0) {
       loadDiscoverProfiles(true);
     }
-  }, []);
 
-  useEffect(() => {
-    console.log('🔍 Chat screen useEffect triggered');
-    console.log('Conversations count:', conversations.length);
-    console.log('Discover profiles count:', discoverProfiles.length);
+    // Set up real-time listener for conversations
+    let unsubscribe: (() => void) | null = null;
 
-    // Sort conversations by most recent first
-    const sortedConversations = [...conversations].sort(
-      (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
-    );
-
-    const chatItems: ChatItem[] = sortedConversations
-      .map((conversation) => {
-        // Find the other participant (not current user)
-        const otherParticipantId = conversation.participants.find(
-          (id) => id !== currentUser?.id
+    if (currentUser) {
+      const setupRealtimeListener = async () => {
+        const { collection, query, where, onSnapshot, orderBy } = await import(
+          'firebase/firestore'
         );
-        // Look in both discoverProfiles and matchedProfilesData
-        const otherParticipant =
-          discoverProfiles.find(
-            (profile) => profile.id === otherParticipantId
-          ) ||
-          matchedProfilesData.find(
-            (profile) => profile.id === otherParticipantId
+        const { db } = await import('../../services/firebase/config');
+
+        // Listen to conversations where user is a participant
+        const conversationsQuery = query(
+          collection(db, 'conversations'),
+          where('participants', 'array-contains', currentUser.id),
+          orderBy('updatedAt', 'desc')
+        );
+
+        unsubscribe = onSnapshot(conversationsQuery, async (snapshot) => {
+          console.log(
+            '🔔 Real-time conversation update:',
+            snapshot.size,
+            'conversations'
           );
 
-        console.log('Processing conversation:', {
-          conversationId: conversation.id,
-          otherParticipantId,
-          foundProfile: !!otherParticipant,
-          hasLastMessage: !!conversation.lastMessage,
+          try {
+            // Process the conversations directly from snapshot to avoid cache
+            const conversationsData = snapshot.docs.map((doc) => {
+              const data = doc.data();
+              return {
+                id: doc.id,
+                participants: data.participants || [],
+                createdAt:
+                  data.createdAt?.toDate?.() ||
+                  new Date(data.createdAt || Date.now()),
+                updatedAt:
+                  data.updatedAt?.toDate?.() ||
+                  new Date(data.updatedAt || Date.now()),
+                lastMessage: data.lastMessage
+                  ? {
+                      text: data.lastMessage.text || '',
+                      senderId: data.lastMessage.senderId || '',
+                      timestamp:
+                        data.lastMessage.createdAt?.toDate?.() ||
+                        new Date(data.lastMessage.createdAt || Date.now()),
+                    }
+                  : undefined,
+                unreadCount: data.unreadCount?.[currentUser.id] || 0,
+              };
+            });
+
+            // Update store directly with real-time data
+            useUserStore.setState({ conversations: conversationsData });
+          } catch (error) {
+            console.error('❌ Error processing conversation snapshot:', error);
+          }
         });
+      };
 
-        if (!otherParticipant) {
-          return null;
-        }
+      setupRealtimeListener();
+    }
 
-        console.log('Mapped chat item:', conversation);
+    return () => {
+      if (unsubscribe) {
+        console.log('🔕 Cleaning up conversation listener');
+        unsubscribe();
+      }
+    };
+  }, [currentUser?.id]);
 
-        // Show conversation even without messages (new matches)
-        return {
-          id: conversation.id,
-          name: otherParticipant.name,
-          age: otherParticipant.age,
-          lastMessage: conversation.lastMessage?.text || t('chat.newMatch'),
-          time: conversation.lastMessage
-            ? formatTime(conversation.lastMessage.timestamp)
-            : formatTime(conversation.createdAt),
-          image: otherParticipant.image,
-          unread: conversation.unreadCount > 0,
-          isOnline: otherParticipant.isOnline,
-        };
-      })
-      .filter(Boolean) as ChatItem[];
+  useEffect(() => {
+    try {
+      console.log('🔍 Chat screen useEffect triggered');
+      console.log('Conversations count:', conversations?.length || 0);
+      console.log('Discover profiles count:', discoverProfiles?.length || 0);
+      console.log('Matched profiles count:', matchedProfilesData?.length || 0);
 
-    console.log('Final chat items:', chatItems.length);
-    setChats(chatItems);
+      // Safety check: ensure conversations is defined
+      if (!conversations || !Array.isArray(conversations)) {
+        console.log('⚠️ Conversations not yet loaded');
+        setChats([]);
+        return;
+      }
 
-    // Animate content when chats are loaded
-    if (chatItems.length > 0) {
-      Animated.parallel([
-        Animated.timing(contentSlideAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(contentFadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      // Sort conversations by most recent first
+      const sortedConversations = [...conversations].sort(
+        (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
+      );
+
+      const chatItems: ChatItem[] = sortedConversations
+        .map((conversation) => {
+          // Find the other participant (not current user)
+          const otherParticipantId = conversation.participants?.find(
+            (id) => id !== currentUser?.id
+          );
+          // Look in both discoverProfiles and matchedProfilesData
+          const otherParticipant =
+            (discoverProfiles || []).find(
+              (profile) => profile.id === otherParticipantId
+            ) ||
+            (matchedProfilesData || []).find(
+              (profile) => profile.id === otherParticipantId
+            );
+
+          console.log('Processing conversation:', {
+            conversationId: conversation.id,
+            otherParticipantId,
+            foundProfile: !!otherParticipant,
+            hasLastMessage: !!conversation.lastMessage,
+          });
+
+          if (!otherParticipant) {
+            return null;
+          }
+
+          console.log('Mapped chat item:', conversation);
+
+          // Show conversation even without messages (new matches)
+          return {
+            id: conversation.id,
+            name: otherParticipant.name,
+            age: otherParticipant.age,
+            lastMessage: conversation.lastMessage?.text || t('chat.newMatch'),
+            time: conversation.lastMessage
+              ? formatTime(conversation.lastMessage.timestamp)
+              : formatTime(conversation.createdAt),
+            image: otherParticipant.image,
+            unread: conversation.unreadCount > 0,
+            isOnline: otherParticipant.isOnline,
+          };
+        })
+        .filter(Boolean) as ChatItem[];
+
+      console.log('Final chat items:', chatItems.length);
+      setChats(chatItems);
+
+      // Animate content when chats are loaded
+      if (chatItems.length > 0) {
+        Animated.parallel([
+          Animated.timing(contentSlideAnim, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(contentFadeAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
+    } catch (error) {
+      console.error('❌ Error in chat screen useEffect:', error);
+      setChats([]);
     }
   }, [conversations, discoverProfiles, matchedProfilesData, currentUser]);
 
-  const handleChatPress = (chatId: string) => {
-    router.push(`/chat/${chatId}`);
-  };
+  const handleChatPress = useCallback(
+    (chatId: string) => {
+      router.push(`/chat/${chatId}`);
+    },
+    [router]
+  );
+
+  // FlatList optimization callbacks
+  const keyExtractor = useCallback((item: ChatItem) => item.id, []);
+
+  const renderChatItem = useCallback(
+    ({ item, index }: ListRenderItemInfo<ChatItem>) => (
+      <ChatItem
+        key={item.id}
+        chat={item}
+        theme={theme}
+        index={index}
+        onPress={() => handleChatPress(item.id)}
+      />
+    ),
+    [theme, handleChatPress]
+  );
 
   // Empty state animations
   useEffect(() => {
@@ -394,20 +513,20 @@ export default function ChatScreen() {
           {chats.length === 0 ? (
             renderEmptyState()
           ) : (
-            <ScrollView
+            <FlatList
+              data={chats}
+              renderItem={renderChatItem}
+              keyExtractor={keyExtractor}
+              extraData={theme}
               style={styles.chatList}
               showsVerticalScrollIndicator={false}
-            >
-              {chats.map((chat, index) => (
-                <ChatItem
-                  key={chat.id}
-                  chat={chat}
-                  theme={theme}
-                  index={index}
-                  onPress={() => handleChatPress(chat.id)}
-                />
-              ))}
-            </ScrollView>
+              removeClippedSubviews={true}
+              maxToRenderPerBatch={5}
+              updateCellsBatchingPeriod={50}
+              windowSize={5}
+              initialNumToRender={8}
+              scrollEventThrottle={16}
+            />
           )}
         </Animated.View>
       </SafeAreaView>

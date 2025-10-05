@@ -20,6 +20,7 @@ import {
   Dimensions,
   Modal,
   Alert,
+  Keyboard,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
@@ -185,7 +186,8 @@ const MessageItem: React.FC<MessageItemProps> = memo(
       prevProps.message.id === nextProps.message.id &&
       prevProps.message.text === nextProps.message.text &&
       prevProps.message.isFromCurrentUser ===
-        nextProps.message.isFromCurrentUser
+        nextProps.message.isFromCurrentUser &&
+      prevProps.theme === nextProps.theme // IMPORTANT: Check theme changes for dark/light mode
     );
   }
 );
@@ -214,6 +216,7 @@ const ChatScreen = () => {
   const [showUnmatchConfirm, setShowUnmatchConfirm] = useState(false);
   const [heartAnimation, setHeartAnimation] = useState(false);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const flatListRef = useRef<FlatList>(null);
 
   // Animation values
@@ -243,6 +246,32 @@ const ChatScreen = () => {
       inputSlideAnim.value = 50;
       inputFadeAnim.value = 0;
       heartScale.value = 1;
+    };
+  }, []);
+
+  // Keyboard listeners for auto-scrolling
+  useEffect(() => {
+    const keyboardWillShow = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+        // Auto-scroll when keyboard appears
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+    );
+
+    const keyboardWillHide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      keyboardWillShow.remove();
+      keyboardWillHide.remove();
     };
   }, []);
 
@@ -322,15 +351,20 @@ const ChatScreen = () => {
       // This prevents conflicts between store data and Firestore data
 
       // Mark messages as read (debounced)
-      const unreadMessageIds = conversation.messages
-        .filter((msg) => !msg.isRead && msg.senderId !== currentUser.id)
-        .map((msg) => msg.id);
+      // Safety check: ensure messages array exists
+      if (conversation.messages && Array.isArray(conversation.messages)) {
+        const unreadMessageIds = conversation.messages
+          .filter((msg) => !msg.isRead && msg.senderId !== currentUser.id)
+          .map((msg) => msg.id);
 
-      if (unreadMessageIds.length > 0) {
-        // Batch read operations for better performance
-        requestAnimationFrame(() => {
-          markMessagesAsRead(conversation.id, unreadMessageIds);
-        });
+        if (unreadMessageIds.length > 0) {
+          // Batch read operations for better performance
+          requestAnimationFrame(() => {
+            markMessagesAsRead(conversation.id, unreadMessageIds);
+          });
+        }
+      } else {
+        console.log('⚠️ conversation.messages is not defined or not an array');
       }
     } else {
       console.log('❌ Missing required data for chat initialization');
@@ -422,20 +456,20 @@ const ChatScreen = () => {
         if (otherUserId) {
           console.log(`🚫 Removing ${otherUserId} from store`);
           useUserStore.setState((state) => ({
-            matchedProfiles: state.matchedProfiles.filter(
+            matchedProfiles: (state.matchedProfiles || []).filter(
               (id) => id !== otherUserId
             ),
-            matchedProfilesData: state.matchedProfilesData.filter(
+            matchedProfilesData: (state.matchedProfilesData || []).filter(
               (profile) => profile.id !== otherUserId
             ),
-            likedProfiles: state.likedProfiles.filter(
+            likedProfiles: (state.likedProfiles || []).filter(
               (id) => id !== otherUserId
             ),
-            likedProfilesData: state.likedProfilesData.filter(
+            likedProfilesData: (state.likedProfilesData || []).filter(
               (profile) => profile.id !== otherUserId
             ),
-            conversations: state.conversations.filter(
-              (conv) => !conv.participants.includes(otherUserId)
+            conversations: (state.conversations || []).filter(
+              (conv) => !conv.participants?.includes(otherUserId)
             ),
           }));
         }
@@ -790,11 +824,19 @@ const ChatScreen = () => {
           data={messages}
           renderItem={renderMessage}
           keyExtractor={keyExtractor}
+          extraData={theme}
           getItemLayout={getItemLayout}
           style={[styles.messagesList, { backgroundColor: theme.background }]}
-          contentContainerStyle={styles.messagesContent}
+          contentContainerStyle={[
+            styles.messagesContent,
+            {
+              paddingBottom: Platform.OS === 'android' ? keyboardHeight : 0,
+            },
+          ]}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={onContentSizeChange}
+          keyboardShouldPersistTaps="handled"
+          onScrollBeginDrag={() => Keyboard.dismiss()}
           removeClippedSubviews={true}
           maxToRenderPerBatch={10}
           windowSize={10}
@@ -839,6 +881,12 @@ const ChatScreen = () => {
               placeholderTextColor={theme.textSecondary}
               multiline
               textAlign="left"
+              onFocus={() => {
+                // Scroll to bottom when input is focused
+                setTimeout(() => {
+                  flatListRef.current?.scrollToEnd({ animated: true });
+                }, 300);
+              }}
             />
             <TouchableOpacity
               style={[
@@ -854,7 +902,9 @@ const ChatScreen = () => {
             >
               <Send
                 size={18}
-                color={inputText.trim() ? '#FFF' : theme.textSecondary}
+                color={
+                  inputText.trim() ? theme.textOnPrimary : theme.textSecondary
+                }
               />
             </TouchableOpacity>
           </View>
@@ -974,7 +1024,7 @@ const ChatScreen = () => {
                   ]}
                   onPress={confirmUnmatch}
                 >
-                  <Text style={styles.deleteButtonText}>
+                  <Text style={[styles.deleteButtonText, { color: '#FFF' }]}>
                     {t('common.unmatch')}
                   </Text>
                 </TouchableOpacity>
@@ -1012,7 +1062,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   retryButtonText: {
-    color: '#FFF',
+    // color will be set from theme.textOnPrimary
     fontSize: 16,
     fontWeight: '600',
   },
@@ -1262,7 +1312,7 @@ const styles = StyleSheet.create({
   deleteButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFF',
+    // color will be set from theme.textOnPrimary or white
   },
 });
 

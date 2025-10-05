@@ -512,45 +512,6 @@ export default function CommentsScreen() {
               )}
             </ScrollView>
 
-            {/* That's Me Button */}
-            {connection && connection.userId !== user?.id && (
-              <View
-                style={[
-                  styles.claimContainer,
-                  {
-                    backgroundColor: theme.surface,
-                    borderTopColor: theme.border,
-                  },
-                ]}
-              >
-                <TouchableOpacity
-                  style={[
-                    styles.claimButton,
-                    {
-                      backgroundColor: theme.primary,
-                      opacity: isClaiming ? 0.7 : 1,
-                    },
-                  ]}
-                  onPress={handleClaimConnection}
-                  disabled={isClaiming}
-                >
-                  {isClaiming ? (
-                    <ActivityIndicator size="small" color="#FFF" />
-                  ) : (
-                    <>
-                      <UserCheck size={20} color="#FFF" />
-                      <Text style={styles.claimButtonText}>That's Me!</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-                <Text
-                  style={[styles.claimHint, { color: theme.textSecondary }]}
-                >
-                  Were you at {connection.location.landmark}?
-                </Text>
-              </View>
-            )}
-
             {/* Comment Input */}
             <View style={styles.commentInputWrapper}>
               {/* Anonymous Toggle */}

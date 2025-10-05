@@ -1,5 +1,12 @@
 // app/(tabs)/search.tsx
-import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  memo,
+  useRef,
+} from 'react';
 import {
   View,
   Text,
@@ -83,30 +90,32 @@ const ProfileCard = memo(
     );
 
     React.useEffect(() => {
+      // Faster entrance animation
       opacity.value = withTiming(1, {
-        duration: 250,
-        easing: Easing.out(Easing.ease),
+        duration: 150,
+        easing: Easing.out(Easing.cubic),
       });
       translateY.value = withTiming(0, {
-        duration: 250,
-        easing: Easing.out(Easing.ease),
+        duration: 150,
+        easing: Easing.out(Easing.cubic),
       });
-      scale.value = withSpring(1, { damping: 15, stiffness: 200 });
+      scale.value = withSpring(1, { damping: 20, stiffness: 300 });
     }, []);
 
     React.useEffect(() => {
       if (isAnimatingOut) {
+        // Faster exit animation
         opacity.value = withTiming(0, {
-          duration: 200,
-          easing: Easing.in(Easing.ease),
+          duration: 120,
+          easing: Easing.in(Easing.cubic),
         });
-        translateY.value = withTiming(isLiked || !isDisliked ? -100 : 100, {
-          duration: 200,
-          easing: Easing.in(Easing.ease),
+        translateY.value = withTiming(isLiked || !isDisliked ? -80 : 80, {
+          duration: 150,
+          easing: Easing.in(Easing.cubic),
         });
         scale.value = withSequence(
-          withTiming(1.03, { duration: 60, easing: Easing.out(Easing.ease) }),
-          withTiming(0.8, { duration: 140, easing: Easing.in(Easing.ease) })
+          withTiming(1.02, { duration: 40, easing: Easing.out(Easing.cubic) }),
+          withTiming(0.85, { duration: 110, easing: Easing.in(Easing.cubic) })
         );
       }
     }, [isAnimatingOut, isLiked, isDisliked]);
@@ -141,9 +150,12 @@ const ProfileCard = memo(
         <TouchableOpacity
           style={[
             styles.card,
-            { backgroundColor: theme.cardBackground },
-            isLiked && styles.likedCard,
-            isDisliked && styles.dislikedCard,
+            {
+              backgroundColor: theme.cardBackground,
+              shadowColor: theme.shadow,
+            },
+            isLiked && [styles.likedCard, { borderColor: theme.primary }],
+            isDisliked && [styles.dislikedCard, { borderColor: theme.error }],
           ]}
           onPress={() => onPress(user)}
           disabled={isLiked || isDisliked || isAnimatingOut}
@@ -184,7 +196,7 @@ const ProfileCard = memo(
             )}
 
             {/* White dots indicator */}
-            {userImages.length > 1 && (
+            {/* {userImages.length > 1 && (
               <View style={styles.cardDotsContainer}>
                 {userImages.map((_, index) => (
                   <View
@@ -203,7 +215,7 @@ const ProfileCard = memo(
                   />
                 ))}
               </View>
-            )}
+            )} */}
           </View>
           <View style={styles.cardInfo}>
             <Text style={[styles.cardText, { color: theme.text }]}>
@@ -214,18 +226,32 @@ const ProfileCard = memo(
           {/* Action buttons */}
           <View style={styles.cardActions}>
             <TouchableOpacity
-              style={[styles.actionBtn, styles.dislikeBtn]}
+              style={[
+                styles.actionBtn,
+                styles.dislikeBtn,
+                {
+                  backgroundColor: theme.errorBackground,
+                  shadowColor: theme.shadow,
+                },
+              ]}
               onPress={(e) => {
                 e.stopPropagation();
                 onDislike(user.id);
               }}
               disabled={isDisliked || isLiked}
             >
-              <X size={16} color="#FF6B6B" />
+              <X size={16} color={theme.error} />
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.actionBtn, styles.likeBtn]}
+              style={[
+                styles.actionBtn,
+                styles.likeBtn,
+                {
+                  backgroundColor: theme.primaryVariant,
+                  shadowColor: theme.shadow,
+                },
+              ]}
               onPress={(e) => {
                 e.stopPropagation();
                 onLike(user.id);
@@ -234,16 +260,24 @@ const ProfileCard = memo(
             >
               <Heart
                 size={16}
-                color="#FF69B4"
-                fill={isLiked ? '#FF69B4' : 'transparent'}
+                color={theme.primary}
+                fill={isLiked ? theme.primary : 'transparent'}
               />
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
 
         {user.distance !== null && user.distance !== undefined && (
-          <View style={styles.distanceContainer}>
-            <Text style={styles.distanceText}>
+          <View
+            style={[
+              styles.distanceContainer,
+              {
+                backgroundColor: `${theme.primary}E6`,
+                shadowColor: theme.shadow,
+              },
+            ]}
+          >
+            <Text style={[styles.distanceText, { color: theme.textOnPrimary }]}>
               {user.distance >= 1000
                 ? `${(user.distance / 1000).toFixed(1)}km`
                 : `${Math.round(user.distance)}m`}
@@ -255,15 +289,26 @@ const ProfileCard = memo(
   },
   (prevProps, nextProps) => {
     // Custom comparison function for memo - only re-render if these props change
-    return (
-      prevProps.user.id === nextProps.user.id &&
-      prevProps.isLiked === nextProps.isLiked &&
-      prevProps.isDisliked === nextProps.isDisliked &&
-      prevProps.isAnimatingOut === nextProps.isAnimatingOut &&
-      prevProps.user.image === nextProps.user.image &&
-      JSON.stringify(prevProps.user.images) ===
-        JSON.stringify(nextProps.user.images)
-    );
+    // Most common changes first for early exit
+    if (prevProps.isAnimatingOut !== nextProps.isAnimatingOut) return false;
+    if (prevProps.isLiked !== nextProps.isLiked) return false;
+    if (prevProps.isDisliked !== nextProps.isDisliked) return false;
+    if (prevProps.user.id !== nextProps.user.id) return false;
+
+    // Image comparisons (less frequent changes)
+    if (prevProps.user.image !== nextProps.user.image) return false;
+
+    // Avoid JSON.stringify - compare array lengths and elements
+    const prevImages = prevProps.user.images || [];
+    const nextImages = nextProps.user.images || [];
+    if (prevImages.length !== nextImages.length) return false;
+    if (!prevImages.every((img, idx) => img === nextImages[idx])) return false;
+
+    // IMPORTANT: Check if theme has changed (for dark/light mode switching)
+    if (prevProps.theme !== nextProps.theme) return false;
+
+    // Distance changes shouldn't trigger re-render (display only)
+    return true;
   }
 );
 
@@ -338,20 +383,31 @@ export default function SearchScreen() {
   // Also deduplicate by ID to prevent duplicate key errors
   // Memoized for performance - only recalculate when dependencies change
   const sortedDiscoverProfiles = useMemo(() => {
-    return [...discoverProfiles]
-      .filter((profile) => !matchedProfiles.includes(profile.id)) // Exclude matched profiles
-      .filter((profile) => !likedProfiles.includes(profile.id)) // Exclude liked profiles
-      .filter((profile) => !dislikedProfiles.includes(profile.id)) // Exclude disliked profiles (24h block)
+    // Convert arrays to Sets for O(1) lookup instead of O(n)
+    const matchedSet = new Set(matchedProfiles);
+    const likedSet = new Set(likedProfiles);
+    const dislikedSet = new Set(dislikedProfiles);
+    const seenIds = new Set<string>();
+
+    return discoverProfiles
       .filter((profile) => {
-        // Filter by age range (client-side safety check)
+        // Quick rejection checks first (most common filters)
+        if (matchedSet.has(profile.id)) return false;
+        if (likedSet.has(profile.id)) return false;
+        if (dislikedSet.has(profile.id)) return false;
+
+        // Deduplicate by ID (check if we've seen this ID before)
+        if (seenIds.has(profile.id)) return false;
+        seenIds.add(profile.id);
+
+        // Age range filter (client-side safety check)
         const profileAge = profile.age || 0;
-        return profileAge >= ageRange[0] && profileAge <= ageRange[1];
+        if (profileAge < ageRange[0] || profileAge > ageRange[1]) return false;
+
+        return true;
       })
-      .filter(
-        (profile, index, self) =>
-          index === self.findIndex((p) => p.id === profile.id)
-      ) // Deduplicate by ID
       .sort((a, b) => {
+        // Sort by distance (nullish distances go to end)
         const distA = a.distance ?? Number.MAX_SAFE_INTEGER;
         const distB = b.distance ?? Number.MAX_SAFE_INTEGER;
         return distA - distB;
@@ -421,20 +477,57 @@ export default function SearchScreen() {
   }, [isAuthenticated, isAuthLoading]); // Run when authentication state changes
 
   // Handle when currentUser changes - update preferences and load profiles
+  // Prefetch images for better scrolling performance
+  useEffect(() => {
+    if (sortedDiscoverProfiles.length > 0) {
+      // Prefetch first 3 profile images
+      sortedDiscoverProfiles.slice(0, 3).forEach((profile) => {
+        const images =
+          profile.images && profile.images.length > 0
+            ? profile.images
+            : [profile.image];
+
+        // Prefetch main image for each profile
+        if (images[0]) {
+          Image.prefetch(images[0]).catch(() => {
+            // Silently fail - not critical
+          });
+        }
+      });
+    }
+  }, [sortedDiscoverProfiles]);
+
   useEffect(() => {
     if (currentUser && isAuthenticated) {
       updateUserPreferences();
+
       // Load profiles after preferences are updated
-      setTimeout(() => {
+      const loadTimer = setTimeout(() => {
         loadDiscoverProfiles(true);
+
         // Start animation after profiles load
-        setTimeout(() => {
+        const animTimer = setTimeout(() => {
           setShowAnimation(true);
           triggerSearchAnimation();
         }, 500);
+
+        // Cleanup animation timer
+        return () => clearTimeout(animTimer);
       }, 200); // Small delay to ensure preferences are updated in store
+
+      // Cleanup load timer
+      return () => clearTimeout(loadTimer);
     }
   }, [currentUser?.id]); // Only run when user ID changes (initial load)
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (filterDebounceTimer.current) {
+        clearTimeout(filterDebounceTimer.current);
+      }
+    };
+  }, []);
 
   // Handle when isSearching changes (from button trigger or auto-trigger)
   useEffect(() => {
@@ -835,66 +928,105 @@ export default function SearchScreen() {
     setShowFilterModal(true);
   };
 
-  const handleDistanceChange = async (distance: number) => {
-    // Distance is already in meters from FilterModal
-    console.log('🎯 handleDistanceChange called with:', distance);
-    setMaxDistance(distance);
-    updateSearchFilters({ maxDistance: distance });
+  // Debounce timer for filter changes
+  const filterDebounceTimer = useRef<NodeJS.Timeout | null>(null);
 
-    // Update ONLY maxDistance field using dot notation (handled by firebaseServices)
-    if (currentUser && updateProfile) {
-      try {
-        await updateProfile({
-          preferences: {
-            maxDistance: distance, // Only send the field we're updating
-          },
-        });
-        console.log(`✅ maxDistance updated to ${distance}m in Firebase`);
+  const handleDistanceChange = useCallback(
+    async (distance: number) => {
+      // Distance is already in meters from FilterModal
+      console.log('🎯 handleDistanceChange called with:', distance);
+      setMaxDistance(distance);
+      updateSearchFilters({ maxDistance: distance });
 
-        // Clear discovery queue when filters change to get fresh results
-        console.log('🧹 Clearing discovery queue due to filter change...');
-        await discoveryService.clearDiscoveryQueue(currentUser.id);
-
-        // Reload current user to get fresh data
-        await loadCurrentUser();
-      } catch (error) {
-        console.error('❌ Error updating maxDistance:', error);
+      // Clear existing timer
+      if (filterDebounceTimer.current) {
+        clearTimeout(filterDebounceTimer.current);
       }
-    }
 
-    loadDiscoverProfiles(true);
-  };
+      // Debounce the Firebase update and reload (wait 500ms after user stops adjusting)
+      filterDebounceTimer.current = setTimeout(async () => {
+        // Update ONLY maxDistance field using dot notation (handled by firebaseServices)
+        if (currentUser && updateProfile) {
+          try {
+            await updateProfile({
+              preferences: {
+                maxDistance: distance, // Only send the field we're updating
+              },
+            });
+            console.log(`✅ maxDistance updated to ${distance}m in Firebase`);
 
-  const handleAgeRangeChange = async (newAgeRange: [number, number]) => {
-    // Update local state and search filters
-    setAgeRange(newAgeRange);
-    updateSearchFilters({ ageRange: newAgeRange });
+            // Clear discovery queue when filters change to get fresh results
+            console.log('🧹 Clearing discovery queue due to filter change...');
+            await discoveryService.clearDiscoveryQueue(currentUser.id);
 
-    // Update ONLY ageRange field using dot notation (handled by firebaseServices)
-    if (currentUser && updateProfile) {
-      try {
-        await updateProfile({
-          preferences: {
-            ageRange: newAgeRange, // Only send the field we're updating
-          },
-        });
-        console.log(
-          `✅ ageRange updated to [${newAgeRange[0]}, ${newAgeRange[1]}] in Firebase`
-        );
+            // Reload current user to get fresh data
+            await loadCurrentUser();
 
-        // Clear discovery queue when filters change to get fresh results
-        console.log('🧹 Clearing discovery queue due to filter change...');
-        await discoveryService.clearDiscoveryQueue(currentUser.id);
+            // Reload profiles with new filter
+            loadDiscoverProfiles(true);
+          } catch (error) {
+            console.error('❌ Error updating maxDistance:', error);
+          }
+        }
+      }, 500);
+    },
+    [
+      currentUser,
+      updateProfile,
+      updateSearchFilters,
+      loadCurrentUser,
+      loadDiscoverProfiles,
+    ]
+  );
 
-        // Reload current user to get fresh data
-        await loadCurrentUser();
-      } catch (error) {
-        console.error('❌ Error updating ageRange:', error);
+  const handleAgeRangeChange = useCallback(
+    async (newAgeRange: [number, number]) => {
+      // Update local state and search filters (immediate UI feedback)
+      setAgeRange(newAgeRange);
+      updateSearchFilters({ ageRange: newAgeRange });
+
+      // Clear existing timer
+      if (filterDebounceTimer.current) {
+        clearTimeout(filterDebounceTimer.current);
       }
-    }
 
-    loadDiscoverProfiles(true);
-  };
+      // Debounce the Firebase update and reload (wait 500ms after user stops adjusting)
+      filterDebounceTimer.current = setTimeout(async () => {
+        // Update ONLY ageRange field using dot notation (handled by firebaseServices)
+        if (currentUser && updateProfile) {
+          try {
+            await updateProfile({
+              preferences: {
+                ageRange: newAgeRange, // Only send the field we're updating
+              },
+            });
+            console.log(
+              `✅ ageRange updated to [${newAgeRange[0]}, ${newAgeRange[1]}] in Firebase`
+            );
+
+            // Clear discovery queue when filters change to get fresh results
+            console.log('🧹 Clearing discovery queue due to filter change...');
+            await discoveryService.clearDiscoveryQueue(currentUser.id);
+
+            // Reload current user to get fresh data
+            await loadCurrentUser();
+
+            // Reload profiles with new filter
+            loadDiscoverProfiles(true);
+          } catch (error) {
+            console.error('❌ Error updating ageRange:', error);
+          }
+        }
+      }, 500);
+    },
+    [
+      currentUser,
+      updateProfile,
+      updateSearchFilters,
+      loadCurrentUser,
+      loadDiscoverProfiles,
+    ]
+  );
 
   const handleSearchButton = async () => {
     // Clear discovery queue and refresh profiles
@@ -1094,17 +1226,19 @@ export default function SearchScreen() {
         data={sortedDiscoverProfiles}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
+        extraData={theme}
         numColumns={2}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.flatListContent}
         columnWrapperStyle={styles.columnWrapper}
         ListEmptyComponent={ListEmptyComponent}
         removeClippedSubviews={true}
-        maxToRenderPerBatch={6}
-        updateCellsBatchingPeriod={50}
-        initialNumToRender={6}
-        windowSize={5}
+        maxToRenderPerBatch={4}
+        updateCellsBatchingPeriod={100}
+        initialNumToRender={4}
+        windowSize={3}
         getItemLayout={getItemLayout}
+        scrollEventThrottle={16}
       />
 
       {/* Profile Detail Modal */}
@@ -1140,27 +1274,56 @@ export default function SearchScreen() {
       {/* Custom Unmatch Confirmation Modal */}
       {showUnmatchConfirm && (
         <View style={styles.centeredModalOverlay}>
-          <View style={styles.confirmationModal}>
-            <View style={styles.confirmationIcon}>
-              <X size={32} color="#FF6B6B" />
+          <View
+            style={[
+              styles.confirmationModal,
+              {
+                backgroundColor: theme.surface,
+                shadowColor: theme.shadow,
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.confirmationIcon,
+                { backgroundColor: theme.errorBackground },
+              ]}
+            >
+              <X size={32} color={theme.error} />
             </View>
-            <Text style={styles.confirmationTitle}>
+            <Text style={[styles.confirmationTitle, { color: theme.text }]}>
               {t('modals.unmatchTitle')}
             </Text>
-            <Text style={styles.confirmationText}>
+            <Text
+              style={[styles.confirmationText, { color: theme.textSecondary }]}
+            >
               {t('modals.unmatchText')}
             </Text>
             <View style={styles.confirmationButtons}>
               <TouchableOpacity
-                style={[styles.confirmButton, styles.cancelButton]}
+                style={[
+                  styles.confirmButton,
+                  styles.cancelButton,
+                  {
+                    backgroundColor: theme.surfaceVariant,
+                    borderColor: theme.border,
+                  },
+                ]}
                 onPress={cancelUnmatch}
               >
-                <Text style={styles.cancelButtonText}>
+                <Text style={[styles.cancelButtonText, { color: theme.text }]}>
                   {t('actions.cancel')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.confirmButton, styles.deleteButton]}
+                style={[
+                  styles.confirmButton,
+                  styles.deleteButton,
+                  {
+                    backgroundColor: theme.error,
+                    shadowColor: theme.error,
+                  },
+                ]}
                 onPress={confirmUnmatch}
               >
                 <Text style={styles.deleteButtonText}>
@@ -1268,11 +1431,9 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   card: {
-    backgroundColor: '#FFF',
     borderRadius: 24,
     overflow: 'hidden',
     elevation: 5,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
@@ -1282,12 +1443,10 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   likedCard: {
-    borderColor: '#FF69B4',
     borderWidth: 2,
   },
   dislikedCard: {
     opacity: 0.5,
-    borderColor: '#FF6B6B',
     borderWidth: 2,
   },
   imageContainer: {
@@ -1339,7 +1498,6 @@ const styles = StyleSheet.create({
   cardDot: {
     borderRadius: 3,
     elevation: 1,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.3,
     shadowRadius: 1,
@@ -1357,36 +1515,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 3,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
   },
-  dislikeBtn: {
-    backgroundColor: '#FFE5E5',
-  },
-  likeBtn: {
-    backgroundColor: '#FFE5F4',
-  },
+  dislikeBtn: {},
+  likeBtn: {},
   distanceContainer: {
     position: 'absolute',
     top: 8,
     right: 8,
-    backgroundColor: 'rgba(201, 183, 233, 0.95)',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 12,
     zIndex: 10,
     minWidth: 50,
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
   },
   distanceText: {
-    color: '#461237ff',
     fontSize: 12,
     fontWeight: '700',
   },
@@ -1395,7 +1545,6 @@ const styles = StyleSheet.create({
   },
   cardText: {
     fontSize: 15,
-    color: '#333',
     textAlign: 'center',
     fontWeight: '600',
   },
@@ -1488,7 +1637,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
@@ -1501,7 +1649,6 @@ const styles = StyleSheet.create({
   surroundingProfile: {
     position: 'absolute',
     overflow: 'hidden',
-    shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 3,
@@ -1546,13 +1693,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   confirmationModal: {
-    backgroundColor: '#FFF',
     marginHorizontal: 20,
     borderRadius: 24,
     padding: 32,
     alignItems: 'center',
     elevation: 8,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -1563,7 +1708,6 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#FFEBEE',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
@@ -1571,13 +1715,11 @@ const styles = StyleSheet.create({
   confirmationTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 12,
     textAlign: 'center',
   },
   confirmationText: {
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 28,
@@ -1599,14 +1741,10 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   cancelButton: {
-    backgroundColor: '#F8F9FA',
     borderWidth: 1.5,
-    borderColor: '#E9ECEF',
   },
   deleteButton: {
-    backgroundColor: '#FF6B6B',
     elevation: 2,
-    shadowColor: '#FF6B6B',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
@@ -1614,7 +1752,6 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#495057',
   },
   deleteButtonText: {
     fontSize: 16,

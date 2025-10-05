@@ -74,6 +74,7 @@ interface UserState {
   loadDiscoverProfiles: (refresh?: boolean) => Promise<void>;
   loadMoreProfiles: () => Promise<void>;
   loadMatches: () => Promise<void>; // Load existing matches from Firestore
+  loadLikes: () => Promise<void>; // Load existing likes from Firestore
   likeProfile: (profileId: string) => Promise<{
     isMatch: boolean;
     matchId?: string;
@@ -416,6 +417,42 @@ export const useUserStore = create<UserState>((set, get) => ({
     } catch (error) {
       console.error('❌ Error loading matches:', error);
       set({ error: 'Failed to load matches' });
+    } finally {
+      set({ isLoadingDiscover: false });
+    }
+  },
+
+  loadLikes: async () => {
+    const { currentUser } = get();
+    if (!currentUser) {
+      console.log('No user logged in, skipping likes loading');
+      return;
+    }
+
+    console.log('🔄 Loading existing likes from Firestore...');
+    set({ isLoadingDiscover: true, error: null });
+
+    try {
+      const response = await matchingService.getLikedProfiles(currentUser.id);
+
+      if (response.success) {
+        const likedUsers = response.data;
+        console.log(
+          `✅ Loaded ${likedUsers.length} liked profiles:`,
+          likedUsers.map((u) => u.id)
+        );
+
+        set({
+          likedProfiles: likedUsers.map((u) => u.id),
+          likedProfilesData: likedUsers,
+        });
+      } else {
+        console.error('❌ Failed to load likes:', response.message);
+        set({ error: response.message || 'Failed to load likes' });
+      }
+    } catch (error) {
+      console.error('❌ Error loading likes:', error);
+      set({ error: 'Failed to load likes' });
     } finally {
       set({ isLoadingDiscover: false });
     }

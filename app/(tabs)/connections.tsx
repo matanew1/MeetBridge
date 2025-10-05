@@ -419,7 +419,8 @@ const MemoizedConnectionItem = React.memo(
       prevProps.isSaved === nextProps.isSaved &&
       prevProps.connection.likes === nextProps.connection.likes &&
       prevProps.connection.comments === nextProps.connection.comments &&
-      prevProps.connection.views === nextProps.connection.views
+      prevProps.connection.views === nextProps.connection.views &&
+      prevProps.theme === nextProps.theme // IMPORTANT: Check theme changes for dark/light mode
     );
   }
 );
@@ -589,7 +590,7 @@ const CreateConnectionModal: React.FC<CreateModalProps> = ({
                     onPress={detectLocation}
                     disabled={isDetecting}
                   >
-                    <Navigation size={20} color="#FFF" />
+                    <Navigation size={20} color={theme.surface} />
                     <Text style={styles.detectButtonText}>
                       {isDetecting ? 'Detecting...' : 'Detect My Location'}
                     </Text>
@@ -732,7 +733,7 @@ const CreateConnectionModal: React.FC<CreateModalProps> = ({
                     <View
                       style={[
                         styles.toggleThumb,
-                        { backgroundColor: '#FFF' },
+                        { backgroundColor: theme.surface },
                         isAnonymous && styles.toggleThumbActive,
                       ]}
                     />
@@ -967,7 +968,7 @@ const EditConnectionModal: React.FC<EditModalProps> = ({
                     <View
                       style={[
                         styles.toggleThumb,
-                        { backgroundColor: '#FFF' },
+                        { backgroundColor: theme.surface },
                         isAnonymous && styles.toggleThumbActive,
                       ]}
                     />
@@ -1643,6 +1644,7 @@ export default function ConnectionsScreen() {
               />
             )}
             keyExtractor={(item) => item.id}
+            extraData={theme}
             ListEmptyComponent={renderEmptyState()}
             style={styles.connectionList}
             showsVerticalScrollIndicator={false}
@@ -1789,7 +1791,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#E0E0E0',
   },
   userInfo: {
     flex: 1,

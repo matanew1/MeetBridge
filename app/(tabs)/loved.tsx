@@ -54,25 +54,25 @@ const LikedProfileCard = React.memo(
     const heartAnim = React.useRef(new Animated.Value(1)).current;
 
     useEffect(() => {
-      // Reduced animation durations for snappier feel
+      // Faster animation durations for better performance
       Animated.parallel([
         Animated.timing(slideAnim, {
           toValue: 0,
-          duration: 300,
-          delay: index * 50, // Reduced delay
+          duration: 200, // Reduced from 300ms
+          delay: index * 30, // Reduced from 50ms
           useNativeDriver: true,
         }),
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 300,
-          delay: index * 50,
+          duration: 200, // Reduced from 300ms
+          delay: index * 30,
           useNativeDriver: true,
         }),
         Animated.spring(scaleAnim, {
           toValue: 1,
-          tension: 60,
+          tension: 80, // Increased from 60
           friction: 8,
-          delay: index * 50,
+          delay: index * 30,
           useNativeDriver: true,
         }),
       ]).start();
@@ -83,12 +83,12 @@ const LikedProfileCard = React.memo(
           Animated.sequence([
             Animated.timing(heartAnim, {
               toValue: 1.2,
-              duration: 600, // Slightly faster
+              duration: 500, // Reduced from 600ms
               useNativeDriver: true,
             }),
             Animated.timing(heartAnim, {
               toValue: 1,
-              duration: 600,
+              duration: 500, // Reduced from 600ms
               useNativeDriver: true,
             }),
           ]).start(() => pulse());
@@ -308,14 +308,31 @@ export default function LovedScreen() {
     loadCurrentUser(); // Ensure current user is loaded for actions
     loadConversations(); // Load existing conversations
 
-    // Load existing matches from Firestore
-    const { loadMatches } = useUserStore.getState();
+    // Load existing matches and likes from Firestore
+    const { loadMatches, loadLikes } = useUserStore.getState();
     loadMatches();
+    loadLikes();
 
     if (discoverProfiles.length === 0) {
       loadDiscoverProfiles(true);
     }
   }, []);
+
+  // Prefetch images for better scrolling performance
+  useEffect(() => {
+    const profilesToPreload =
+      activeTab === 'loved'
+        ? onlyLikedProfiles.slice(0, 3)
+        : matchedProfilesData.slice(0, 3);
+
+    profilesToPreload.forEach((profile) => {
+      if (profile.image) {
+        Image.prefetch(profile.image).catch(() => {
+          // Silently fail - not critical
+        });
+      }
+    });
+  }, [activeTab, onlyLikedProfiles, matchedProfilesData]);
 
   // Real-time unmatch listener - syncs unmatch across both users
   useEffect(() => {
@@ -407,11 +424,13 @@ export default function LovedScreen() {
       likedProfilesDataRaw.length,
       likedProfilesDataRaw.map((p) => p.id)
     );
-    // Deduplicate profiles by ID to prevent duplicate key errors
-    return likedProfilesDataRaw.filter(
-      (profile, index, self) =>
-        index === self.findIndex((p) => p.id === profile.id)
-    );
+    // Deduplicate profiles by ID using Set for O(1) lookup
+    const seenIds = new Set<string>();
+    return likedProfilesDataRaw.filter((profile) => {
+      if (seenIds.has(profile.id)) return false;
+      seenIds.add(profile.id);
+      return true;
+    });
   }, [likedProfilesDataRaw]);
 
   const matchedProfilesData = useMemo(() => {
@@ -420,18 +439,20 @@ export default function LovedScreen() {
       matchedProfilesDataRaw.length,
       matchedProfilesDataRaw.map((p) => p.id)
     );
-    // Deduplicate profiles by ID to prevent duplicate key errors
-    return matchedProfilesDataRaw.filter(
-      (profile, index, self) =>
-        index === self.findIndex((p) => p.id === profile.id)
-    );
+    // Deduplicate profiles by ID using Set for O(1) lookup
+    const seenIds = new Set<string>();
+    return matchedProfilesDataRaw.filter((profile) => {
+      if (seenIds.has(profile.id)) return false;
+      seenIds.add(profile.id);
+      return true;
+    });
   }, [matchedProfilesDataRaw]);
 
   // Get only liked profiles that are not matches
   const onlyLikedProfiles = useMemo(() => {
-    return likedProfilesData.filter(
-      (profile) => !matchedProfilesData.some((match) => match.id === profile.id)
-    );
+    // Use Set for O(1) lookup instead of some() which is O(n)
+    const matchedIds = new Set(matchedProfilesData.map((p) => p.id));
+    return likedProfilesData.filter((profile) => !matchedIds.has(profile.id));
   }, [likedProfilesData, matchedProfilesData]);
 
   // Memoized handlers for better performance
@@ -655,14 +676,16 @@ export default function LovedScreen() {
               data={onlyLikedProfiles}
               renderItem={renderItem}
               keyExtractor={keyExtractor}
+              extraData={theme}
               getItemLayout={getItemLayout}
               contentContainerStyle={styles.flatListContent}
               showsVerticalScrollIndicator={false}
               removeClippedSubviews={true}
-              maxToRenderPerBatch={10}
+              maxToRenderPerBatch={4}
               updateCellsBatchingPeriod={50}
-              windowSize={5}
+              windowSize={3}
               initialNumToRender={6}
+              scrollEventThrottle={16}
             />
           )
         ) : matchedProfilesData.length === 0 ? (
@@ -672,14 +695,16 @@ export default function LovedScreen() {
             data={matchedProfilesData}
             renderItem={renderItem}
             keyExtractor={keyExtractor}
+            extraData={theme}
             getItemLayout={getItemLayout}
             contentContainerStyle={styles.flatListContent}
             showsVerticalScrollIndicator={false}
             removeClippedSubviews={true}
-            maxToRenderPerBatch={10}
+            maxToRenderPerBatch={4}
             updateCellsBatchingPeriod={50}
-            windowSize={5}
+            windowSize={3}
             initialNumToRender={6}
+            scrollEventThrottle={16}
           />
         )}
       </Animated.View>
