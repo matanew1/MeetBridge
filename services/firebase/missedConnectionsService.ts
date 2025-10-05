@@ -556,7 +556,8 @@ class MissedConnectionsService {
   async addComment(
     connectionId: string,
     userId: string,
-    commentText: string
+    commentText: string,
+    isAnonymous: boolean = false
   ): Promise<{ success: boolean; message: string }> {
     try {
       const user = auth.currentUser;
@@ -575,10 +576,11 @@ class MissedConnectionsService {
 
       const commentData = {
         connectionId,
-        userId,
-        userName: userData?.name || 'Anonymous',
-        userImage: userData?.image || null,
+        userId: isAnonymous ? userId : userId, // Keep userId for tracking but hide identity
+        userName: isAnonymous ? 'Anonymous' : userData?.name || 'Anonymous',
+        userImage: isAnonymous ? null : userData?.image || null,
         text: commentText,
+        isAnonymous,
         createdAt: serverTimestamp(),
       };
 

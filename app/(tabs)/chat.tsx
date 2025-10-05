@@ -49,14 +49,14 @@ const ChatItem = ({
     Animated.parallel([
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 500,
-        delay: index * 100,
+        duration: 300,
+        delay: index * 50,
         useNativeDriver: true,
       }),
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 500,
-        delay: index * 100,
+        duration: 300,
+        delay: index * 50,
         useNativeDriver: true,
       }),
       Animated.spring(scaleAnim, {
@@ -209,12 +209,12 @@ export default function ChatScreen() {
     Animated.parallel([
       Animated.timing(headerSlideAnim, {
         toValue: 0,
-        duration: 500,
+        duration: 300,
         useNativeDriver: true,
       }),
       Animated.timing(headerFadeAnim, {
         toValue: 1,
-        duration: 500,
+        duration: 300,
         useNativeDriver: true,
       }),
     ]).start();
@@ -286,12 +286,12 @@ export default function ChatScreen() {
       Animated.parallel([
         Animated.timing(contentSlideAnim, {
           toValue: 0,
-          duration: 500,
+          duration: 300,
           useNativeDriver: true,
         }),
         Animated.timing(contentFadeAnim, {
           toValue: 1,
-          duration: 500,
+          duration: 300,
           useNativeDriver: true,
         }),
       ]).start();
@@ -308,19 +308,19 @@ export default function ChatScreen() {
       Animated.sequence([
         Animated.timing(emptyFadeAnim, {
           toValue: 1,
-          duration: 600,
+          duration: 400,
           useNativeDriver: true,
         }),
         Animated.parallel([
           Animated.spring(emptyIconAnim, {
             toValue: 1,
-            tension: 50,
-            friction: 7,
+            tension: 70,
+            friction: 8,
             useNativeDriver: true,
           }),
           Animated.timing(emptyTextAnim, {
             toValue: 0,
-            duration: 500,
+            duration: 300,
             useNativeDriver: true,
           }),
         ]),

@@ -7,6 +7,7 @@ import {
   SafeAreaView,
   TouchableOpacity,
   ScrollView,
+  FlatList,
   Animated,
   TextInput,
   Modal,
@@ -104,20 +105,20 @@ const ConnectionItem: React.FC<ConnectionItemProps> = ({
     Animated.parallel([
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 500,
-        delay: index * 100,
+        duration: 300,
+        delay: index * 50,
         useNativeDriver: true,
       }),
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 500,
-        delay: index * 100,
+        duration: 300,
+        delay: index * 50,
         useNativeDriver: true,
       }),
       Animated.spring(scaleAnim, {
         toValue: 1,
-        tension: 50,
-        friction: 7,
+        tension: 80,
+        friction: 8,
         delay: index * 100,
         useNativeDriver: true,
       }),
@@ -407,6 +408,21 @@ const ConnectionItem: React.FC<ConnectionItemProps> = ({
     </Animated.View>
   );
 };
+
+// Memoize ConnectionItem to prevent unnecessary re-renders
+const MemoizedConnectionItem = React.memo(
+  ConnectionItem,
+  (prevProps, nextProps) => {
+    return (
+      prevProps.connection.id === nextProps.connection.id &&
+      prevProps.isLiked === nextProps.isLiked &&
+      prevProps.isSaved === nextProps.isSaved &&
+      prevProps.connection.likes === nextProps.connection.likes &&
+      prevProps.connection.comments === nextProps.connection.comments &&
+      prevProps.connection.views === nextProps.connection.views
+    );
+  }
+);
 
 // Create Connection Modal
 interface CreateModalProps {
@@ -1607,37 +1623,40 @@ export default function ConnectionsScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-          {connections.length === 0 ? (
-            renderEmptyState()
-          ) : (
-            <ScrollView
-              style={styles.connectionList}
-              showsVerticalScrollIndicator={false}
-            >
-              {connections.map((connection, index) => (
-                <ConnectionItem
-                  key={connection.id}
-                  connection={connection}
-                  theme={theme}
-                  index={index}
-                  onPress={() => handleViewConnection(connection.id)}
-                  onLike={() => handleLike(connection.id)}
-                  onClaim={() => handleClaim(connection.id)}
-                  onComment={() => handleComment(connection.id)}
-                  onEdit={() => handleEdit(connection)}
-                  onDelete={() => handleDelete(connection.id)}
-                  onSave={() => handleSave(connection.id)}
-                  isLiked={
-                    connection.likedBy?.includes(user?.id || '') || false
-                  }
-                  isSaved={
-                    connection.savedBy?.includes(user?.id || '') || false
-                  }
-                  currentUserId={user?.id}
-                />
-              ))}
-            </ScrollView>
-          )}
+          <FlatList
+            data={connections}
+            renderItem={({ item: connection, index }) => (
+              <MemoizedConnectionItem
+                connection={connection}
+                theme={theme}
+                index={index}
+                onPress={() => handleViewConnection(connection.id)}
+                onLike={() => handleLike(connection.id)}
+                onClaim={() => handleClaim(connection.id)}
+                onComment={() => handleComment(connection.id)}
+                onEdit={() => handleEdit(connection)}
+                onDelete={() => handleDelete(connection.id)}
+                onSave={() => handleSave(connection.id)}
+                isLiked={connection.likedBy?.includes(user?.id || '') || false}
+                isSaved={connection.savedBy?.includes(user?.id || '') || false}
+                currentUserId={user?.id}
+              />
+            )}
+            keyExtractor={(item) => item.id}
+            ListEmptyComponent={renderEmptyState()}
+            style={styles.connectionList}
+            showsVerticalScrollIndicator={false}
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={5}
+            updateCellsBatchingPeriod={50}
+            initialNumToRender={5}
+            windowSize={5}
+            getItemLayout={(data, index) => ({
+              length: 200,
+              offset: 200 * index,
+              index,
+            })}
+          />
         </Animated.View>
       </SafeAreaView>
 

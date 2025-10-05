@@ -73,29 +73,29 @@ const ProfileCard = ({
 
   React.useEffect(() => {
     opacity.value = withTiming(1, {
-      duration: 400,
-      easing: Easing.out(Easing.cubic),
+      duration: 250,
+      easing: Easing.out(Easing.ease),
     });
     translateY.value = withTiming(0, {
-      duration: 400,
-      easing: Easing.out(Easing.cubic),
+      duration: 250,
+      easing: Easing.out(Easing.ease),
     });
-    scale.value = withSpring(1, { damping: 12, stiffness: 150 });
+    scale.value = withSpring(1, { damping: 15, stiffness: 200 });
   }, []);
 
   React.useEffect(() => {
     if (isAnimatingOut) {
       opacity.value = withTiming(0, {
-        duration: 400,
-        easing: Easing.bezier(0.4, 0, 0.6, 1),
+        duration: 200,
+        easing: Easing.in(Easing.ease),
       });
-      translateY.value = withTiming(isLiked || !isDisliked ? -80 : 80, {
-        duration: 400,
-        easing: Easing.bezier(0.4, 0, 0.2, 1),
+      translateY.value = withTiming(isLiked || !isDisliked ? -100 : 100, {
+        duration: 200,
+        easing: Easing.in(Easing.ease),
       });
       scale.value = withSequence(
-        withTiming(1.05, { duration: 100, easing: Easing.out(Easing.ease) }),
-        withTiming(0.7, { duration: 300, easing: Easing.in(Easing.cubic) })
+        withTiming(1.03, { duration: 60, easing: Easing.out(Easing.ease) }),
+        withTiming(0.8, { duration: 140, easing: Easing.in(Easing.ease) })
       );
     }
   }, [isAnimatingOut, isLiked, isDisliked]);
@@ -610,7 +610,7 @@ export default function SearchScreen() {
             return newSet;
           });
         });
-    }, 300); // Match animation duration
+    }, 200); // Reduced from 300ms to 200ms for faster animation
   };
 
   const handleDislike = (profileId: string) => {
@@ -628,7 +628,7 @@ export default function SearchScreen() {
         newSet.delete(profileId);
         return newSet;
       });
-    }, 300); // Match animation duration
+    }, 200); // Reduced from 300ms to 200ms for faster animation
   };
 
   const handleProfilePress = (user: any) => {

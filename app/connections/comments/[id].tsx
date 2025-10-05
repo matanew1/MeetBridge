@@ -14,6 +14,7 @@ import {
   Alert,
   Image,
   ActivityIndicator,
+  Keyboard,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -23,6 +24,10 @@ import {
   Heart,
   Eye,
   TrendingUp,
+  EyeOff,
+  UserCheck,
+  MapPin,
+  CheckCircle,
 } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -40,6 +45,7 @@ interface Comment {
   userImage?: string;
   text: string;
   createdAt: Date;
+  isAnonymous?: boolean;
 }
 
 function formatRelativeTime(date: Date): string {
@@ -70,14 +76,14 @@ const CommentItem: React.FC<{
     Animated.parallel([
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 400,
-        delay: index * 50,
+        duration: 250,
+        delay: index * 30,
         useNativeDriver: true,
       }),
       Animated.timing(commentFadeAnim, {
         toValue: 1,
-        duration: 400,
-        delay: index * 50,
+        duration: 250,
+        delay: index * 30,
         useNativeDriver: true,
       }),
     ]).start();
@@ -104,9 +110,29 @@ const CommentItem: React.FC<{
       />
       <View style={styles.commentContent}>
         <View style={styles.commentHeader}>
-          <Text style={[styles.commentUserName, { color: theme.text }]}>
-            {comment.userName}
-          </Text>
+          <View style={styles.commentUserNameRow}>
+            <Text style={[styles.commentUserName, { color: theme.text }]}>
+              {comment.userName}
+            </Text>
+            {comment.isAnonymous && (
+              <View
+                style={[
+                  styles.anonymousBadge,
+                  { backgroundColor: theme.borderLight },
+                ]}
+              >
+                <EyeOff size={10} color={theme.textSecondary} />
+                <Text
+                  style={[
+                    styles.anonymousBadgeText,
+                    { color: theme.textSecondary },
+                  ]}
+                >
+                  Anonymous
+                </Text>
+              </View>
+            )}
+          </View>
           <Text style={[styles.commentTime, { color: theme.textSecondary }]}>
             {formatRelativeTime(comment.createdAt)}
           </Text>
@@ -131,9 +157,12 @@ export default function CommentsScreen() {
   const [commentText, setCommentText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [isClaiming, setIsClaiming] = useState(false);
 
   const scrollViewRef = useRef<ScrollView>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
     loadConnectionAndComments();
@@ -142,6 +171,21 @@ export default function CommentsScreen() {
       duration: 500,
       useNativeDriver: true,
     }).start();
+
+    // Keyboard listeners
+    const keyboardWillShow = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    );
+
+    const keyboardWillHide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
 
     // Set up real-time listener for comments
     const unsubscribe = missedConnectionsService.subscribeToComments(
@@ -155,6 +199,8 @@ export default function CommentsScreen() {
       if (unsubscribe) {
         unsubscribe();
       }
+      keyboardWillShow.remove();
+      keyboardWillHide.remove();
     };
   }, [id]);
 
@@ -198,8 +244,9 @@ export default function CommentsScreen() {
 
     const result = await missedConnectionsService.addComment(
       id as string,
-      user?.uid || '',
-      commentText.trim()
+      user?.id || '',
+      commentText.trim(),
+      isAnonymous
     );
 
     if (result.success) {
@@ -223,6 +270,93 @@ export default function CommentsScreen() {
     }
 
     setIsSending(false);
+  };
+
+  const handleClaimConnection = async () => {
+    if (!isAuthenticated) {
+      Alert.alert(
+        'Sign In Required',
+        'Please sign in to claim this connection.'
+      );
+      return;
+    }
+
+    /**
+     * VERIFICATION SYSTEM IDEAS:
+     *
+     * 1. Location History Verification (Privacy-Aware)
+     *    - Check if user's location history shows they were within 100m radius
+     *    - Only checks if user has location tracking enabled
+     *    - Uses geohash matching for privacy
+     *
+     * 2. Time-Based Verification
+     *    - Check if claim time matches post time ±2 hours
+     *    - Cross-reference with user's app usage timestamps
+     *
+     * 3. Creator Confirmation
+     *    - Post creator gets notification with claimer's profile
+     *    - Can approve/reject the claim
+     *    - Both get matched if approved
+     *
+     * 4. Reputation System
+     *    - Track successful vs. false claims
+     *    - Lower credibility = claims require more verification
+     *    - Good reputation = instant matches
+     *
+     * 5. Photo Verification (Future)
+     *    - Optional: Upload a photo from that time/location
+     *    - Check EXIF data for location & timestamp
+     *
+     * 6. Mutual Friends/Connections
+     *    - If claimer and creator have mutual matches
+     *    - Higher trust score
+     */
+
+    // Show verification info and confirmation
+    Alert.alert(
+      "That's You? 🎯",
+      "By claiming this connection, you're saying you were at this location at the specified time.\n\n" +
+        '💡 Verification:\n' +
+        "• We'll check your location history (if enabled)\n" +
+        '• Post creator will review your claim\n' +
+        '• Multiple false claims may affect your credibility\n\n' +
+        'Are you sure you were there?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: "Yes, That's Me!",
+          onPress: async () => {
+            setIsClaiming(true);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+            const result = await missedConnectionsService.claimConnection(
+              id as string
+            );
+
+            if (result.success) {
+              Alert.alert(
+                'Claim Submitted! ✨',
+                "The post creator will be notified. If they confirm, you'll both be matched!"
+              );
+
+              // Reload connection to show updated claims
+              const connectionResult =
+                await missedConnectionsService.getConnectionById(id as string);
+              if (connectionResult.success && connectionResult.data) {
+                setConnection(connectionResult.data);
+              }
+            } else {
+              Alert.alert('Error', result.message);
+            }
+
+            setIsClaiming(false);
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -262,7 +396,11 @@ export default function CommentsScreen() {
             <ActivityIndicator size="large" color={theme.primary} />
           </View>
         ) : (
-          <>
+          <KeyboardAvoidingView
+            style={styles.keyboardAvoidingView}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          >
             {/* Connection Post */}
             {connection && (
               <Animated.View
@@ -343,8 +481,15 @@ export default function CommentsScreen() {
             <ScrollView
               ref={scrollViewRef}
               style={styles.commentsList}
-              contentContainerStyle={styles.commentsListContent}
+              contentContainerStyle={[
+                styles.commentsListContent,
+                {
+                  paddingBottom: Platform.OS === 'android' ? keyboardHeight : 0,
+                },
+              ]}
               showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              onScrollBeginDrag={() => Keyboard.dismiss()}
             >
               {comments.length === 0 ? (
                 <View style={styles.emptyState}>
@@ -367,11 +512,82 @@ export default function CommentsScreen() {
               )}
             </ScrollView>
 
+            {/* That's Me Button */}
+            {connection && connection.userId !== user?.id && (
+              <View
+                style={[
+                  styles.claimContainer,
+                  {
+                    backgroundColor: theme.surface,
+                    borderTopColor: theme.border,
+                  },
+                ]}
+              >
+                <TouchableOpacity
+                  style={[
+                    styles.claimButton,
+                    {
+                      backgroundColor: theme.primary,
+                      opacity: isClaiming ? 0.7 : 1,
+                    },
+                  ]}
+                  onPress={handleClaimConnection}
+                  disabled={isClaiming}
+                >
+                  {isClaiming ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <>
+                      <UserCheck size={20} color="#FFF" />
+                      <Text style={styles.claimButtonText}>That's Me!</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+                <Text
+                  style={[styles.claimHint, { color: theme.textSecondary }]}
+                >
+                  Were you at {connection.location.landmark}?
+                </Text>
+              </View>
+            )}
+
             {/* Comment Input */}
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-            >
+            <View style={styles.commentInputWrapper}>
+              {/* Anonymous Toggle */}
+              <View
+                style={[
+                  styles.anonymousToggle,
+                  { backgroundColor: theme.surface },
+                ]}
+              >
+                <TouchableOpacity
+                  style={styles.anonymousToggleButton}
+                  onPress={() => {
+                    setIsAnonymous(!isAnonymous);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                >
+                  {isAnonymous ? (
+                    <EyeOff size={16} color={theme.primary} />
+                  ) : (
+                    <Eye size={16} color={theme.textSecondary} />
+                  )}
+                  <Text
+                    style={[
+                      styles.anonymousToggleText,
+                      {
+                        color: isAnonymous
+                          ? theme.primary
+                          : theme.textSecondary,
+                      },
+                    ]}
+                  >
+                    {isAnonymous ? 'Anonymous' : 'Public'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Input Row */}
               <View
                 style={[
                   styles.inputContainer,
@@ -394,8 +610,16 @@ export default function CommentsScreen() {
                   placeholderTextColor={theme.textSecondary}
                   value={commentText}
                   onChangeText={setCommentText}
+                  onFocus={() => {
+                    // Scroll to bottom when input is focused
+                    setTimeout(() => {
+                      scrollViewRef.current?.scrollToEnd({ animated: true });
+                    }, 300);
+                  }}
                   multiline
                   maxLength={500}
+                  returnKeyType="send"
+                  blurOnSubmit={false}
                 />
                 <TouchableOpacity
                   style={[
@@ -417,8 +641,8 @@ export default function CommentsScreen() {
                   )}
                 </TouchableOpacity>
               </View>
-            </KeyboardAvoidingView>
-          </>
+            </View>
+          </KeyboardAvoidingView>
         )}
       </SafeAreaView>
     </LinearGradient>
@@ -430,6 +654,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   safeArea: {
+    flex: 1,
+  },
+  keyboardAvoidingView: {
     flex: 1,
   },
   header: {
@@ -566,9 +793,28 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 6,
   },
+  commentUserNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
   commentUserName: {
     fontSize: 14,
     fontWeight: '700',
+  },
+  anonymousBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  anonymousBadgeText: {
+    fontSize: 9,
+    fontWeight: '600',
+    textTransform: 'uppercase',
   },
   commentTime: {
     fontSize: 11,
@@ -589,12 +835,59 @@ const styles = StyleSheet.create({
     fontSize: 15,
     textAlign: 'center',
   },
+  claimContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    alignItems: 'center',
+    gap: 8,
+  },
+  claimButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  claimButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  claimHint: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  commentInputWrapper: {
+    backgroundColor: 'transparent',
+  },
+  anonymousToggle: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
+  },
+  anonymousToggleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  anonymousToggleText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderTopWidth: 1,
     gap: 12,
   },
   input: {
