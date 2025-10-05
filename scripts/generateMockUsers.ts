@@ -10,6 +10,7 @@ import {
   getDoc,
 } from 'firebase/firestore';
 import { geohashForLocation } from 'geofire-common';
+import * as readline from 'readline';
 
 //CHECK: remove unused fields ✅ (Removed: displayName, lookingFor duplicates)
 //CHECK: when unmatch make sure to remove from both users related collections the chats in both users ✅ (Implemented in unmatchProfile - deletes match, conversation, all messages, creates 24h ban both directions)
@@ -37,9 +38,9 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Base location (Tel Aviv area - your current location)
-const BASE_LAT = 32.081273;
-const BASE_LON = 34.890642;
+// Base location - Will be set from user input or default to Tel Aviv
+let BASE_LAT = 32.081273; // Default: Tel Aviv
+let BASE_LON = 34.890642; // Default: Tel Aviv
 
 // Helper function to generate random location near base
 function generateNearbyLocation(distanceMeters: number): {
@@ -93,7 +94,7 @@ function getRandomPlaceholderImage(
 
 // Mock user data - All distances in METERS
 // Filter range: 50m-5000m (configured in FilterModal.tsx)
-// Precise distances: 5m, 10m, 20m, 50m, 100m, 200m, 500m, 1000m for accurate testing
+// Wide spread of distances for comprehensive filter testing: 50m to 4500m
 const mockUsers = [
   {
     name: 'Sarah',
@@ -103,7 +104,7 @@ const mockUsers = [
     bio: 'Love hiking and beach volleyball 🏐',
     interests: ['Sports', 'Nature', 'Travel', 'Music'],
     height: 168,
-    distanceMeters: 5, // 5m away - ultra close!
+    distanceMeters: 5, // 5m away - very close!
   },
   {
     name: 'Yael',
@@ -113,7 +114,7 @@ const mockUsers = [
     bio: 'Foodie and coffee enthusiast ☕',
     interests: ['Food', 'Photography', 'Art', 'Music'],
     height: 165,
-    distanceMeters: 10, // 10m away
+    distanceMeters: 25, // 25m away
   },
   {
     name: 'Maya',
@@ -123,7 +124,7 @@ const mockUsers = [
     bio: 'Yoga instructor & wellness coach 🧘‍♀️',
     interests: ['Fitness', 'Nature', 'Wellness', 'Meditation'],
     height: 170,
-    distanceMeters: 20, // 20m away
+    distanceMeters: 50, // 50m away
   },
   {
     name: 'Noa',
@@ -133,7 +134,7 @@ const mockUsers = [
     bio: 'Tech enthusiast and gamer 🎮',
     interests: ['Gaming', 'Technology', 'Movies', 'Anime'],
     height: 162,
-    distanceMeters: 50, // 50m away - minimum filter distance
+    distanceMeters: 100, // 100m away
   },
   {
     name: 'Tamar',
@@ -143,7 +144,7 @@ const mockUsers = [
     bio: 'Artist and dreamer 🎨',
     interests: ['Art', 'Music', 'Theater', 'Photography'],
     height: 172,
-    distanceMeters: 100, // 100m away
+    distanceMeters: 200, // 200m away
   },
   {
     name: 'Dan',
@@ -153,7 +154,7 @@ const mockUsers = [
     bio: 'Entrepreneur and adventure seeker 🚀',
     interests: ['Business', 'Travel', 'Sports', 'Technology'],
     height: 180,
-    distanceMeters: 10, // 10m away
+    distanceMeters: 10, // 10m away - very close!
   },
   {
     name: 'Ori',
@@ -163,7 +164,7 @@ const mockUsers = [
     bio: 'Music producer and DJ 🎧',
     interests: ['Music', 'Nightlife', 'Travel', 'Art'],
     height: 178,
-    distanceMeters: 20, // 20m away
+    distanceMeters: 75, // 75m away
   },
   {
     name: 'Avi',
@@ -173,7 +174,7 @@ const mockUsers = [
     bio: 'Chef and food lover 👨‍🍳',
     interests: ['Food', 'Cooking', 'Wine', 'Travel'],
     height: 182,
-    distanceMeters: 200, // 200m away
+    distanceMeters: 150, // 150m away
   },
   {
     name: 'Tom',
@@ -183,7 +184,7 @@ const mockUsers = [
     bio: 'Software engineer and book nerd 📚',
     interests: ['Technology', 'Reading', 'Gaming', 'Science'],
     height: 175,
-    distanceMeters: 500, // 500m away
+    distanceMeters: 300, // 300m away
   },
   {
     name: 'Eitan',
@@ -193,7 +194,7 @@ const mockUsers = [
     bio: 'Fitness trainer and sports enthusiast 💪',
     interests: ['Fitness', 'Sports', 'Health', 'Nature'],
     height: 185,
-    distanceMeters: 1000, // 1000m away (1km)
+    distanceMeters: 500, // 500m away - max distance
   },
 ];
 
@@ -264,7 +265,11 @@ const mockComments = [
   'Sending positive vibes! ✨',
 ];
 
-async function createMockUser(userData: (typeof mockUsers)[0], index: number) {
+async function createMockUser(
+  userData: (typeof mockUsers)[0],
+  index: number,
+  locationName: string = 'Tel Aviv, Israel'
+) {
   const email = `mock${index + 1}@meetbridge.test`;
   const password = 'Test1234!';
 
@@ -283,10 +288,27 @@ async function createMockUser(userData: (typeof mockUsers)[0], index: number) {
 
     // Generate location near base coordinates
     const location = generateNearbyLocation(userData.distanceMeters);
-    // Use precision 9 for ~4.8m accuracy (highest accuracy for matching)
+    // Use precision 9 for ~4.8m accuracy (HIGH PRECISION for 5-500m range)
+    // Precision 9 provides:
+    // - Excellent accuracy (±4.8m) - perfect for close proximity matching
+    // - Essential for 5-500m distance range
+    // - More granular location tracking
     const geohash = geohashForLocation(
       [location.latitude, location.longitude],
       9
+    );
+
+    // Verify actual distance for debugging
+    const actualDistance = Math.round(
+      Math.sqrt(
+        Math.pow((location.latitude - BASE_LAT) * 111000, 2) +
+          Math.pow(
+            (location.longitude - BASE_LON) *
+              111000 *
+              Math.cos((BASE_LAT * Math.PI) / 180),
+            2
+          )
+      )
     );
 
     console.log(`📍 Generated location for ${userData.name}:`, {
@@ -295,8 +317,11 @@ async function createMockUser(userData: (typeof mockUsers)[0], index: number) {
         lon: location.longitude.toFixed(6),
       },
       targetDistanceMeters: userData.distanceMeters,
+      actualDistanceMeters: actualDistance,
+      deviation: Math.abs(actualDistance - userData.distanceMeters) + 'm',
       geohash,
       geohashPrecision: 9,
+      geohashAccuracy: '±4.8m',
     });
 
     // Calculate date of birth from age
@@ -332,7 +357,7 @@ async function createMockUser(userData: (typeof mockUsers)[0], index: number) {
       height: userData.height,
       image: placeholderImage, // First image (images[0])
       images: placeholderImages, // Full array including the first image
-      location: 'Tel Aviv, Israel',
+      location: locationName, // Use dynamic location name
       coordinates: {
         latitude: location.latitude,
         longitude: location.longitude,
@@ -340,7 +365,7 @@ async function createMockUser(userData: (typeof mockUsers)[0], index: number) {
       geohash,
       preferences: {
         ageRange: [18, 35],
-        maxDistance: 1000, // 1km in METERS (within 50m-5000m filter range)
+        maxDistance: 500, // 500m in METERS (matches new 5-500m range)
         interestedIn: userData.interestedIn, // Removed duplicate: lookingFor (using preferences.interestedIn)
       },
       createdAt: serverTimestamp(),
@@ -497,15 +522,131 @@ async function createMockComments(
   );
 }
 
+// Function to get location from user
+async function getUserLocation(): Promise<{
+  lat: number;
+  lon: number;
+  locationName: string;
+}> {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  return new Promise((resolve) => {
+    console.log('\n📍 Location Setup for Mock Users');
+    console.log('='.repeat(50));
+    console.log('You can either:');
+    console.log(
+      '  1. Use your CURRENT device location (requires location services)'
+    );
+    console.log('  2. Enter coordinates manually');
+    console.log('  3. Use default Tel Aviv location');
+    console.log('');
+
+    rl.question('Choose option (1/2/3) [default: 3]: ', (answer) => {
+      const choice = answer.trim() || '3';
+
+      if (choice === '1') {
+        console.log(
+          '\n⚠️ Note: This script runs in Node.js and cannot access device location.'
+        );
+        console.log('Please use option 2 to enter your coordinates manually.');
+        console.log(
+          'You can find your coordinates at: https://www.latlong.net/\n'
+        );
+
+        rl.question('Enter latitude (e.g., 32.081273): ', (lat) => {
+          rl.question('Enter longitude (e.g., 34.890642): ', (lon) => {
+            rl.question('Enter location name (e.g., Tel Aviv): ', (name) => {
+              rl.close();
+              const latitude = parseFloat(lat.trim());
+              const longitude = parseFloat(lon.trim());
+
+              if (isNaN(latitude) || isNaN(longitude)) {
+                console.log('❌ Invalid coordinates, using Tel Aviv default');
+                resolve({
+                  lat: 32.081273,
+                  lon: 34.890642,
+                  locationName: 'Tel Aviv, Israel',
+                });
+              } else {
+                resolve({
+                  lat: latitude,
+                  lon: longitude,
+                  locationName: name.trim() || 'Custom Location',
+                });
+              }
+            });
+          });
+        });
+      } else if (choice === '2') {
+        console.log(
+          '\nEnter your coordinates (you can find them at https://www.latlong.net/)\n'
+        );
+
+        rl.question('Enter latitude (e.g., 32.081273): ', (lat) => {
+          rl.question('Enter longitude (e.g., 34.890642): ', (lon) => {
+            rl.question('Enter location name (e.g., Tel Aviv): ', (name) => {
+              rl.close();
+              const latitude = parseFloat(lat.trim());
+              const longitude = parseFloat(lon.trim());
+
+              if (isNaN(latitude) || isNaN(longitude)) {
+                console.log('❌ Invalid coordinates, using Tel Aviv default');
+                resolve({
+                  lat: 32.081273,
+                  lon: 34.890642,
+                  locationName: 'Tel Aviv, Israel',
+                });
+              } else {
+                console.log(`✅ Using coordinates: ${latitude}, ${longitude}`);
+                resolve({
+                  lat: latitude,
+                  lon: longitude,
+                  locationName: name.trim() || 'Custom Location',
+                });
+              }
+            });
+          });
+        });
+      } else {
+        rl.close();
+        console.log('✅ Using default Tel Aviv location');
+        resolve({
+          lat: 32.081273,
+          lon: 34.890642,
+          locationName: 'Tel Aviv, Israel',
+        });
+      }
+    });
+  });
+}
+
 async function generateAllMockUsers() {
   console.log('🚀 Starting mock user generation...');
-  console.log(`📍 Base location: ${BASE_LAT}, ${BASE_LON} (Tel Aviv area)\n`);
+  console.log('');
+
+  // Get user's preferred location
+  const userLocation = await getUserLocation();
+  BASE_LAT = userLocation.lat;
+  BASE_LON = userLocation.lon;
+
+  console.log('\n📍 Base Location Configuration:');
+  console.log(`   Latitude: ${BASE_LAT}`);
+  console.log(`   Longitude: ${BASE_LON}`);
+  console.log(`   Location: ${userLocation.locationName}`);
+  console.log('');
 
   const results = [];
 
   // Step 1: Create users
   for (let i = 0; i < mockUsers.length; i++) {
-    const result = await createMockUser(mockUsers[i], i);
+    const result = await createMockUser(
+      mockUsers[i],
+      i,
+      userLocation.locationName
+    );
     results.push(result);
 
     // Small delay to avoid rate limits
@@ -525,14 +666,15 @@ async function generateAllMockUsers() {
     console.log('Password: Test1234!');
 
     console.log('\n📏 Distance Configuration (ALL IN METERS):');
-    console.log('Filter range: 50m - 5000m');
+    console.log('Filter range: 5m - 500m');
     console.log(
       `Mock users spread: ${Math.min(
         ...mockUsers.map((u) => u.distanceMeters)
       )}m - ${Math.max(...mockUsers.map((u) => u.distanceMeters))}m`
     );
-    console.log('User preferences maxDistance: 1000m');
-    console.log('✅ All users are within discoverable range!');
+    console.log('User preferences maxDistance: 500m');
+    console.log('✅ All users are within the 500m discoverable range!');
+    console.log('🎯 Geohash precision: 9 (±4.8m accuracy)');
 
     // Step 2: Create posts
     const successfulUsers = results

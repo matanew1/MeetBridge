@@ -480,21 +480,43 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
           const data = docSnapshot.data();
 
           // Validate and filter
-          if (!data || typeof data.age !== 'number' || !data.gender) return;
+          if (!data || typeof data.age !== 'number' || !data.gender) {
+            console.log(
+              `⚠️ QUEUE: Invalid data for profile ${docSnapshot.id}:`,
+              {
+                hasData: !!data,
+                hasAge: typeof data?.age === 'number',
+                hasGender: !!data?.gender,
+              }
+            );
+            return;
+          }
 
           const matchesGender =
             filters.gender === 'both' || data.gender === filters.gender;
           const matchesAge =
             data.age >= filters.ageRange[0] && data.age <= filters.ageRange[1];
 
-          // DEBUG: Log gender filtering in queue population
-          if (!matchesGender) {
-            console.log(
-              `⚠️ QUEUE: Gender mismatch - ${data.name} (${data.gender}) filtered. Looking for: ${filters.gender}`
-            );
-          }
+          // DEBUG: Comprehensive logging for each profile
+          console.log(`👤 QUEUE: Processing ${data.name || 'Unknown'}`, {
+            profileId: docSnapshot.id,
+            gender: data.gender,
+            lookingFor: filters.gender,
+            matchesGender,
+            age: data.age,
+            ageRange: filters.ageRange,
+            matchesAge,
+            willAdd: matchesGender && matchesAge,
+          });
 
-          if (!matchesGender || !matchesAge) return;
+          if (!matchesGender || !matchesAge) {
+            console.log(
+              `❌ QUEUE: Filtered out ${data.name} - Gender: ${
+                matchesGender ? '✅' : '❌'
+              }, Age: ${matchesAge ? '✅' : '❌'}`
+            );
+            return;
+          }
 
           // Calculate distance and score
           if (data.coordinates?.latitude && data.coordinates?.longitude) {
@@ -507,8 +529,24 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
                 data.coordinates.longitude
               );
 
+              console.log(`📏 QUEUE: Distance calculated for ${data.name}`, {
+                distance: distance + 'm',
+                maxDistance: filters.maxDistance + 'm',
+                withinRange: distance <= filters.maxDistance,
+                userLat: userLocation.latitude.toFixed(6),
+                userLon: userLocation.longitude.toFixed(6),
+                profileLat: data.coordinates.latitude.toFixed(6),
+                profileLon: data.coordinates.longitude.toFixed(6),
+                profileGeohash: data.geohash,
+              });
+
               // Both in METERS
-              if (distance > filters.maxDistance) return;
+              if (distance > filters.maxDistance) {
+                console.log(
+                  `❌ QUEUE: ${data.name} filtered by distance: ${distance}m > ${filters.maxDistance}m`
+                );
+                return;
+              }
 
               // Calculate compatibility score (0-100)
               const score = this.calculateCompatibilityScore(

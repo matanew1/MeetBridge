@@ -11,6 +11,9 @@
     "lint": "npx expo lint",
     "generate-mock-users": "ts-node scripts/generateMockUsers.ts",
     "delete-mock-users": "ts-node scripts/deleteMockUsers.ts",
+    "check-mock-users": "ts-node scripts/checkMockUsersGeohash.ts",
+    "test-geohash-query": "ts-node scripts/testGeohashQuery.ts",
+    "update-my-profile": "ts-node scripts/updateMyProfile.ts",
     "drop-collections": "ts-node scripts/dropCollections.ts",
     "drop-collection": "ts-node scripts/dropCollections.ts"
   },

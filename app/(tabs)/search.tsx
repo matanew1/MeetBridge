@@ -288,8 +288,8 @@ export default function SearchScreen() {
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [matchedUser, setMatchedUser] = useState<any>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [maxDistance, setMaxDistance] = useState(100); // Default to 100m for nearby search
-  const [ageRange, setAgeRange] = useState<[number, number]>([18, 99]); // Default age range
+  const [maxDistance, setMaxDistance] = useState(500); // Default to 500m max range (precision 9)
+  const [ageRange, setAgeRange] = useState<[number, number]>([18, 35]); // Default age range 18-35
   const [showMatchAnimation, setShowMatchAnimation] = useState(false);
   const [matchData, setMatchData] = useState<{
     user: any;
@@ -370,14 +370,14 @@ export default function SearchScreen() {
   const updateUserPreferences = () => {
     // Update search filters based on user preferences
     if (currentUser) {
-      let maxDistanceMeters = currentUser.preferences?.maxDistance || 100; // Default to 100m for nearby search
+      let maxDistanceMeters = currentUser.preferences?.maxDistance || 500; // Default to 500m max range
 
-      // Safety check: If maxDistance is less than 5m (minimum), set to 100m default
+      // Safety check: If maxDistance is less than 5m (minimum), set to 500m default
       if (maxDistanceMeters < 5) {
         console.warn(
-          `⚠️ maxDistance too small (${maxDistanceMeters}m), using 100m default`
+          `⚠️ maxDistance too small (${maxDistanceMeters}m), using 500m default`
         );
-        maxDistanceMeters = 100;
+        maxDistanceMeters = 500;
       }
 
       const userAgeRange = currentUser.preferences?.ageRange || [18, 99];

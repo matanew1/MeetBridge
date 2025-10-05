@@ -361,17 +361,17 @@ class LocationService {
    * Generate geohash with adaptive precision based on use case
    * @param latitude - Latitude coordinate
    * @param longitude - Longitude coordinate
-   * @param precision - Geohash precision (default: 8 for optimal balance)
+   * @param precision - Geohash precision (default: 9 for HIGH PRECISION)
    */
   generateGeohash(
     latitude: number,
     longitude: number,
-    precision: number = 8
+    precision: number = 9
   ): string {
-    // Precision 8 (~19m accuracy) is optimal for dating apps
-    // - More accurate than needed for city-level matching
-    // - Less storage than precision 9
-    // - Better query performance than higher precision
+    // Precision 9 (~4.8m accuracy) is optimal for close-proximity dating apps
+    // - Perfect for 5-500m range matching
+    // - High accuracy essential for nearby user discovery
+    // - Excellent granularity for location-based features
     const geohash = geohashForLocation([latitude, longitude], precision);
 
     return geohash;
@@ -432,23 +432,73 @@ class LocationService {
   /**
    * Get optimized query bounds for searching within a radius (in KM)
    * Uses intelligent bound reduction to minimize queries
+   *
+   * IMPORTANT: Uses precision 6 for queries to cast VERY wide net for 500m range!
+   * Storage: Precision 9 (±4.8m) for accurate positions
+   * Queries: Precision 6 (±610m) to reliably catch ALL nearby users within 500m
+   * Then filter by actual distance in post-processing
    */
   getQueryBounds(center: Coordinates, radiusInKm: number): [string, string][] {
-    const bounds = geohashQueryBounds(
+    // For small radiuses (<= 500m), use precision 6 to ensure we catch everyone
+    // For larger radiuses, use precision 7 or let geofire-common decide
+    const queryPrecision = radiusInKm <= 0.5 ? 6 : radiusInKm < 1 ? 7 : 8;
+
+    // Get bounds from geofire-common
+    const rawBounds = geohashQueryBounds(
       [center.latitude, center.longitude],
       radiusInKm
     );
 
-    console.log(`🔍 Optimized query bounds:`, {
-      center: {
-        lat: center.latitude.toFixed(6),
-        lon: center.longitude.toFixed(6),
-      },
-      radiusKm: radiusInKm,
-      radiusMeters: Math.round(radiusInKm * 1000),
-      boundsCount: bounds.length,
-      estimatedCoverage: this.estimateBoundCoverage(radiusInKm),
+    // Truncate all bounds to our chosen precision
+    const boundsSet = new Set<string>();
+    const bounds: [string, string][] = [];
+
+    rawBounds.forEach(([start, end]) => {
+      // Truncate to query precision
+      const startTrunc = start.substring(0, queryPrecision);
+      const endTrunc = end.substring(0, queryPrecision);
+
+      // Create a unique key for this bound
+      const key = `${startTrunc}-${endTrunc}`;
+
+      if (!boundsSet.has(key)) {
+        boundsSet.add(key);
+        // Add bounds without further expansion
+        bounds.push([startTrunc, endTrunc + '~']);
+      }
     });
+
+    // If no bounds or too many, create a simple wide bound
+    if (bounds.length === 0 || bounds.length > 20) {
+      const centerGeohash = geohashForLocation(
+        [center.latitude, center.longitude],
+        queryPrecision
+      );
+      const prefix = centerGeohash.substring(
+        0,
+        Math.max(5, queryPrecision - 2)
+      );
+      bounds.length = 0;
+      bounds.push([prefix, prefix + '~']);
+    }
+
+    console.log(
+      `🔍 Optimized query bounds (precision ${queryPrecision} for queries):`,
+      {
+        center: {
+          lat: center.latitude.toFixed(6),
+          lon: center.longitude.toFixed(6),
+        },
+        radiusKm: radiusInKm,
+        radiusMeters: Math.round(radiusInKm * 1000),
+        boundsCount: bounds.length,
+        boundsSample: bounds[0],
+        estimatedCoverage: this.estimateBoundCoverage(radiusInKm),
+        queryPrecision,
+        storagePrecision: 9,
+        note: `Query at p${queryPrecision}, filter by distance post-query`,
+      }
+    );
 
     return bounds;
   }

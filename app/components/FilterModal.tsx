@@ -219,7 +219,7 @@ const FilterModal: React.FC<FilterModalProps> = React.memo(
                     <Slider
                       style={styles.slider}
                       minimumValue={5}
-                      maximumValue={5000}
+                      maximumValue={500}
                       step={5}
                       value={tempDistance}
                       onValueChange={setTempDistance}
@@ -242,7 +242,7 @@ const FilterModal: React.FC<FilterModalProps> = React.memo(
                           { color: theme.textSecondary },
                         ]}
                       >
-                        5km
+                        500m
                       </Text>
                     </View>
                   </View>
@@ -269,7 +269,7 @@ const FilterModal: React.FC<FilterModalProps> = React.memo(
                     <Slider
                       style={styles.slider}
                       minimumValue={18}
-                      maximumValue={99}
+                      maximumValue={35}
                       step={1}
                       value={tempMinAge}
                       onValueChange={handleMinAgeChange}
@@ -292,7 +292,7 @@ const FilterModal: React.FC<FilterModalProps> = React.memo(
                           { color: theme.textSecondary },
                         ]}
                       >
-                        99
+                        35
                       </Text>
                     </View>
                   </View>
@@ -316,7 +316,7 @@ const FilterModal: React.FC<FilterModalProps> = React.memo(
                     <Slider
                       style={styles.slider}
                       minimumValue={18}
-                      maximumValue={99}
+                      maximumValue={35}
                       step={1}
                       value={tempMaxAge}
                       onValueChange={handleMaxAgeChange}
@@ -339,7 +339,7 @@ const FilterModal: React.FC<FilterModalProps> = React.memo(
                           { color: theme.textSecondary },
                         ]}
                       >
-                        99
+                        35
                       </Text>
                     </View>
                   </View>
