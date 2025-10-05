@@ -18,9 +18,6 @@ import {
   X,
   MessageCircle,
   MapPin,
-  Instagram,
-  Music,
-  Facebook,
 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -68,19 +65,15 @@ const ProfileDetail = ({
   const imageScrollRef = useRef<FlatList>(null);
 
   const userImages =
-    user.images && user.images.length > 0 ? [user.image, ...user.images] : [user.image];
+    user.images && user.images.length > 0
+      ? [user.image, ...user.images]
+      : [user.image];
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const index = Math.round(offsetX / (width * 0.75));
     setCurrentImageIndex(index);
   };
-
-  const socialIcons = [
-    { icon: Instagram, color: '#E4405F' },
-    { icon: Music, color: '#1DB954' },
-    { icon: Facebook, color: '#FF6B6B' },
-  ];
 
   return (
     <SafeAreaView
@@ -226,26 +219,6 @@ const ProfileDetail = ({
               </View>
             </View>
           )}
-        </View>
-
-        {/* Social Media */}
-        <View style={styles.socialSection}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>
-            {t('profile.about')}
-          </Text>
-          <View style={styles.socialRow}>
-            {socialIcons.map((social, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[
-                  styles.socialButton,
-                  { backgroundColor: theme.surface },
-                ]}
-              >
-                <social.icon size={24} color={social.color} />
-              </TouchableOpacity>
-            ))}
-          </View>
         </View>
       </ScrollView>
 

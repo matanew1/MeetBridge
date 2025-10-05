@@ -440,8 +440,8 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
       matches1.docs.forEach((doc) => matchedUserIds.add(doc.data().user2));
       matches2.docs.forEach((doc) => matchedUserIds.add(doc.data().user1));
 
-      // Get geohash query bounds (filters.maxDistance is in METERS)
-      const bounds = LocationService.getQueryBounds(
+      // Get optimized geohash query bounds (filters.maxDistance is in METERS)
+      const bounds = LocationService.getQueryBoundsMeters(
         userLocation,
         filters.maxDistance
       );
@@ -1164,7 +1164,7 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
             : 'Looking for ALL profiles',
       });
 
-      const bounds = LocationService.getQueryBounds(
+      const bounds = LocationService.getQueryBoundsMeters(
         userLocation,
         filters.maxDistance
       );

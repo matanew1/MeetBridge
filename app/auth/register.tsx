@@ -33,6 +33,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import InterestTagPicker from '../components/InterestTagPicker';
+import { Image } from 'expo-image';
 
 const { width, height } = Dimensions.get('window');
 
@@ -190,15 +191,12 @@ const RegisterScreen = () => {
         >
           {/* Header Section */}
           <View style={styles.headerSection}>
-            <LinearGradient
-              colors={[theme.primary, theme.primaryVariant]}
-              style={styles.logoContainer}
-            >
-              <Heart size={32} color="white" fill="white" />
-            </LinearGradient>
-            <Text style={[styles.appTitle, { color: theme.text }]}>
-              Join MeetBridge
-            </Text>
+            <Image
+              source={require('../../assets/images/logo.png')}
+              style={styles.logo}
+              contentFit="contain"
+              tintColor={theme.primary}
+            />
             <Text style={[styles.welcomeText, { color: theme.textSecondary }]}>
               Create your account and find your perfect match
             </Text>
@@ -282,7 +280,7 @@ const RegisterScreen = () => {
                 onPress={() => setShowDatePicker(true)}
               >
                 <Calendar size={20} color={theme.textSecondary} />
-                <Text style={[styles.dateText, { color: theme.text }]}>
+                <Text style={[styles.dateText, { color: theme.textSecondary }]}>
                   {formatDate(formData.dateOfBirth)}
                 </Text>
               </TouchableOpacity>
@@ -295,6 +293,7 @@ const RegisterScreen = () => {
                     maximumDate={new Date()}
                     minimumDate={new Date(1920, 0, 1)}
                     onChange={onDateChange}
+                    textColor={theme.text}
                   />
                   <TouchableOpacity
                     style={{
@@ -334,11 +333,19 @@ const RegisterScreen = () => {
                     selectedValue={formData.gender}
                     onValueChange={(value) => updateFormData('gender', value)}
                     style={[styles.picker, { color: theme.text }]}
-                    dropdownIconColor={theme.textSecondary}
+                    dropdownIconColor={theme.text}
                   >
-                    <Picker.Item label="Male" value="male" />
-                    <Picker.Item label="Female" value="female" />
-                    <Picker.Item label="Other" value="other" />
+                    <Picker.Item label="Male" value="male" color={theme.text} />
+                    <Picker.Item
+                      label="Female"
+                      value="female"
+                      color={theme.text}
+                    />
+                    <Picker.Item
+                      label="Other"
+                      value="other"
+                      color={theme.text}
+                    />
                   </Picker>
                 </View>
               </View>
@@ -366,11 +373,19 @@ const RegisterScreen = () => {
                       updateFormData('interestedIn', value)
                     }
                     style={[styles.picker, { color: theme.text }]}
-                    dropdownIconColor={theme.textSecondary}
+                    dropdownIconColor={theme.text}
                   >
-                    <Picker.Item label="Men" value="male" />
-                    <Picker.Item label="Women" value="female" />
-                    <Picker.Item label="Everyone" value="both" />
+                    <Picker.Item label="Men" value="male" color={theme.text} />
+                    <Picker.Item
+                      label="Women"
+                      value="female"
+                      color={theme.text}
+                    />
+                    <Picker.Item
+                      label="Everyone"
+                      value="both"
+                      color={theme.text}
+                    />
                   </Picker>
                 </View>
               </View>
@@ -386,15 +401,11 @@ const RegisterScreen = () => {
                   </Text>
                 </View>
                 <Text
-                  style={[
-                    styles.sliderValue,
-                    {
-                      color:
-                        formData.height === 0
-                          ? theme.textSecondary
-                          : theme.primary,
-                    },
-                  ]}
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 'bold',
+                    color: theme.textSecondary,
+                  }}
                 >
                   {formData.height === 0
                     ? 'Set your height'
@@ -415,14 +426,10 @@ const RegisterScreen = () => {
                 thumbTintColor={theme.primary}
               />
               <View style={styles.sliderLabels}>
-                <Text
-                  style={[styles.sliderLabel, { color: theme.textSecondary }]}
-                >
+                <Text style={{ fontSize: 12, color: theme.textSecondary }}>
                   140cm
                 </Text>
-                <Text
-                  style={[styles.sliderLabel, { color: theme.textSecondary }]}
-                >
+                <Text style={{ fontSize: 12, color: theme.textSecondary }}>
                   220cm
                 </Text>
               </View>
@@ -568,9 +575,6 @@ const styles = StyleSheet.create({
     paddingTop: 20,
   },
   logoContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
@@ -579,6 +583,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 8,
+  },
+  logo: {
+    width: 150,
+    height: 150,
   },
   appTitle: {
     fontSize: 32,
@@ -608,7 +616,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: 50,
   },
   inputLabel: {
     fontSize: 16,
@@ -707,6 +715,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+    color: 'black',
   },
   sliderLabelContainer: {
     flexDirection: 'row',
@@ -716,6 +725,7 @@ const styles = StyleSheet.create({
   sliderValue: {
     fontSize: 18,
     fontWeight: 'bold',
+    color: 'black',
   },
   slider: {
     width: '100%',
@@ -725,9 +735,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 4,
+    color: 'black',
   },
   sliderLabel: {
     fontSize: 12,
+    color: 'black',
   },
 });
 

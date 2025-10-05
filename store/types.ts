@@ -1,8 +1,7 @@
 export interface User {
   id: string;
   email: string;
-  displayName: string;
-  name: string;
+  name: string; // Removed duplicate: displayName (use name instead)
   age: number;
   dateOfBirth: Date | string;
   image?: string;
@@ -22,18 +21,17 @@ export interface User {
   createdAt: Date | string;
   updatedAt?: Date | string;
   gender: 'male' | 'female' | 'other';
-  lookingFor: 'male' | 'female' | 'both';
   height?: number; // height in cm
   preferences?: {
     ageRange: [number, number];
     maxDistance: number; // Max distance in METERS
-    interestedIn: 'male' | 'female' | 'both';
+    interestedIn: 'male' | 'female' | 'both'; // Removed duplicate: lookingFor (use preferences.interestedIn instead)
   };
+  notificationsEnabled?: boolean;
+  pushToken?: string;
 }
 
-export interface UserProfile extends User {
-  // Alias for User, kept for backward compatibility
-}
+// Removed: UserProfile alias (use User directly)
 
 export interface MatchProfile extends User {
   size: number;

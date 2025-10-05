@@ -11,10 +11,11 @@ import {
 } from 'firebase/firestore';
 import { geohashForLocation } from 'geofire-common';
 
-//TODO: remove unused fields
+//CHECK: remove unused fields ✅ (Removed: displayName, lookingFor duplicates)
 //CHECK: when unmatch make sure to remove from both users related collections the chats in both users ✅ (Implemented in unmatchProfile - deletes match, conversation, all messages, creates 24h ban both directions)
 //CHECK: on match make sure image occur in both users animations ✅ (matchedUser data includes image field, used in EnhancedMatchAnimation)
 //CHECK: notification for message received ✅ (Implemented in sendMessage with broadcastMessageNotification)
+//CHECK: improve the register and login UI add them the logo.png both ✅ (Added logo to both login and register screens)
 //TODO: make sure everything is LTR on english and RTL on hebrew
 //TODO: when there is a suggestion for email, dont skip fields that has already value ( jump to password  field)
 //TODO: add zodiac sign
@@ -98,7 +99,7 @@ const mockUsers = [
     name: 'Sarah',
     age: 25,
     gender: 'female' as const,
-    lookingFor: 'male' as const,
+    interestedIn: 'male' as const,
     bio: 'Love hiking and beach volleyball 🏐',
     interests: ['Sports', 'Nature', 'Travel', 'Music'],
     height: 168,
@@ -108,7 +109,7 @@ const mockUsers = [
     name: 'Yael',
     age: 23,
     gender: 'female' as const,
-    lookingFor: 'male' as const,
+    interestedIn: 'male' as const,
     bio: 'Foodie and coffee enthusiast ☕',
     interests: ['Food', 'Photography', 'Art', 'Music'],
     height: 165,
@@ -118,7 +119,7 @@ const mockUsers = [
     name: 'Maya',
     age: 27,
     gender: 'female' as const,
-    lookingFor: 'male' as const,
+    interestedIn: 'male' as const,
     bio: 'Yoga instructor & wellness coach 🧘‍♀️',
     interests: ['Fitness', 'Nature', 'Wellness', 'Meditation'],
     height: 170,
@@ -128,7 +129,7 @@ const mockUsers = [
     name: 'Noa',
     age: 24,
     gender: 'female' as const,
-    lookingFor: 'male' as const,
+    interestedIn: 'male' as const,
     bio: 'Tech enthusiast and gamer 🎮',
     interests: ['Gaming', 'Technology', 'Movies', 'Anime'],
     height: 162,
@@ -138,7 +139,7 @@ const mockUsers = [
     name: 'Tamar',
     age: 26,
     gender: 'female' as const,
-    lookingFor: 'male' as const,
+    interestedIn: 'male' as const,
     bio: 'Artist and dreamer 🎨',
     interests: ['Art', 'Music', 'Theater', 'Photography'],
     height: 172,
@@ -148,7 +149,7 @@ const mockUsers = [
     name: 'Dan',
     age: 28,
     gender: 'male' as const,
-    lookingFor: 'female' as const,
+    interestedIn: 'female' as const,
     bio: 'Entrepreneur and adventure seeker 🚀',
     interests: ['Business', 'Travel', 'Sports', 'Technology'],
     height: 180,
@@ -158,7 +159,7 @@ const mockUsers = [
     name: 'Ori',
     age: 26,
     gender: 'male' as const,
-    lookingFor: 'female' as const,
+    interestedIn: 'female' as const,
     bio: 'Music producer and DJ 🎧',
     interests: ['Music', 'Nightlife', 'Travel', 'Art'],
     height: 178,
@@ -168,7 +169,7 @@ const mockUsers = [
     name: 'Avi',
     age: 29,
     gender: 'male' as const,
-    lookingFor: 'female' as const,
+    interestedIn: 'female' as const,
     bio: 'Chef and food lover 👨‍🍳',
     interests: ['Food', 'Cooking', 'Wine', 'Travel'],
     height: 182,
@@ -178,7 +179,7 @@ const mockUsers = [
     name: 'Tom',
     age: 25,
     gender: 'male' as const,
-    lookingFor: 'female' as const,
+    interestedIn: 'female' as const,
     bio: 'Software engineer and book nerd 📚',
     interests: ['Technology', 'Reading', 'Gaming', 'Science'],
     height: 175,
@@ -188,7 +189,7 @@ const mockUsers = [
     name: 'Eitan',
     age: 27,
     gender: 'male' as const,
-    lookingFor: 'female' as const,
+    interestedIn: 'female' as const,
     bio: 'Fitness trainer and sports enthusiast 💪',
     interests: ['Fitness', 'Sports', 'Health', 'Nature'],
     height: 185,
@@ -322,12 +323,10 @@ async function createMockUser(userData: (typeof mockUsers)[0], index: number) {
     const userDoc = {
       id: userId,
       email,
-      name: userData.name,
-      displayName: userData.name,
+      name: userData.name, // Removed duplicate: displayName
       age: userData.age,
       dateOfBirth,
       gender: userData.gender,
-      lookingFor: userData.lookingFor,
       bio: userData.bio,
       interests: userData.interests,
       height: userData.height,
@@ -342,7 +341,7 @@ async function createMockUser(userData: (typeof mockUsers)[0], index: number) {
       preferences: {
         ageRange: [18, 35],
         maxDistance: 1000, // 1km in METERS (within 50m-5000m filter range)
-        interestedIn: userData.lookingFor,
+        interestedIn: userData.interestedIn, // Removed duplicate: lookingFor (using preferences.interestedIn)
       },
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),

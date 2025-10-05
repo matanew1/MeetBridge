@@ -19,6 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
+import { Image } from 'expo-image';
 
 const { width, height } = Dimensions.get('window');
 
@@ -67,15 +68,12 @@ const LoginScreen = () => {
         >
           {/* Header Section */}
           <View style={styles.headerSection}>
-            <LinearGradient
-              colors={[theme.primary, theme.primaryVariant]}
-              style={styles.logoContainer}
-            >
-              <Heart size={32} color="white" fill="white" />
-            </LinearGradient>
-            <Text style={[styles.appTitle, { color: theme.text }]}>
-              MeetBridge
-            </Text>
+              <Image
+                source={require('../../assets/images/logo.png')}
+                style={styles.logo}
+                contentFit="contain"
+                tintColor={theme.primary}
+              />
             <Text style={[styles.welcomeText, { color: theme.textSecondary }]}>
               Welcome back! Sign in to continue your journey
             </Text>
@@ -189,9 +187,7 @@ const LoginScreen = () => {
                 Don't have an account?{' '}
               </Text>
               <Link href="/auth/register" asChild>
-                <Text style={{ color: theme.textSecondary }}>
-                  Sign Up
-                </Text>
+                <Text style={{ color: theme.textSecondary }}>Sign Up</Text>
               </Link>
             </Text>
           </View>
@@ -219,9 +215,6 @@ const styles = StyleSheet.create({
     paddingTop: 20,
   },
   logoContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
@@ -230,6 +223,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 8,
+  },
+  logo: {
+    width: 150,
+    height: 150,
   },
   appTitle: {
     fontSize: 32,
