@@ -6,6 +6,7 @@ import {
   FirebaseAuthService,
 } from './firebase/firebaseServices';
 import { IServiceContainer } from './interfaces';
+import presenceService from './presenceService';
 
 // Storage service implementation using AsyncStorage
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -87,5 +88,8 @@ export const chatService = services.chat;
 export const authService = services.auth;
 export const userProfileService = services.userProfile;
 
+// Export presence service
+export { presenceService };
+
 // Export Firebase config
-export { db, auth, storage } from './firebase/config';
+export { db, auth, storage, realtimeDb } from './firebase/config';

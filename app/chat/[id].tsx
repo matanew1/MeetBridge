@@ -46,6 +46,7 @@ import { useUserStore } from '../../store';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import ProfileDetail from '../components/ProfileDetail';
+import { usePresence } from '../../hooks/usePresence';
 
 const { width } = Dimensions.get('window');
 
@@ -218,6 +219,9 @@ const ChatScreen = () => {
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+
+  // Get real-time presence for the other user
+  const { isOnline, lastSeenText } = usePresence(otherUserId);
 
   // Animation values
   const headerSlideAnim = useSharedValue(-50);
@@ -794,9 +798,24 @@ const ChatScreen = () => {
               <Text style={[styles.userName, { color: theme.text }]}>
                 {otherUser.name}
               </Text>
-              <Text style={[styles.userStatus, { color: theme.textSecondary }]}>
-                {otherUser.isOnline ? t('chat.online') : t('chat.offline')}
-              </Text>
+              <View style={styles.statusContainer}>
+                {isOnline && (
+                  <View
+                    style={[
+                      styles.onlineIndicatorSmall,
+                      { backgroundColor: '#4CAF50' },
+                    ]}
+                  />
+                )}
+                <Text
+                  style={[
+                    styles.userStatus,
+                    { color: isOnline ? '#4CAF50' : theme.textSecondary },
+                  ]}
+                >
+                  {lastSeenText}
+                </Text>
+              </View>
             </View>
           </View>
           <View style={styles.headerActions}>
@@ -1099,6 +1118,17 @@ const styles = StyleSheet.create({
   userStatus: {
     fontSize: 12,
     marginTop: 2,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  onlineIndicatorSmall: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   headerActions: {
     flexDirection: 'row',

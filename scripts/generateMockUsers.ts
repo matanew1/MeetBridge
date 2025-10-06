@@ -12,7 +12,6 @@ import {
 import { geohashForLocation } from 'geofire-common';
 import * as readline from 'readline';
 
-//CHECK: remove unused fields ✅ (Removed: displayName, lookingFor duplicates)
 //CHECK: when unmatch make sure to remove from both users related collections the chats in both users ✅ (Implemented in unmatchProfile - deletes match, conversation, all messages, creates 24h ban both directions)
 //CHECK: on match make sure image occur in both users animations ✅ (matchedUser data includes image field, used in EnhancedMatchAnimation)
 //CHECK: notification for message received ✅ (Implemented in sendMessage with broadcastMessageNotification)
@@ -20,7 +19,8 @@ import * as readline from 'readline';
 //TODO: make sure everything is LTR on english and RTL on hebrew
 //TODO: when there is a suggestion for email, dont skip fields that has already value ( jump to password  field)
 //TODO: add zodiac sign
-//TODO: toggle button switch offline/online
+//TODO: toggle button show my status online/offline to others users everywhere (connection and in chat)
+//TODO: is discovery search show online users only toggle on
 //TODO: add search by name in connections tab
 
 // Firebase configuration

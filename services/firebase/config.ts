@@ -9,6 +9,7 @@ import {
   Auth,
 } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
+import { getDatabase } from 'firebase/database';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -16,6 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const firebaseConfig = {
   apiKey: 'AIzaSyBPdV1BiL67xJes80Gv_tozl1E1ZAqslbk',
   authDomain: 'meetbridge-b5cdc.firebaseapp.com',
+  databaseURL: 'https://meetbridge-b5cdc-default-rtdb.firebaseio.com', // Add Realtime Database URL
   projectId: 'meetbridge-b5cdc',
   storageBucket: 'meetbridge-b5cdc.firebasestorage.app',
   messagingSenderId: '331612362377',
@@ -54,4 +56,5 @@ if (Platform.OS === 'web') {
 export { auth };
 
 export const storage = getStorage(app);
+export const realtimeDb = getDatabase(app);
 export default app;

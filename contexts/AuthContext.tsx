@@ -20,6 +20,8 @@ import { services } from '../services';
 import { User } from '../store/types';
 import LocationService from '../services/locationService';
 import notificationService from '../services/notificationService';
+import presenceService from '../services/presenceService';
+import firebaseApp from '../services/firebase/config';
 import * as Location from 'expo-location';
 
 interface AuthContextType {
@@ -96,6 +98,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!firebaseUser) return;
 
     const initializeServices = async () => {
+      // Initialize presence service with Realtime Database
+      console.log('👁️ Initializing presence service...');
+      try {
+        await presenceService.initialize(firebaseUser.uid, firebaseApp);
+        console.log('✅ Presence service initialized');
+      } catch (error) {
+        console.error('Error initializing presence service:', error);
+      }
+
       // Initialize push notifications
       console.log('🔔 Initializing push notifications...');
       try {
@@ -181,6 +192,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       LocationService.stopLocationWatcher();
       console.log('🔕 Cleaning up notification listeners...');
       notificationService.cleanup();
+      console.log('👁️ Cleaning up presence service...');
+      presenceService.cleanup();
     };
   }, [firebaseUser]);
 
@@ -192,9 +205,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setFirebaseUser(firebaseUser);
 
         try {
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          console.log('🔍 Fetching user document for UID:', firebaseUser.uid);
+          const userDocRef = doc(db, 'users', firebaseUser.uid);
+          const userDoc = await getDoc(userDocRef);
+
+          console.log('📄 Document fetch result:', {
+            exists: userDoc.exists(),
+            id: userDoc.id,
+            ref_path: userDocRef.path,
+          });
 
           if (userDoc.exists()) {
+            console.log('✅ User document found in Firestore');
             const userData = userDoc.data();
             const fullUser: User = {
               id: userDoc.id,
@@ -204,14 +226,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
             setUser(fullUser);
 
-            try {
-              await updateDoc(doc(db, 'users', firebaseUser.uid), {
-                lastSeen: serverTimestamp(),
-                isOnline: true,
-              });
-            } catch (updateError) {
-              console.warn('Failed to update user online status:', updateError);
-            }
+            // Note: User online status will be set by presenceService initialization
+            // which happens in the separate useEffect
           } else {
             // User exists in Firebase Auth but not in Firestore
             // This should ONLY happen in rare cases - DO NOT auto-create defaults for existing users
@@ -219,6 +235,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               '❌ CRITICAL: User exists in Firebase Auth but not in Firestore:',
               firebaseUser.uid
             );
+            console.error('📍 Document path attempted:', userDocRef.path);
             console.error(
               '❌ User should register properly. Not creating default profile to prevent data loss.'
             );
@@ -253,16 +270,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
           if (isGoingOnline) {
             console.log('👁️ App became active - setting user online');
-            await updateDoc(doc(db, 'users', firebaseUser.uid), {
-              lastSeen: serverTimestamp(),
-              isOnline: true,
-            });
+            // Reinitialize presence service to set user online
+            await presenceService.initialize(firebaseUser.uid, firebaseApp);
           } else if (isGoingOffline) {
             console.log('👁️ App going to background - setting user offline');
-            await updateDoc(doc(db, 'users', firebaseUser.uid), {
-              lastSeen: serverTimestamp(),
-              isOnline: false,
-            });
+            await presenceService.setUserOffline();
           }
         } catch (error) {
           console.warn('Failed to update presence status:', error);
@@ -273,10 +285,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const handleBeforeUnload = async () => {
       if (firebaseUser && user) {
         try {
-          await updateDoc(doc(db, 'users', firebaseUser.uid), {
-            lastSeen: serverTimestamp(),
-            isOnline: false,
-          });
+          await presenceService.setUserOffline();
         } catch (error) {
           console.warn('Failed to update offline status:', error);
         }
@@ -303,38 +312,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, [firebaseUser, user]);
 
-  // Presence heartbeat - update lastSeen every 60 seconds while app is active
-  useEffect(() => {
-    if (!firebaseUser || !user) return;
-
-    console.log('💓 Starting presence heartbeat');
-
-    const updatePresence = async () => {
-      try {
-        const currentAppState = AppState.currentState;
-        if (currentAppState === 'active') {
-          await updateDoc(doc(db, 'users', firebaseUser.uid), {
-            lastSeen: serverTimestamp(),
-            isOnline: true,
-          });
-          console.log('💓 Heartbeat: Updated presence');
-        }
-      } catch (error) {
-        console.warn('Failed to update heartbeat:', error);
-      }
-    };
-
-    // Update immediately
-    updatePresence();
-
-    // Then update every 60 seconds
-    const heartbeatInterval = setInterval(updatePresence, 60000);
-
-    return () => {
-      console.log('💓 Stopping presence heartbeat');
-      clearInterval(heartbeatInterval);
-    };
-  }, [firebaseUser, user]);
+  // Note: Presence heartbeat is now handled by presenceService internally
+  // The service manages sync between Realtime Database and Firestore
 
   const login = async (email: string, password: string) => {
     try {
@@ -380,10 +359,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       if (firebaseUser) {
         try {
-          await updateDoc(doc(db, 'users', firebaseUser.uid), {
-            lastSeen: serverTimestamp(),
-            isOnline: false,
-          });
+          // Set user offline in presence service
+          await presenceService.setUserOffline();
+          await presenceService.cleanup();
         } catch (updateError) {
           console.warn(
             'Failed to update offline status on logout:',

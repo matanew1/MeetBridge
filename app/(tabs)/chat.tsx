@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, memo } from 'react';
+import React, { useState, useEffect, useCallback, memo, useMemo } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import { useRouter } from 'expo-router';
 import { useUserStore } from '../../store';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
+import { useMultiplePresence } from '../../hooks/usePresence';
 
 interface ChatItem {
   id: string;
@@ -45,6 +46,7 @@ const ChatItem = memo(
     const fadeAnim = React.useRef(new Animated.Value(0)).current;
     const scaleAnim = React.useRef(new Animated.Value(0.95)).current;
     const pulseAnim = React.useRef(new Animated.Value(1)).current;
+    const pulseAnimationRef = React.useRef<any>(null);
 
     useEffect(() => {
       // Faster staggered entrance animation
@@ -69,11 +71,13 @@ const ChatItem = memo(
           useNativeDriver: true,
         }),
       ]).start();
+    }, [index]);
 
-      // Online indicator pulse animation
+    useEffect(() => {
+      // Online indicator pulse animation - only when online
       if (chat.isOnline) {
         const pulse = () => {
-          Animated.sequence([
+          pulseAnimationRef.current = Animated.sequence([
             Animated.timing(pulseAnim, {
               toValue: 1.2,
               duration: 1000,
@@ -84,11 +88,28 @@ const ChatItem = memo(
               duration: 1000,
               useNativeDriver: true,
             }),
-          ]).start(() => pulse());
+          ]);
+          pulseAnimationRef.current.start(() => {
+            if (chat.isOnline) {
+              pulse();
+            }
+          });
         };
         pulse();
+      } else {
+        // Stop animation and reset scale when offline
+        if (pulseAnimationRef.current) {
+          pulseAnimationRef.current.stop();
+        }
+        pulseAnim.setValue(1);
       }
-    }, [index, chat.isOnline]);
+
+      return () => {
+        if (pulseAnimationRef.current) {
+          pulseAnimationRef.current.stop();
+        }
+      };
+    }, [chat.isOnline]);
 
     return (
       <Animated.View
@@ -192,6 +213,16 @@ export default function ChatScreen() {
     loadDiscoverProfiles,
   } = useUserStore();
   const [chats, setChats] = useState<ChatItem[]>([]);
+
+  // Get all chat participant IDs for presence monitoring
+  const participantIds = useMemo(() => {
+    return conversations
+      .map((conv) => conv.participants?.find((id) => id !== currentUser?.id))
+      .filter((id): id is string => typeof id === 'string');
+  }, [conversations, currentUser?.id]);
+
+  // Monitor presence for all chat participants
+  const presenceMap = useMultiplePresence(participantIds);
 
   // Animation values
   const headerSlideAnim = React.useRef(new Animated.Value(-50)).current;
@@ -360,6 +391,11 @@ export default function ChatScreen() {
 
           console.log('Mapped chat item:', conversation);
 
+          // Get real-time presence data for this participant
+          const presenceData = presenceMap.get(otherParticipantId || '');
+          const isOnline =
+            presenceData?.isOnline || otherParticipant.isOnline || false;
+
           // Show conversation even without messages (new matches)
           return {
             id: conversation.id,
@@ -371,7 +407,7 @@ export default function ChatScreen() {
               : formatTime(conversation.createdAt),
             image: otherParticipant.image,
             unread: conversation.unreadCount > 0,
-            isOnline: otherParticipant.isOnline,
+            isOnline: isOnline, // Use real-time presence data
           };
         })
         .filter(Boolean) as ChatItem[];
@@ -398,7 +434,13 @@ export default function ChatScreen() {
       console.error('❌ Error in chat screen useEffect:', error);
       setChats([]);
     }
-  }, [conversations, discoverProfiles, matchedProfilesData, currentUser]);
+  }, [
+    conversations,
+    discoverProfiles,
+    matchedProfilesData,
+    currentUser,
+    presenceMap,
+  ]);
 
   const handleChatPress = useCallback(
     (chatId: string) => {
