@@ -11,8 +11,10 @@ import {
   Dimensions,
   Image,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { router } from 'expo-router';
 import {
   X,
@@ -28,6 +30,8 @@ import {
   Plus,
   Trash2,
   Image as ImageIcon,
+  Calendar,
+  Star,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -37,6 +41,8 @@ import { User } from '../../store/types';
 import { LinearGradient } from 'expo-linear-gradient';
 import AvatarUpload from './AvatarUpload';
 import InterestTagPicker from './InterestTagPicker';
+import ZodiacBadge from './ZodiacBadge';
+import { calculateAge, calculateZodiacSign } from '../../utils/dateUtils';
 
 interface EditProfileModalProps {
   visible: boolean;
@@ -55,12 +61,22 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const { user } = useAuth();
   const theme = isDarkMode ? darkTheme : lightTheme;
 
+  // Initialize date of birth from user data or default to 18 years ago
+  const getInitialDate = () => {
+    if (user?.dateOfBirth) {
+      return new Date(user.dateOfBirth);
+    }
+    const date = new Date();
+    date.setFullYear(date.getFullYear() - 18); // Default to 18 years ago
+    return date;
+  };
+
   const [formData, setFormData] = useState({
     name: user?.name || '',
     bio: user?.bio || '',
     location: user?.location || '',
     coordinates: user?.coordinates || undefined,
-    age: user?.age?.toString() || '',
+    dateOfBirth: getInitialDate(),
     height: user?.height || 170, // Default to 170cm
     gender: user?.gender || 'other',
     image: user?.image || '',
@@ -75,6 +91,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
   const [newInterest, setNewInterest] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const handleSave = async () => {
     if (isSaving) return;
@@ -86,17 +103,29 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
         return;
       }
 
-      if (!formData.age || isNaN(Number(formData.age))) {
-        Alert.alert('Error', 'Please enter a valid age');
+      if (!formData.dateOfBirth) {
+        Alert.alert('Error', 'Date of birth is required');
         return;
       }
+
+      // Check if user is at least 18 years old
+      const age = calculateAge(formData.dateOfBirth);
+      if (age === null || age < 18) {
+        Alert.alert('Error', 'You must be at least 18 years old');
+        return;
+      }
+
+      // Calculate zodiac sign
+      const zodiacSign = calculateZodiacSign(formData.dateOfBirth);
 
       const updatedData: Partial<User> = {
         name: formData.name.trim(),
         bio: formData.bio.trim(),
         location: formData.location.trim(),
         coordinates: formData.coordinates,
-        age: Number(formData.age),
+        dateOfBirth: formData.dateOfBirth.toISOString(),
+        age: age,
+        zodiacSign: zodiacSign || undefined,
         height: formData.height,
         gender: formData.gender as 'male' | 'female' | 'other',
         image: formData.image,
@@ -113,6 +142,23 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+
+    if (selectedDate) {
+      setFormData((prev) => ({ ...prev, dateOfBirth: selectedDate }));
+    }
+  };
+
+  const formatDate = (date: Date): string => {
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
   };
 
   const addInterest = () => {
@@ -331,29 +377,80 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
             <View style={styles.inputContainer}>
               <View style={styles.inputHeader}>
-                <Users size={18} color={theme.primary} />
+                <Calendar size={18} color={theme.primary} />
                 <Text style={[styles.inputLabel, { color: theme.text }]}>
-                  Age
+                  Date of Birth
                 </Text>
               </View>
-              <TextInput
+              <TouchableOpacity
                 style={[
-                  styles.textInput,
+                  styles.datePickerButton,
                   {
                     backgroundColor: theme.surface,
-                    color: theme.text,
                     borderColor: theme.border,
                   },
                 ]}
-                value={formData.age}
-                onChangeText={(text) =>
-                  setFormData((prev) => ({ ...prev, age: text }))
-                }
-                placeholder="Enter your age"
-                placeholderTextColor={theme.textSecondary}
-                keyboardType="numeric"
-              />
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Text style={[styles.dateText, { color: theme.text }]}>
+                  {formatDate(formData.dateOfBirth)}
+                </Text>
+                <Calendar size={20} color={theme.primary} />
+              </TouchableOpacity>
+
+              {showDatePicker && (
+                <DateTimePicker
+                  value={formData.dateOfBirth}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={handleDateChange}
+                  maximumDate={new Date()} // Can't select future dates
+                  minimumDate={new Date(1924, 0, 1)} // Min date: 100 years ago
+                  textColor={theme.text}
+                  themeVariant={isDarkMode ? 'dark' : 'light'}
+                />
+              )}
+
+              {Platform.OS === 'ios' && showDatePicker && (
+                <TouchableOpacity
+                  style={[
+                    styles.datePickerDoneButton,
+                    { backgroundColor: theme.primary },
+                  ]}
+                  onPress={() => setShowDatePicker(false)}
+                >
+                  <Text style={styles.datePickerDoneText}>Done</Text>
+                </TouchableOpacity>
+              )}
+
+              {formData.dateOfBirth &&
+                calculateAge(formData.dateOfBirth) !== null && (
+                  <Text
+                    style={[styles.helperText, { color: theme.textSecondary }]}
+                  >
+                    Age: {calculateAge(formData.dateOfBirth)} years old
+                  </Text>
+                )}
             </View>
+
+            {formData.dateOfBirth &&
+              calculateZodiacSign(formData.dateOfBirth) && (
+                <View style={styles.inputContainer}>
+                  <View style={styles.inputHeader}>
+                    <Star size={18} color={theme.primary} />
+                    <Text style={[styles.inputLabel, { color: theme.text }]}>
+                      Zodiac Sign
+                    </Text>
+                  </View>
+                  <View style={styles.zodiacContainer}>
+                    <ZodiacBadge
+                      zodiacSign={calculateZodiacSign(formData.dateOfBirth)}
+                      size="large"
+                      showLabel={true}
+                    />
+                  </View>
+                </View>
+              )}
 
             <View style={styles.inputContainer}>
               <View style={styles.inputHeader}>
@@ -798,6 +895,37 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     marginTop: 8,
+  },
+  helperText: {
+    fontSize: 13,
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  zodiacContainer: {
+    marginTop: 8,
+  },
+  datePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+  },
+  dateText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  datePickerDoneButton: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  datePickerDoneText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

@@ -24,6 +24,7 @@ import {
   Clock,
   CheckCircle,
   Activity,
+  Star,
 } from 'lucide-react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -32,6 +33,8 @@ import { User } from '../../store/types';
 import { LinearGradient } from 'expo-linear-gradient';
 import EditProfileModal from './EditProfileModal';
 import { PREDEFINED_INTERESTS } from '../../constants/interests';
+import ZodiacBadge from './ZodiacBadge';
+import { calculateAge } from '../../utils/dateUtils';
 
 interface ProfileModalProps {
   visible: boolean;
@@ -100,26 +103,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
   if (!user) return null;
 
-  const calculateAge = (birthDate?: Date | string) => {
-    if (!birthDate) return '?';
-    const birth = new Date(birthDate);
-    const today = new Date();
-    const age = today.getFullYear() - birth.getFullYear();
-    const monthDiff = today.getMonth() - birth.getMonth();
-    if (
-      monthDiff < 0 ||
-      (monthDiff === 0 && today.getDate() < birth.getDate())
-    ) {
-      return age - 1;
-    }
-    return age;
-  };
-
   const getAgeDisplay = (birthDate?: Date | string) => {
-    if (!birthDate) return 'Age not set';
-    const birth = new Date(birthDate);
-    const today = new Date();
-    const age = today.getFullYear() - birth.getFullYear();
+    const age = calculateAge(birthDate);
+    if (age === null) return 'Age not set';
     return `${age} years old`;
   };
 
@@ -283,6 +269,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 ? `${user.age} years old`
                 : getAgeDisplay(user.createdAt)}
             </Text>
+
+            {user.zodiacSign && (
+              <View style={styles.zodiacContainer}>
+                <ZodiacBadge
+                  zodiacSign={user.zodiacSign}
+                  size="medium"
+                  showLabel={true}
+                />
+              </View>
+            )}
           </View>
 
           {/* User Info Cards */}
@@ -390,6 +386,27 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 {getGenderDisplay(user.gender)}
               </Text>
             </View>
+
+            {/* Zodiac Sign Card */}
+            {user.zodiacSign && (
+              <View
+                style={[styles.infoCard, { backgroundColor: theme.surface }]}
+              >
+                <View style={styles.cardHeader}>
+                  <Star size={20} color={theme.primary} />
+                  <Text style={[styles.cardTitle, { color: theme.text }]}>
+                    Zodiac Sign
+                  </Text>
+                </View>
+                <View style={styles.zodiacCardContent}>
+                  <ZodiacBadge
+                    zodiacSign={user.zodiacSign}
+                    size="large"
+                    showLabel={true}
+                  />
+                </View>
+              </View>
+            )}
 
             {/* Dating Preferences Card */}
             {user.preferences && (
@@ -649,6 +666,13 @@ const styles = StyleSheet.create({
   },
   userAge: {
     fontSize: 16,
+  },
+  zodiacContainer: {
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  zodiacCardContent: {
+    alignItems: 'flex-start',
   },
   infoSection: {
     marginBottom: 30,

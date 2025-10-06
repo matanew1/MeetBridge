@@ -4,6 +4,7 @@ export interface User {
   name: string; // Removed duplicate: displayName (use name instead)
   age: number;
   dateOfBirth: Date | string;
+  zodiacSign?: string;
   image?: string;
   images?: string[];
   bio?: string;

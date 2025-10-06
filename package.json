@@ -15,7 +15,8 @@
     "test-geohash-query": "ts-node scripts/testGeohashQuery.ts",
     "update-my-profile": "ts-node scripts/updateMyProfile.ts",
     "drop-collections": "ts-node scripts/dropCollections.ts",
-    "drop-collection": "ts-node scripts/dropCollections.ts"
+    "drop-collection": "ts-node scripts/dropCollections.ts",
+    "migrate-dob": "ts-node scripts/migrateDateOfBirth.ts"
   },
   "dependencies": {
     "@expo/config-plugins": "^54.0.1",
@@ -49,6 +50,7 @@
     "expo-system-ui": "~6.0.7",
     "expo-web-browser": "~15.0.7",
     "firebase": "^12.3.0",
+    "firebase-admin": "^13.5.0",
     "geofire-common": "^6.0.0",
     "i18next": "^25.5.2",
     "lucide-react-native": "^0.475.0",

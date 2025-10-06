@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import { PREDEFINED_INTERESTS } from '../../constants/interests';
+import ZodiacBadge from './ZodiacBadge';
 
 const { width, height } = Dimensions.get('window');
 
@@ -31,6 +32,7 @@ interface ProfileDetailProps {
     id: string;
     name: string;
     age: number;
+    zodiacSign?: string;
     distance?: number;
     image: string;
     images?: string[];
@@ -150,11 +152,18 @@ const ProfileDetail = ({
             </View>
           )}
 
-          {/* Age badge */}
-          <View style={[styles.ageBadge, { backgroundColor: theme.surface }]}>
-            <Text style={[styles.ageText, { color: theme.text }]}>
-              {user.age} y/o
-            </Text>
+          {/* Age and Zodiac badges */}
+          <View style={styles.badgesContainer}>
+            <View style={[styles.ageBadge, { backgroundColor: theme.surface }]}>
+              <Text style={[styles.ageText, { color: theme.text }]}>
+                {user.age} y/o
+              </Text>
+            </View>
+            {user.zodiacSign && (
+              <View style={styles.zodiacBadgeWrapper}>
+                <ZodiacBadge zodiacSign={user.zodiacSign} size="medium" />
+              </View>
+            )}
           </View>
         </View>
 
@@ -309,10 +318,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 2,
   },
-  ageBadge: {
+  badgesContainer: {
     position: 'absolute',
     top: 30,
     right: width * 0.15,
+    flexDirection: 'column',
+    gap: 8,
+    alignItems: 'flex-end',
+  },
+  ageBadge: {
     borderRadius: 15,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -325,6 +339,13 @@ const styles = StyleSheet.create({
   ageText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  zodiacBadgeWrapper: {
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   profileInfo: {
     flex: 1,
