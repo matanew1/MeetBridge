@@ -26,7 +26,7 @@ export interface User {
   preferences?: {
     ageRange: [number, number];
     maxDistance: number; // Max distance in METERS
-    interestedIn: 'male' | 'female' | 'both'; // Removed duplicate: lookingFor (use preferences.interestedIn instead)
+    interestedIn: 'male' | 'female'; // Only male or female, no "both" option
   };
   notificationsEnabled?: boolean;
   pushToken?: string;
@@ -41,7 +41,7 @@ export interface MatchProfile extends User {
 }
 
 export interface SearchFilters {
-  gender: 'male' | 'female' | 'both';
+  gender: 'male' | 'female'; // Only male or female, no "both" option
   ageRange: [number, number];
   maxDistance: number; // Max distance in METERS
   interests?: string[];

@@ -447,7 +447,7 @@ export default function SearchScreen() {
       setMaxDistance(maxDistanceMeters);
       setAgeRange(userAgeRange as [number, number]);
       updateSearchFilters({
-        gender: currentUser.preferences?.interestedIn || 'both',
+        gender: currentUser.preferences?.interestedIn || 'female', // Default to female if not set
         ageRange: userAgeRange,
         location: currentUser.location || '',
         maxDistance: maxDistanceMeters,

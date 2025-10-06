@@ -544,16 +544,14 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
             return;
           }
 
-          // Two-way gender matching:
+          // Two-way gender matching (no "both" option):
           // 1. Current user must be interested in profile's gender
-          const currentUserInterestedInProfile =
-            filters.gender === 'both' || data.gender === filters.gender;
+          const currentUserInterestedInProfile = data.gender === filters.gender;
 
           // 2. Profile must be interested in current user's gender
-          const profileInterestedIn = data.preferences?.interestedIn || 'both';
+          const profileInterestedIn = data.preferences?.interestedIn;
           const currentUserGender = currentUserData?.gender || 'other';
           const profileInterestedInCurrentUser =
-            profileInterestedIn === 'both' ||
             profileInterestedIn === currentUserGender;
 
           const matchesGender =
@@ -842,15 +840,13 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
           const data = profileDoc.data();
           const queueData = queueDataMap.get(profileId);
 
-          // CRITICAL: Apply BIDIRECTIONAL gender filter
+          // CRITICAL: Apply BIDIRECTIONAL gender filter (no "both" option)
           // 1. Current user must be interested in profile's gender
-          const currentUserInterestedInProfile =
-            filters.gender === 'both' || data.gender === filters.gender;
+          const currentUserInterestedInProfile = data.gender === filters.gender;
 
           // 2. Profile must be interested in current user's gender
-          const profileInterestedIn = data.preferences?.interestedIn || 'both';
+          const profileInterestedIn = data.preferences?.interestedIn;
           const profileInterestedInCurrentUser =
-            profileInterestedIn === 'both' ||
             profileInterestedIn === currentUserGender;
 
           const matchesGender =
@@ -1401,16 +1397,14 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
             return;
           }
 
-          // Check if profile matches filters - BIDIRECTIONAL
+          // Check if profile matches filters - BIDIRECTIONAL (no "both" option)
           // 1. Current user must be interested in profile's gender
-          const currentUserInterestedInProfile =
-            filters.gender === 'both' || data.gender === filters.gender;
+          const currentUserInterestedInProfile = data.gender === filters.gender;
 
           // 2. Profile must be interested in current user's gender
-          const profileInterestedIn = data.preferences?.interestedIn || 'both';
+          const profileInterestedIn = data.preferences?.interestedIn;
           const currentUserGender = currentUserData?.gender || 'other';
           const profileInterestedInCurrentUser =
-            profileInterestedIn === 'both' ||
             profileInterestedIn === currentUserGender;
 
           const matchesGender =
@@ -1634,15 +1628,13 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
           return;
         }
 
-        // BIDIRECTIONAL gender matching
+        // BIDIRECTIONAL gender matching (no "both" option)
         // 1. Current user must be interested in profile's gender
-        const currentUserInterestedInProfile =
-          filters.gender === 'both' || data.gender === filters.gender;
+        const currentUserInterestedInProfile = data.gender === filters.gender;
 
         // 2. Profile must be interested in current user's gender
-        const profileInterestedIn = data.preferences?.interestedIn || 'both';
+        const profileInterestedIn = data.preferences?.interestedIn;
         const profileInterestedInCurrentUser =
-          profileInterestedIn === 'both' ||
           profileInterestedIn === currentUserGender;
 
         const matchesGender =
@@ -3149,7 +3141,7 @@ export class FirebaseAuthService implements IAuthService {
         preferences: profileData.preferences || {
           ageRange: [18, 99] as [number, number],
           maxDistance: 500, // meters (500 = 0.5km)
-          interestedIn: 'both' as const,
+          interestedIn: 'female' as const, // Removed 'both' option
         },
       };
 

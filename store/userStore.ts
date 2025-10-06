@@ -108,7 +108,7 @@ interface UserState {
 
 // Default search filters
 const defaultSearchFilters: SearchFilters = {
-  gender: 'both',
+  gender: 'female', // Default to female (users must choose male or female)
   ageRange: APP_CONFIG.DEFAULT_AGE_RANGE,
   maxDistance: APP_CONFIG.MAX_PROFILE_DISTANCE,
   interests: [],

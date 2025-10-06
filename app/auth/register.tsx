@@ -45,7 +45,7 @@ const RegisterScreen = () => {
     confirmPassword: '',
     dateOfBirth: new Date(2000, 0, 1),
     gender: 'male' as 'male' | 'female' | 'other',
-    interestedIn: 'both' as 'male' | 'female' | 'both',
+    interestedIn: 'female' as 'male' | 'female', // Removed 'both' option
     height: 0, // 0 means not set yet - force user to set their height
     interests: [] as string[],
   });
@@ -466,11 +466,6 @@ const RegisterScreen = () => {
                     <Picker.Item
                       label="Women"
                       value="female"
-                      color={theme.text}
-                    />
-                    <Picker.Item
-                      label="Everyone"
-                      value="both"
                       color={theme.text}
                     />
                   </Picker>

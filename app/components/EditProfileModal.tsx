@@ -90,7 +90,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     preferences: user?.preferences || {
       ageRange: [18, 99] as [number, number],
       maxDistance: 500, // meters (500 = 0.5km)
-      interestedIn: 'both' as 'male' | 'female' | 'both',
+      interestedIn: 'female' as 'male' | 'female', // Removed 'both' option
     },
   });
 
@@ -156,10 +156,9 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
             number
           ],
           maxDistance: user?.preferences?.maxDistance || 500,
-          interestedIn: (user?.preferences?.interestedIn || 'both') as
+          interestedIn: (user?.preferences?.interestedIn || 'female') as
             | 'male'
-            | 'female'
-            | 'both',
+            | 'female', // Removed 'both' option
         },
       });
     }
@@ -730,7 +729,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   </Text>
                 </View>
                 <View style={styles.genderContainer}>
-                  {(['male', 'female', 'both'] as const).map((option) => (
+                  {(['male', 'female'] as const).map((option) => (
                     <TouchableOpacity
                       key={option}
                       style={[
@@ -764,9 +763,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                           },
                         ]}
                       >
-                        {option === 'both'
-                          ? 'Everyone'
-                          : option.charAt(0).toUpperCase() + option.slice(1)}
+                        {option.charAt(0).toUpperCase() + option.slice(1)}
                       </Text>
                     </TouchableOpacity>
                   ))}
