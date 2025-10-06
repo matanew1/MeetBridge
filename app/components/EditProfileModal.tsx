@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -58,16 +58,21 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   onSave,
 }) => {
   const { isDarkMode } = useTheme();
-  const { user } = useAuth();
+  const { user, refreshUserProfile } = useAuth();
   const theme = isDarkMode ? darkTheme : lightTheme;
 
   // Initialize date of birth from user data or default to 18 years ago
   const getInitialDate = () => {
     if (user?.dateOfBirth) {
-      return new Date(user.dateOfBirth);
+      const date = new Date(user.dateOfBirth);
+      // Validate the date is valid
+      if (!isNaN(date.getTime())) {
+        return date;
+      }
     }
+    // Default to 18 years ago
     const date = new Date();
-    date.setFullYear(date.getFullYear() - 18); // Default to 18 years ago
+    date.setFullYear(date.getFullYear() - 18);
     return date;
   };
 
@@ -83,15 +88,82 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     images: user?.images ? [...user.images] : [],
     interests: user?.interests ? [...user.interests] : [],
     preferences: user?.preferences || {
-      ageRange: [18, 35] as [number, number],
-      maxDistance: 5000, // meters (5 km default)
+      ageRange: [18, 99] as [number, number],
+      maxDistance: 500, // meters (500 = 0.5km)
       interestedIn: 'both' as 'male' | 'female' | 'both',
     },
   });
 
   const [newInterest, setNewInterest] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // Load fresh data from Firebase whenever modal opens
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (visible) {
+        setIsLoading(true);
+        try {
+          // Refresh user data from Firebase
+          await refreshUserProfile();
+        } catch (error) {
+          console.error('Error loading user profile:', error);
+          Alert.alert(
+            'Error',
+            'Failed to load profile data. Please try again.'
+          );
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadUserData();
+  }, [visible]);
+
+  // Update form data whenever user data changes
+  useEffect(() => {
+    if (user) {
+      const getInitialDate = () => {
+        if (user?.dateOfBirth) {
+          const date = new Date(user.dateOfBirth);
+          // Validate the date is valid
+          if (!isNaN(date.getTime())) {
+            return date;
+          }
+        }
+        // Default to 18 years ago
+        const date = new Date();
+        date.setFullYear(date.getFullYear() - 18);
+        return date;
+      };
+
+      setFormData({
+        name: user?.name || '',
+        bio: user?.bio || '',
+        location: user?.location || '',
+        coordinates: user?.coordinates || undefined,
+        dateOfBirth: getInitialDate(),
+        height: user?.height || 170,
+        gender: user?.gender || 'other',
+        image: user?.image || '',
+        images: user?.images ? [...user.images] : [],
+        interests: user?.interests ? [...user.interests] : [],
+        preferences: {
+          ageRange: (user?.preferences?.ageRange || [18, 99]) as [
+            number,
+            number
+          ],
+          maxDistance: user?.preferences?.maxDistance || 500,
+          interestedIn: (user?.preferences?.interestedIn || 'both') as
+            | 'male'
+            | 'female'
+            | 'both',
+        },
+      });
+    }
+  }, [user]);
 
   const handleSave = async () => {
     if (isSaving) return;
@@ -108,22 +180,37 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
         return;
       }
 
+      // Ensure dateOfBirth is a valid Date object
+      const dobDate =
+        formData.dateOfBirth instanceof Date
+          ? formData.dateOfBirth
+          : new Date(formData.dateOfBirth);
+
+      // Validate the date is valid
+      if (isNaN(dobDate.getTime())) {
+        Alert.alert(
+          'Error',
+          'Invalid date of birth. Please select a valid date.'
+        );
+        return;
+      }
+
       // Check if user is at least 18 years old
-      const age = calculateAge(formData.dateOfBirth);
+      const age = calculateAge(dobDate);
       if (age === null || age < 18) {
         Alert.alert('Error', 'You must be at least 18 years old');
         return;
       }
 
       // Calculate zodiac sign
-      const zodiacSign = calculateZodiacSign(formData.dateOfBirth);
+      const zodiacSign = calculateZodiacSign(dobDate);
 
       const updatedData: Partial<User> = {
         name: formData.name.trim(),
         bio: formData.bio.trim(),
         location: formData.location.trim(),
         coordinates: formData.coordinates,
-        dateOfBirth: formData.dateOfBirth.toISOString(),
+        dateOfBirth: dobDate.toISOString(),
         age: age,
         zodiacSign: zodiacSign || undefined,
         height: formData.height,
@@ -155,6 +242,9 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   };
 
   const formatDate = (date: Date): string => {
+    if (!date || isNaN(date.getTime())) {
+      return 'Select date';
+    }
     const day = date.getDate().toString().padStart(2, '0');
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const year = date.getFullYear();
@@ -268,397 +358,423 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           </TouchableOpacity>
         </LinearGradient>
 
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Profile Picture Section */}
-          <View style={styles.profileSection}>
-            <AvatarUpload
-              currentImage={formData.image}
-              onImageSelected={handleImageSelected}
-              size={120}
-              showUploadButton={true}
-            />
-          </View>
-
-          {/* Additional Photos Section */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <ImageIcon size={20} color={theme.primary} />
-              <Text
-                style={[
-                  styles.sectionTitle,
-                  { color: theme.text, marginBottom: 0, marginLeft: 8 },
-                ]}
-              >
-                Additional Photos
-              </Text>
-            </View>
-            <Text
-              style={[styles.sectionSubtitle, { color: theme.textSecondary }]}
-            >
-              Add up to 5 more photos to your profile
+        {/* Loading Indicator */}
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.primary} />
+            <Text style={[styles.loadingText, { color: theme.textSecondary }]}>
+              Loading profile data...
             </Text>
+          </View>
+        ) : (
+          <ScrollView
+            style={styles.content}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Profile Picture Section */}
+            <View style={styles.profileSection}>
+              <AvatarUpload
+                currentImage={formData.image}
+                onImageSelected={handleImageSelected}
+                size={120}
+                showUploadButton={true}
+              />
+            </View>
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.photosScrollView}
-              contentContainerStyle={styles.photosContainer}
-            >
-              {formData.images.map((imageUri, index) => (
-                <View key={index} style={styles.photoItem}>
-                  <Image source={{ uri: imageUri }} style={styles.photoImage} />
+            {/* Additional Photos Section */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <ImageIcon size={20} color={theme.primary} />
+                <Text
+                  style={[
+                    styles.sectionTitle,
+                    { color: theme.text, marginBottom: 0, marginLeft: 8 },
+                  ]}
+                >
+                  Additional Photos
+                </Text>
+              </View>
+              <Text
+                style={[styles.sectionSubtitle, { color: theme.textSecondary }]}
+              >
+                Add up to 5 more photos to your profile
+              </Text>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.photosScrollView}
+                contentContainerStyle={styles.photosContainer}
+              >
+                {formData.images.map((imageUri, index) => (
+                  <View key={index} style={styles.photoItem}>
+                    <Image
+                      source={{ uri: imageUri }}
+                      style={styles.photoImage}
+                    />
+                    <TouchableOpacity
+                      style={[
+                        styles.removePhotoButton,
+                        { backgroundColor: theme.error || '#FF3B30' },
+                      ]}
+                      onPress={() => removeImage(index)}
+                    >
+                      <Trash2 size={16} color="white" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+
+                {formData.images.length < 5 && (
                   <TouchableOpacity
                     style={[
-                      styles.removePhotoButton,
-                      { backgroundColor: theme.error || '#FF3B30' },
+                      styles.addPhotoButton,
+                      {
+                        backgroundColor: theme.surface,
+                        borderColor: theme.border,
+                      },
                     ]}
-                    onPress={() => removeImage(index)}
+                    onPress={pickAdditionalImage}
                   >
-                    <Trash2 size={16} color="white" />
+                    <Plus size={32} color={theme.primary} />
+                    <Text
+                      style={[
+                        styles.addPhotoText,
+                        { color: theme.textSecondary },
+                      ]}
+                    >
+                      Add Photo
+                    </Text>
                   </TouchableOpacity>
-                </View>
-              ))}
+                )}
+              </ScrollView>
+            </View>
 
-              {formData.images.length < 5 && (
+            {/* Basic Information */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                Basic Information
+              </Text>
+
+              <View style={styles.inputContainer}>
+                <View style={styles.inputHeader}>
+                  <UserIcon size={18} color={theme.primary} />
+                  <Text style={[styles.inputLabel, { color: theme.text }]}>
+                    Name
+                  </Text>
+                </View>
+                <TextInput
+                  style={[
+                    styles.textInput,
+                    {
+                      backgroundColor: theme.surface,
+                      color: theme.text,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                  value={formData.name}
+                  onChangeText={(text) =>
+                    setFormData((prev) => ({ ...prev, name: text }))
+                  }
+                  placeholder="Enter your name"
+                  placeholderTextColor={theme.textSecondary}
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <View style={styles.inputHeader}>
+                  <Calendar size={18} color={theme.primary} />
+                  <Text style={[styles.inputLabel, { color: theme.text }]}>
+                    Date of Birth
+                  </Text>
+                </View>
                 <TouchableOpacity
                   style={[
-                    styles.addPhotoButton,
+                    styles.datePickerButton,
                     {
                       backgroundColor: theme.surface,
                       borderColor: theme.border,
                     },
                   ]}
-                  onPress={pickAdditionalImage}
+                  onPress={() => setShowDatePicker(true)}
                 >
-                  <Plus size={32} color={theme.primary} />
+                  <Text style={[styles.dateText, { color: theme.text }]}>
+                    {formatDate(formData.dateOfBirth)}
+                  </Text>
+                  <Calendar size={20} color={theme.primary} />
+                </TouchableOpacity>
+
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={formData.dateOfBirth}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleDateChange}
+                    maximumDate={new Date()} // Can't select future dates
+                    minimumDate={new Date(1924, 0, 1)} // Min date: 100 years ago
+                    textColor={theme.text}
+                    themeVariant={isDarkMode ? 'dark' : 'light'}
+                  />
+                )}
+
+                {Platform.OS === 'ios' && showDatePicker && (
+                  <TouchableOpacity
+                    style={[
+                      styles.datePickerDoneButton,
+                      { backgroundColor: theme.primary },
+                    ]}
+                    onPress={() => setShowDatePicker(false)}
+                  >
+                    <Text style={styles.datePickerDoneText}>Done</Text>
+                  </TouchableOpacity>
+                )}
+
+                {formData.dateOfBirth &&
+                  calculateAge(formData.dateOfBirth) !== null && (
+                    <Text
+                      style={[
+                        styles.helperText,
+                        { color: theme.textSecondary },
+                      ]}
+                    >
+                      Age: {calculateAge(formData.dateOfBirth)} years old
+                    </Text>
+                  )}
+              </View>
+
+              {formData.dateOfBirth &&
+                calculateZodiacSign(formData.dateOfBirth) && (
+                  <View style={styles.inputContainer}>
+                    <View style={styles.inputHeader}>
+                      <Star size={18} color={theme.primary} />
+                      <Text style={[styles.inputLabel, { color: theme.text }]}>
+                        Zodiac Sign
+                      </Text>
+                    </View>
+                    <View style={styles.zodiacContainer}>
+                      <ZodiacBadge
+                        zodiacSign={calculateZodiacSign(formData.dateOfBirth)}
+                        size="large"
+                        showLabel={true}
+                      />
+                    </View>
+                  </View>
+                )}
+
+              <View style={styles.inputContainer}>
+                <View style={styles.inputHeader}>
+                  <Ruler size={18} color={theme.primary} />
+                  <Text style={[styles.inputLabel, { color: theme.text }]}>
+                    Height: {formData.height} cm
+                  </Text>
+                </View>
+                <View style={styles.sliderContainer}>
+                  <Text
+                    style={[styles.sliderLabel, { color: theme.textSecondary }]}
+                  >
+                    140 cm
+                  </Text>
+                  <Slider
+                    style={styles.slider}
+                    minimumValue={140}
+                    maximumValue={220}
+                    step={1}
+                    value={formData.height}
+                    onValueChange={(value) =>
+                      setFormData((prev) => ({ ...prev, height: value }))
+                    }
+                    minimumTrackTintColor={theme.primary}
+                    maximumTrackTintColor={theme.border}
+                    thumbTintColor={theme.primary}
+                  />
+                  <Text
+                    style={[styles.sliderLabel, { color: theme.textSecondary }]}
+                  >
+                    220 cm
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.inputContainer}>
+                <View style={styles.inputHeader}>
+                  <Users size={18} color={theme.primary} />
+                  <Text style={[styles.inputLabel, { color: theme.text }]}>
+                    Gender
+                  </Text>
+                </View>
+                <View style={styles.genderContainer}>
+                  {(['male', 'female', 'other'] as const).map((gender) => (
+                    <TouchableOpacity
+                      key={gender}
+                      style={[
+                        styles.genderOption,
+                        {
+                          backgroundColor:
+                            formData.gender === gender
+                              ? theme.primary
+                              : theme.surface,
+                          borderColor: theme.border,
+                        },
+                      ]}
+                      onPress={() =>
+                        setFormData((prev) => ({ ...prev, gender }))
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.genderText,
+                          {
+                            color:
+                              formData.gender === gender ? 'white' : theme.text,
+                          },
+                        ]}
+                      >
+                        {gender.charAt(0).toUpperCase() + gender.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View>
+
+            {/* About Me */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                About Me
+              </Text>
+
+              <View style={styles.inputContainer}>
+                <View style={styles.inputHeader}>
+                  <FileText size={18} color={theme.primary} />
+                  <Text style={[styles.inputLabel, { color: theme.text }]}>
+                    Bio
+                  </Text>
+                </View>
+                <TextInput
+                  style={[
+                    styles.textArea,
+                    {
+                      backgroundColor: theme.surface,
+                      color: theme.text,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                  value={formData.bio}
+                  onChangeText={(text) =>
+                    setFormData((prev) => ({ ...prev, bio: text }))
+                  }
+                  placeholder="Tell others about yourself..."
+                  placeholderTextColor={theme.textSecondary}
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <View style={styles.inputHeader}>
+                  <MapPin size={18} color={theme.primary} />
+                  <Text style={[styles.inputLabel, { color: theme.text }]}>
+                    Location
+                  </Text>
+                </View>
+
+                {/* Location is automatically tracked in the background */}
+                <View
+                  style={[
+                    styles.locationInfo,
+                    {
+                      backgroundColor: theme.surface,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[styles.locationInfoText, { color: theme.text }]}
+                  >
+                    {user?.location || 'Location updating automatically...'}
+                  </Text>
                   <Text
                     style={[
-                      styles.addPhotoText,
+                      styles.locationInfoSubtext,
                       { color: theme.textSecondary },
                     ]}
                   >
-                    Add Photo
+                    Your location is automatically updated in the background to
+                    show you the best nearby matches.
                   </Text>
-                </TouchableOpacity>
-              )}
-            </ScrollView>
-          </View>
-
-          {/* Basic Information */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              Basic Information
-            </Text>
-
-            <View style={styles.inputContainer}>
-              <View style={styles.inputHeader}>
-                <UserIcon size={18} color={theme.primary} />
-                <Text style={[styles.inputLabel, { color: theme.text }]}>
-                  Name
-                </Text>
-              </View>
-              <TextInput
-                style={[
-                  styles.textInput,
-                  {
-                    backgroundColor: theme.surface,
-                    color: theme.text,
-                    borderColor: theme.border,
-                  },
-                ]}
-                value={formData.name}
-                onChangeText={(text) =>
-                  setFormData((prev) => ({ ...prev, name: text }))
-                }
-                placeholder="Enter your name"
-                placeholderTextColor={theme.textSecondary}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <View style={styles.inputHeader}>
-                <Calendar size={18} color={theme.primary} />
-                <Text style={[styles.inputLabel, { color: theme.text }]}>
-                  Date of Birth
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={[
-                  styles.datePickerButton,
-                  {
-                    backgroundColor: theme.surface,
-                    borderColor: theme.border,
-                  },
-                ]}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Text style={[styles.dateText, { color: theme.text }]}>
-                  {formatDate(formData.dateOfBirth)}
-                </Text>
-                <Calendar size={20} color={theme.primary} />
-              </TouchableOpacity>
-
-              {showDatePicker && (
-                <DateTimePicker
-                  value={formData.dateOfBirth}
-                  mode="date"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={handleDateChange}
-                  maximumDate={new Date()} // Can't select future dates
-                  minimumDate={new Date(1924, 0, 1)} // Min date: 100 years ago
-                  textColor={theme.text}
-                  themeVariant={isDarkMode ? 'dark' : 'light'}
-                />
-              )}
-
-              {Platform.OS === 'ios' && showDatePicker && (
-                <TouchableOpacity
-                  style={[
-                    styles.datePickerDoneButton,
-                    { backgroundColor: theme.primary },
-                  ]}
-                  onPress={() => setShowDatePicker(false)}
-                >
-                  <Text style={styles.datePickerDoneText}>Done</Text>
-                </TouchableOpacity>
-              )}
-
-              {formData.dateOfBirth &&
-                calculateAge(formData.dateOfBirth) !== null && (
-                  <Text
-                    style={[styles.helperText, { color: theme.textSecondary }]}
-                  >
-                    Age: {calculateAge(formData.dateOfBirth)} years old
-                  </Text>
-                )}
-            </View>
-
-            {formData.dateOfBirth &&
-              calculateZodiacSign(formData.dateOfBirth) && (
-                <View style={styles.inputContainer}>
-                  <View style={styles.inputHeader}>
-                    <Star size={18} color={theme.primary} />
-                    <Text style={[styles.inputLabel, { color: theme.text }]}>
-                      Zodiac Sign
-                    </Text>
-                  </View>
-                  <View style={styles.zodiacContainer}>
-                    <ZodiacBadge
-                      zodiacSign={calculateZodiacSign(formData.dateOfBirth)}
-                      size="large"
-                      showLabel={true}
-                    />
-                  </View>
                 </View>
-              )}
-
-            <View style={styles.inputContainer}>
-              <View style={styles.inputHeader}>
-                <Ruler size={18} color={theme.primary} />
-                <Text style={[styles.inputLabel, { color: theme.text }]}>
-                  Height: {formData.height} cm
-                </Text>
-              </View>
-              <View style={styles.sliderContainer}>
-                <Text
-                  style={[styles.sliderLabel, { color: theme.textSecondary }]}
-                >
-                  140 cm
-                </Text>
-                <Slider
-                  style={styles.slider}
-                  minimumValue={140}
-                  maximumValue={220}
-                  step={1}
-                  value={formData.height}
-                  onValueChange={(value) =>
-                    setFormData((prev) => ({ ...prev, height: value }))
-                  }
-                  minimumTrackTintColor={theme.primary}
-                  maximumTrackTintColor={theme.border}
-                  thumbTintColor={theme.primary}
-                />
-                <Text
-                  style={[styles.sliderLabel, { color: theme.textSecondary }]}
-                >
-                  220 cm
-                </Text>
               </View>
             </View>
 
-            <View style={styles.inputContainer}>
-              <View style={styles.inputHeader}>
-                <Users size={18} color={theme.primary} />
-                <Text style={[styles.inputLabel, { color: theme.text }]}>
-                  Gender
-                </Text>
-              </View>
-              <View style={styles.genderContainer}>
-                {(['male', 'female', 'other'] as const).map((gender) => (
-                  <TouchableOpacity
-                    key={gender}
-                    style={[
-                      styles.genderOption,
-                      {
-                        backgroundColor:
-                          formData.gender === gender
-                            ? theme.primary
-                            : theme.surface,
-                        borderColor: theme.border,
-                      },
-                    ]}
-                    onPress={() => setFormData((prev) => ({ ...prev, gender }))}
-                  >
-                    <Text
-                      style={[
-                        styles.genderText,
-                        {
-                          color:
-                            formData.gender === gender ? 'white' : theme.text,
-                        },
-                      ]}
-                    >
-                      {gender.charAt(0).toUpperCase() + gender.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          </View>
-
-          {/* About Me */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              About Me
-            </Text>
-
-            <View style={styles.inputContainer}>
-              <View style={styles.inputHeader}>
-                <FileText size={18} color={theme.primary} />
-                <Text style={[styles.inputLabel, { color: theme.text }]}>
-                  Bio
-                </Text>
-              </View>
-              <TextInput
-                style={[
-                  styles.textArea,
-                  {
-                    backgroundColor: theme.surface,
-                    color: theme.text,
-                    borderColor: theme.border,
-                  },
-                ]}
-                value={formData.bio}
-                onChangeText={(text) =>
-                  setFormData((prev) => ({ ...prev, bio: text }))
+            {/* Interests */}
+            <View style={styles.section}>
+              <InterestTagPicker
+                selectedInterests={formData.interests}
+                onInterestsChange={(interests) =>
+                  setFormData((prev) => ({ ...prev, interests }))
                 }
-                placeholder="Tell others about yourself..."
-                placeholderTextColor={theme.textSecondary}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
               />
             </View>
 
-            <View style={styles.inputContainer}>
-              <View style={styles.inputHeader}>
-                <MapPin size={18} color={theme.primary} />
-                <Text style={[styles.inputLabel, { color: theme.text }]}>
-                  Location
-                </Text>
-              </View>
+            {/* Dating Preferences */}
+            <View style={[styles.section, { paddingBottom: 40 }]}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                Dating Preferences
+              </Text>
 
-              {/* Location is automatically tracked in the background */}
-              <View
-                style={[
-                  styles.locationInfo,
-                  { backgroundColor: theme.surface, borderColor: theme.border },
-                ]}
-              >
-                <Text style={[styles.locationInfoText, { color: theme.text }]}>
-                  {user?.location || 'Location updating automatically...'}
-                </Text>
-                <Text
-                  style={[
-                    styles.locationInfoSubtext,
-                    { color: theme.textSecondary },
-                  ]}
-                >
-                  Your location is automatically updated in the background to
-                  show you the best nearby matches.
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Interests */}
-          <View style={styles.section}>
-            <InterestTagPicker
-              selectedInterests={formData.interests}
-              onInterestsChange={(interests) =>
-                setFormData((prev) => ({ ...prev, interests }))
-              }
-            />
-          </View>
-
-          {/* Dating Preferences */}
-          <View style={[styles.section, { paddingBottom: 40 }]}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              Dating Preferences
-            </Text>
-
-            <View style={styles.inputContainer}>
-              <View style={styles.inputHeader}>
-                <Target size={18} color={theme.primary} />
-                <Text style={[styles.inputLabel, { color: theme.text }]}>
-                  Looking For
-                </Text>
-              </View>
-              <View style={styles.genderContainer}>
-                {(['male', 'female', 'both'] as const).map((option) => (
-                  <TouchableOpacity
-                    key={option}
-                    style={[
-                      styles.genderOption,
-                      {
-                        backgroundColor:
-                          formData.preferences.interestedIn === option
-                            ? theme.primary
-                            : theme.surface,
-                        borderColor: theme.border,
-                      },
-                    ]}
-                    onPress={() =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        preferences: {
-                          ...prev.preferences,
-                          interestedIn: option,
-                        },
-                      }))
-                    }
-                  >
-                    <Text
+              <View style={styles.inputContainer}>
+                <View style={styles.inputHeader}>
+                  <Target size={18} color={theme.primary} />
+                  <Text style={[styles.inputLabel, { color: theme.text }]}>
+                    Looking For
+                  </Text>
+                </View>
+                <View style={styles.genderContainer}>
+                  {(['male', 'female', 'both'] as const).map((option) => (
+                    <TouchableOpacity
+                      key={option}
                       style={[
-                        styles.genderText,
+                        styles.genderOption,
                         {
-                          color:
+                          backgroundColor:
                             formData.preferences.interestedIn === option
-                              ? 'white'
-                              : theme.text,
+                              ? theme.primary
+                              : theme.surface,
+                          borderColor: theme.border,
                         },
                       ]}
+                      onPress={() =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          preferences: {
+                            ...prev.preferences,
+                            interestedIn: option,
+                          },
+                        }))
+                      }
                     >
-                      {option === 'both'
-                        ? 'Everyone'
-                        : option.charAt(0).toUpperCase() + option.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                      <Text
+                        style={[
+                          styles.genderText,
+                          {
+                            color:
+                              formData.preferences.interestedIn === option
+                                ? 'white'
+                                : theme.text,
+                          },
+                        ]}
+                      >
+                        {option === 'both'
+                          ? 'Everyone'
+                          : option.charAt(0).toUpperCase() + option.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
             </View>
-          </View>
-        </ScrollView>
+          </ScrollView>
+        )}
       </View>
     </Modal>
   );
@@ -697,6 +813,17 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    fontWeight: '500',
   },
   profileSection: {
     alignItems: 'center',

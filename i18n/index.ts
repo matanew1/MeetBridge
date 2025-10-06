@@ -144,18 +144,145 @@ const resources = {
       },
     },
   },
+  he: {
+    translation: {
+      // Navigation & Tabs
+      tabs: {
+        discover: 'אהבתי',
+        search: 'חיפוש',
+        connections: 'קשרים',
+        chat: "צ'אט",
+      },
+
+      // Search Screen
+      search: {
+        title: 'גלה אנשים',
+        searchingPerfectMatch: 'מחפש את ההתאמה המושלמת...',
+        searching: 'מחפש...',
+        newSearch: 'חיפוש חדש',
+        loading: 'טוען...',
+        distance: "מ'",
+        noProfiles: 'אין פרופילים זמינים. נסה לשנות את הפילטרים.',
+      },
+
+      // Chat Screen
+      chat: {
+        title: 'שיחות',
+        noConversations: 'אין שיחות עדיין',
+        startMatching: 'התחל להכיר אנשים חדשים',
+        chatsCount: 'שיחות',
+        now: 'עכשיו',
+        minutes: "דק'",
+        hours: 'שעות',
+        yesterday: 'אתמול',
+        days: 'ימים',
+        loading: 'טוען...',
+        online: 'מחובר עכשיו',
+        offline: 'לא מחובר',
+        messageInputPlaceholder: 'כתוב הודעה...',
+        viewProfile: 'צפה בפרופיל',
+        unmatch: 'בטל התאמה',
+        unmatchTitle: 'בטל התאמה',
+        unmatchConfirm:
+          'האם אתה בטוח שברצונך לבטל התאמה עם {{name}}? לא ניתן לבטל פעולה זו.',
+        newMatch: 'יש התאמה! אמור שלום 👋',
+        unmatchDetected: 'השיחה הזו הסתיימה.',
+      },
+
+      // Profile Screen
+      profile: {
+        title: 'פרופיל',
+        interests: 'תחומי עניין',
+        bio: 'אודות',
+        unmatch: 'בטל התאמה',
+        report: 'דווח',
+        block: 'חסום',
+      },
+
+      // Connections Screen
+      connections: {
+        title: 'קשרים',
+        matches: 'התאמות',
+        posts: 'פוסטים',
+        noMatches: 'אין התאמות עדיין',
+        startSwiping: 'התחל להחליק כדי למצוא התאמות',
+        noPosts: 'אין פוסטים עדיין',
+        createPost: 'צור את הפוסט הראשון שלך',
+      },
+
+      // Modals
+      modals: {
+        unmatchTitle: 'בטל התאמה',
+        unmatchText:
+          'האם אתה בטוח שברצונך לבטל התאמה? פעולה זו תמחק גם את השיחה ולא ניתן לבטלה.',
+        confirmUnmatch: 'בטל התאמה',
+        matchTitle: '!יש התאמה',
+        matchText: 'שניכם אהבתם אחד את השני',
+        startChatting: 'התחל לשוחח',
+      },
+
+      // Filter Modal
+      filter: {
+        title: 'פילטרי חיפוש',
+        apply: 'החל',
+        upTo: 'עד',
+        meters: "מ'",
+      },
+
+      // Settings & Theme
+      settings: {
+        title: 'הגדרות',
+        language: 'שפה',
+        theme: 'ערכת נושא',
+        darkMode: 'מצב כהה',
+        lightMode: 'מצב בהיר',
+        notifications: 'התראות',
+        privacy: 'פרטיות',
+        help: 'עזרה',
+        about: 'אודות',
+        logout: 'התנתק',
+      },
+
+      // Common
+      common: {
+        loading: 'טוען...',
+        error: 'שגיאה',
+        retry: 'נסה שוב',
+        noData: 'אין נתונים',
+        comingSoon: 'בקרוב',
+        ok: 'אישור',
+        yes: 'כן',
+        no: 'לא',
+        cancel: 'ביטול',
+        unmatch: 'בטל התאמה',
+      },
+    },
+  },
 };
 
-// Language detection and persistence (English only)
+// Language detection and persistence
 const languageDetector = {
   type: 'languageDetector' as const,
   async: true,
   detect: async (callback: (lng: string) => void) => {
-    callback('en'); // Always default to English
+    try {
+      const savedLanguage = await AsyncStorage.getItem('user-language');
+      if (savedLanguage && (savedLanguage === 'en' || savedLanguage === 'he')) {
+        callback(savedLanguage);
+      } else {
+        callback('en'); // Default to English
+      }
+    } catch (error) {
+      callback('en');
+    }
   },
   init: () => {},
   cacheUserLanguage: async (lng: string) => {
-    // No-op since we only support English
+    try {
+      await AsyncStorage.setItem('user-language', lng);
+    } catch (error) {
+      console.error('Error saving language preference:', error);
+    }
   },
 };
 
@@ -164,11 +291,21 @@ i18n
   .use(initReactI18next)
   .init({
     resources,
-    lng: 'en', // default and only language
+    lng: 'en', // default language
     fallbackLng: 'en',
+    supportedLngs: ['en', 'he'],
     interpolation: {
       escapeValue: false,
     },
   });
+
+// Helper to check if current language is RTL
+export const isRTL = () => i18n.language === 'he';
+
+// Helper to change language and update RTL
+export const changeLanguage = async (lng: 'en' | 'he') => {
+  await i18n.changeLanguage(lng);
+  await AsyncStorage.setItem('user-language', lng);
+};
 
 export default i18n;

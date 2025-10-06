@@ -35,6 +35,7 @@ import EditProfileModal from './EditProfileModal';
 import { PREDEFINED_INTERESTS } from '../../constants/interests';
 import ZodiacBadge from './ZodiacBadge';
 import { calculateAge } from '../../utils/dateUtils';
+import { useUserStore } from '../../store/userStore';
 
 interface ProfileModalProps {
   visible: boolean;
@@ -48,7 +49,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onClose,
 }) => {
   const { isDarkMode } = useTheme();
-  const { user, logout, updateProfile } = useAuth();
+  const { user, logout, updateProfile, refreshUserProfile } = useAuth();
   const theme = isDarkMode ? darkTheme : lightTheme;
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
@@ -83,9 +84,37 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       // If updateProfile exists in AuthContext, use it
       if (updateProfile) {
         await updateProfile(updatedData);
+        // Refresh the user profile from Firebase to ensure we have the latest data
+        if (refreshUserProfile) {
+          await refreshUserProfile();
+        }
+
+        // Sync search filters with user preferences
+        if (updatedData.preferences) {
+          const { updateSearchFilters } = useUserStore.getState();
+          const filterUpdates: any = {};
+
+          if (updatedData.preferences.interestedIn !== undefined) {
+            filterUpdates.gender = updatedData.preferences.interestedIn;
+          }
+          if (updatedData.preferences.ageRange !== undefined) {
+            filterUpdates.ageRange = updatedData.preferences.ageRange;
+          }
+          if (updatedData.preferences.maxDistance !== undefined) {
+            filterUpdates.maxDistance = updatedData.preferences.maxDistance;
+          }
+
+          if (Object.keys(filterUpdates).length > 0) {
+            updateSearchFilters(filterUpdates);
+            console.log(
+              '✅ Search filters synced with preferences:',
+              filterUpdates
+            );
+          }
+        }
+
+        console.log('✅ Profile updated and refreshed from Firebase');
       }
-      // TODO: Also update the user profile in your backend/Firebase
-      console.log('Profile updated:', updatedData);
     } catch (error) {
       console.error('Error updating profile:', error);
     }
@@ -94,11 +123,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const handleSettings = () => {
     // TODO: Navigate to settings screen
     console.log('Settings functionality coming soon!');
-  };
-
-  const handleChangePhoto = () => {
-    // TODO: Implement photo change functionality
-    console.log('Photo change functionality coming soon!');
   };
 
   if (!user) return null;

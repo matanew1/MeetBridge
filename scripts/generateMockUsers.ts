@@ -18,7 +18,6 @@ import * as readline from 'readline';
 //CHECK: improve the register and login UI add them the logo.png both ✅ (Added logo to both login and register screens)
 //TODO: make sure everything is LTR on english and RTL on hebrew
 //TODO: when there is a suggestion for email, dont skip fields that has already value ( jump to password  field)
-//TODO: add zodiac sign
 //TODO: toggle button show my status online/offline to others users everywhere (connection and in chat)
 //TODO: is discovery search show online users only toggle on
 //TODO: add search by name in connections tab

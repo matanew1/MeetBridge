@@ -84,6 +84,7 @@ interface UserState {
   dislikeProfile: (profileId: string) => Promise<void>;
   unmatchProfile: (profileId: string) => Promise<void>;
   reportProfile: (profileId: string, reason: string) => Promise<void>;
+  subscribeToDiscoveryUpdates: () => (() => void) | null; // Returns unsubscribe function
 
   // Actions - Getters
   getLikedProfiles: () => User[];
@@ -828,6 +829,32 @@ export const useUserStore = create<UserState>((set, get) => ({
       set({ error: 'Failed to delete conversation' });
       console.error('Error deleting conversation:', error);
     }
+  },
+
+  // Subscribe to real-time discovery queue updates
+  subscribeToDiscoveryUpdates: () => {
+    const currentUser = get().currentUser;
+    if (!currentUser) {
+      console.log('⚠️ Cannot subscribe to discovery updates: No current user');
+      return null;
+    }
+
+    console.log('👂 Subscribing to real-time discovery queue updates');
+
+    const unsubscribe = discoveryService.subscribeToDiscoveryQueueUpdates(
+      currentUser.id,
+      (profiles) => {
+        console.log(
+          `🔄 Real-time update: ${profiles.length} profiles in queue`
+        );
+        // Update the discover profiles with the latest data from the queue
+        set({ discoverProfiles: profiles });
+        // Invalidate cache since we have fresh real-time data
+        cacheService.invalidateByPrefix('discoverProfiles_');
+      }
+    );
+
+    return unsubscribe;
   },
 
   // Utility Actions

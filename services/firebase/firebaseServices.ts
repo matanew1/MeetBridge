@@ -214,6 +214,58 @@ export class FirebaseUserProfileService implements IUserProfileService {
       await updateDoc(userRef, updateData);
       console.log('✅ Firebase updateDoc completed successfully');
 
+      // Update all discovery queue entries that contain this user's profile
+      // This ensures real-time updates across all users who have this profile in their queue
+      try {
+        const queueQuery = query(
+          collection(db, 'discovery_queue'),
+          where('profileId', '==', user.uid)
+        );
+        const queueSnapshot = await getDocs(queueQuery);
+
+        if (!queueSnapshot.empty) {
+          console.log(
+            `🔄 Updating ${queueSnapshot.size} discovery queue entries with new profile data`
+          );
+          const batch = writeBatch(db);
+
+          // Prepare update data for queue entries (exclude undefined values)
+          const queueUpdateData: Record<string, any> = {};
+          if (dataToUpdate.name)
+            queueUpdateData['profileData.name'] = dataToUpdate.name;
+          if (dataToUpdate.age !== undefined)
+            queueUpdateData['profileData.age'] = dataToUpdate.age;
+          if (dataToUpdate.bio !== undefined)
+            queueUpdateData['profileData.bio'] = dataToUpdate.bio;
+          if (dataToUpdate.image)
+            queueUpdateData['profileData.image'] = dataToUpdate.image;
+          if (dataToUpdate.images)
+            queueUpdateData['profileData.images'] = dataToUpdate.images;
+          if (dataToUpdate.interests)
+            queueUpdateData['profileData.interests'] = dataToUpdate.interests;
+          if (dataToUpdate.height !== undefined)
+            queueUpdateData['profileData.height'] = dataToUpdate.height;
+          if (dataToUpdate.location)
+            queueUpdateData['profileData.location'] = dataToUpdate.location;
+          if (dataToUpdate.gender)
+            queueUpdateData['profileData.gender'] = dataToUpdate.gender;
+          if (dataToUpdate.zodiacSign)
+            queueUpdateData['profileData.zodiacSign'] = dataToUpdate.zodiacSign;
+
+          queueSnapshot.forEach((queueDoc) => {
+            batch.update(queueDoc.ref, queueUpdateData);
+          });
+
+          await batch.commit();
+          console.log(
+            '✅ Discovery queue entries updated with new profile data'
+          );
+        }
+      } catch (queueError) {
+        console.error('⚠️ Error updating discovery queue:', queueError);
+        // Don't fail the profile update if queue update fails
+      }
+
       // Get updated document
       const updatedDoc = await getDoc(userRef);
       const updatedUserData = updatedDoc.data();
@@ -492,28 +544,49 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
             return;
           }
 
-          const matchesGender =
+          // Two-way gender matching:
+          // 1. Current user must be interested in profile's gender
+          const currentUserInterestedInProfile =
             filters.gender === 'both' || data.gender === filters.gender;
+
+          // 2. Profile must be interested in current user's gender
+          const profileInterestedIn = data.preferences?.interestedIn || 'both';
+          const currentUserGender = currentUserData?.gender || 'other';
+          const profileInterestedInCurrentUser =
+            profileInterestedIn === 'both' ||
+            profileInterestedIn === currentUserGender;
+
+          const matchesGender =
+            currentUserInterestedInProfile && profileInterestedInCurrentUser;
+
           const matchesAge =
             data.age >= filters.ageRange[0] && data.age <= filters.ageRange[1];
 
           // DEBUG: Comprehensive logging for each profile
           console.log(`👤 QUEUE: Processing ${data.name || 'Unknown'}`, {
             profileId: docSnapshot.id,
-            gender: data.gender,
-            lookingFor: filters.gender,
-            matchesGender,
+            profileGender: data.gender,
+            profileInterestedIn: profileInterestedIn,
+            currentUserGender: currentUserGender,
+            currentUserInterestedIn: filters.gender,
+            currentUserInterestedInProfile: currentUserInterestedInProfile
+              ? '✅'
+              : '❌',
+            profileInterestedInCurrentUser: profileInterestedInCurrentUser
+              ? '✅'
+              : '❌',
+            matchesGender: matchesGender ? '✅' : '❌',
             age: data.age,
             ageRange: filters.ageRange,
-            matchesAge,
+            matchesAge: matchesAge ? '✅' : '❌',
             willAdd: matchesGender && matchesAge,
           });
 
           if (!matchesGender || !matchesAge) {
             console.log(
-              `❌ QUEUE: Filtered out ${data.name} - Gender: ${
+              `❌ QUEUE: Filtered out ${data.name} - Gender Match: ${
                 matchesGender ? '✅' : '❌'
-              }, Age: ${matchesAge ? '✅' : '❌'}`
+              }, Age Match: ${matchesAge ? '✅' : '❌'}`
             );
             return;
           }
@@ -695,11 +768,18 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
           newQueueSnapshot,
           pageSize,
           page,
-          filters
+          filters,
+          user.uid
         );
       }
 
-      return this.getProfilesFromQueue(queueSnapshot, pageSize, page, filters);
+      return this.getProfilesFromQueue(
+        queueSnapshot,
+        pageSize,
+        page,
+        filters,
+        user.uid
+      );
     } catch (error) {
       console.error('Error getting discover profiles:', error);
       return {
@@ -718,7 +798,8 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
     queueSnapshot: any,
     pageSize: number,
     page: number,
-    filters: SearchFilters
+    filters: SearchFilters,
+    currentUserId: string
   ): Promise<ApiResponse<User[]>> {
     const profiles: User[] = [];
     const seenProfileIds = new Set<string>();
@@ -748,6 +829,11 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
       `🔍 QUEUE FILTER: Applying gender filter - Looking for: ${filters.gender}`
     );
 
+    // Get current user data for bidirectional matching
+    const currentUserDoc = await getDoc(doc(db, 'users', currentUserId));
+    const currentUserData = currentUserDoc.data();
+    const currentUserGender = currentUserData?.gender || 'other';
+
     // Fetch actual profile data and apply current filters
     for (const profileId of profileIds) {
       try {
@@ -756,16 +842,33 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
           const data = profileDoc.data();
           const queueData = queueDataMap.get(profileId);
 
-          // CRITICAL: Apply gender filter from current user preferences
-          const matchesGender =
+          // CRITICAL: Apply BIDIRECTIONAL gender filter
+          // 1. Current user must be interested in profile's gender
+          const currentUserInterestedInProfile =
             filters.gender === 'both' || data.gender === filters.gender;
+
+          // 2. Profile must be interested in current user's gender
+          const profileInterestedIn = data.preferences?.interestedIn || 'both';
+          const profileInterestedInCurrentUser =
+            profileInterestedIn === 'both' ||
+            profileInterestedIn === currentUserGender;
+
+          const matchesGender =
+            currentUserInterestedInProfile && profileInterestedInCurrentUser;
+
           const matchesAge =
             data.age >= filters.ageRange[0] && data.age <= filters.ageRange[1];
 
           // DEBUG: Log filtering decisions
           if (!matchesGender) {
             console.log(
-              `⚠️ QUEUE RETRIEVAL: Gender mismatch - ${data.name} (${data.gender}) filtered out. Looking for: ${filters.gender}`
+              `⚠️ QUEUE RETRIEVAL: Gender mismatch - ${data.name} (${data.gender}, looking for: ${profileInterestedIn}) ` +
+                `filtered out. Current user: (${currentUserGender}, looking for: ${filters.gender}). ` +
+                `User→Profile: ${
+                  currentUserInterestedInProfile ? '✅' : '❌'
+                }, Profile→User: ${
+                  profileInterestedInCurrentUser ? '✅' : '❌'
+                }`
             );
             continue; // Skip this profile
           }
@@ -866,6 +969,51 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
     } catch (error) {
       console.error('Error removing from queue:', error);
     }
+  }
+
+  /**
+   * Subscribe to real-time updates for discovery queue profiles
+   * This ensures that when a profile in the queue updates, the UI reflects changes immediately
+   */
+  subscribeToDiscoveryQueueUpdates(
+    userId: string,
+    onUpdate: (profiles: User[]) => void
+  ): Unsubscribe {
+    const queueQuery = query(
+      collection(db, 'discovery_queue'),
+      where('userId', '==', userId),
+      where('shown', '==', false),
+      orderBy('score', 'desc'),
+      limit(50)
+    );
+
+    console.log('👂 Setting up real-time listener for discovery queue updates');
+
+    const unsubscribe = onSnapshot(
+      queueQuery,
+      (snapshot) => {
+        const profiles: User[] = [];
+
+        snapshot.forEach((docSnapshot) => {
+          const data = docSnapshot.data();
+          if (data.profileData) {
+            profiles.push({
+              id: data.profileId,
+              ...data.profileData,
+              distance: data.distance,
+            } as User);
+          }
+        });
+
+        console.log(`🔄 Discovery queue updated: ${profiles.length} profiles`);
+        onUpdate(profiles);
+      },
+      (error) => {
+        console.error('❌ Error in discovery queue listener:', error);
+      }
+    );
+
+    return unsubscribe;
   }
 
   /**
@@ -1192,6 +1340,12 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         },
       });
 
+      console.log(`👤 CURRENT USER DEBUG:`, {
+        userId: user.uid,
+        gender: currentUserData?.gender || 'not set',
+        lookingFor: filters.gender,
+      });
+
       console.log(`👤 GENDER FILTER DEBUG:`, {
         lookingFor: filters.gender,
         description:
@@ -1247,16 +1401,34 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
             return;
           }
 
-          // Check if profile matches filters
-          const matchesGender =
+          // Check if profile matches filters - BIDIRECTIONAL
+          // 1. Current user must be interested in profile's gender
+          const currentUserInterestedInProfile =
             filters.gender === 'both' || data.gender === filters.gender;
+
+          // 2. Profile must be interested in current user's gender
+          const profileInterestedIn = data.preferences?.interestedIn || 'both';
+          const currentUserGender = currentUserData?.gender || 'other';
+          const profileInterestedInCurrentUser =
+            profileInterestedIn === 'both' ||
+            profileInterestedIn === currentUserGender;
+
+          const matchesGender =
+            currentUserInterestedInProfile && profileInterestedInCurrentUser;
+
           const matchesAge =
             data.age >= filters.ageRange[0] && data.age <= filters.ageRange[1];
 
           // DEBUG: Log gender filtering
           if (!matchesGender) {
             console.log(
-              `⚠️ GENDER MISMATCH: ${data.name} (${data.gender}) filtered out. Looking for: ${filters.gender}`
+              `⚠️ GENDER MISMATCH: ${data.name} (${data.gender}, looking for: ${profileInterestedIn}) ` +
+                `filtered out. Current user: (${currentUserGender}, looking for: ${filters.gender}). ` +
+                `User→Profile: ${
+                  currentUserInterestedInProfile ? '✅' : '❌'
+                }, Profile→User: ${
+                  profileInterestedInCurrentUser ? '✅' : '❌'
+                }`
             );
           }
 
@@ -1417,6 +1589,11 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         `🔍 Basic Query - Excluding ${interactedUserIds.size} interacted + ${matchedUserIds.size} matched users`
       );
 
+      // Get current user for bidirectional matching
+      const currentUserDoc = await getDoc(doc(db, 'users', currentUserId));
+      const currentUserData = currentUserDoc.data();
+      const currentUserGender = currentUserData?.gender || 'other';
+
       // Basic query without location filtering
       let q = query(
         collection(db, 'users'),
@@ -1453,6 +1630,28 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         if (!data || typeof data.age !== 'number') {
           console.warn(
             `Skipping profile ${docSnapshot.id}: missing required fields`
+          );
+          return;
+        }
+
+        // BIDIRECTIONAL gender matching
+        // 1. Current user must be interested in profile's gender
+        const currentUserInterestedInProfile =
+          filters.gender === 'both' || data.gender === filters.gender;
+
+        // 2. Profile must be interested in current user's gender
+        const profileInterestedIn = data.preferences?.interestedIn || 'both';
+        const profileInterestedInCurrentUser =
+          profileInterestedIn === 'both' ||
+          profileInterestedIn === currentUserGender;
+
+        const matchesGender =
+          currentUserInterestedInProfile && profileInterestedInCurrentUser;
+
+        if (!matchesGender) {
+          console.log(
+            `⚠️ BASIC: Gender mismatch - ${data.name} (${data.gender}, looking for: ${profileInterestedIn}) ` +
+              `filtered out. Current user: (${currentUserGender}, looking for: ${filters.gender})`
           );
           return;
         }
@@ -2948,8 +3147,8 @@ export class FirebaseAuthService implements IAuthService {
         interests: profileData.interests || [],
         location: profileData.location || '',
         preferences: profileData.preferences || {
-          ageRange: [20, 35] as [number, number],
-          maxDistance: 5000, // meters (5 km default)
+          ageRange: [18, 99] as [number, number],
+          maxDistance: 500, // meters (500 = 0.5km)
           interestedIn: 'both' as const,
         },
       };

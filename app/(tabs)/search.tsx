@@ -85,7 +85,9 @@ const ProfileCard = memo(
     // Get user images always user.image and if images > 0 then use images array (which already includes user.image as first item)
     const userImages = useMemo(
       () =>
-        user.images && user.images.length > 0 ? user.images : [user.image],
+        user.images && user.images.length > 0
+          ? [user.image, ...user.images]
+          : [user.image],
       [user.images, user.image]
     );
 
@@ -475,6 +477,24 @@ export default function SearchScreen() {
       loadData();
     }
   }, [isAuthenticated, isAuthLoading]); // Run when authentication state changes
+
+  // Subscribe to real-time discovery queue updates
+  useEffect(() => {
+    if (!currentUser || !isAuthenticated) {
+      return;
+    }
+
+    console.log('🔔 Setting up real-time discovery queue subscription');
+    const unsubscribe = useUserStore.getState().subscribeToDiscoveryUpdates();
+
+    // Cleanup subscription on unmount or when user changes
+    return () => {
+      if (unsubscribe) {
+        console.log('🔕 Cleaning up real-time discovery queue subscription');
+        unsubscribe();
+      }
+    };
+  }, [currentUser?.id, isAuthenticated]);
 
   // Handle when currentUser changes - update preferences and load profiles
   // Prefetch images for better scrolling performance

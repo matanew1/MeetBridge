@@ -128,7 +128,7 @@ const RegisterScreen = () => {
         createdAt: new Date(),
         preferences: {
           ageRange: [18, 99] as [number, number],
-          maxDistance: 5000,
+          maxDistance: 500, // default to 500km
           interestedIn: formData.interestedIn,
         },
       };
@@ -233,6 +233,9 @@ const RegisterScreen = () => {
                   onChangeText={(value) => updateFormData('name', value)}
                   autoCapitalize="words"
                   autoComplete="name"
+                  textContentType="name"
+                  returnKeyType="next"
+                  blurOnSubmit={true}
                 />
               </View>
             </View>
@@ -261,7 +264,91 @@ const RegisterScreen = () => {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoComplete="email"
+                  textContentType="emailAddress"
+                  returnKeyType="next"
+                  blurOnSubmit={true}
                 />
+              </View>
+            </View>
+
+            {/* Password Input */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: theme.text }]}>
+                Password
+              </Text>
+              <View
+                style={[
+                  styles.inputContainer,
+                  {
+                    backgroundColor: theme.background,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <Lock size={20} color={theme.textSecondary} />
+                <TextInput
+                  style={[styles.input, { color: theme.text }]}
+                  placeholder="Create a password"
+                  placeholderTextColor={theme.textSecondary}
+                  value={formData.password}
+                  onChangeText={(value) => updateFormData('password', value)}
+                  secureTextEntry={!showPassword}
+                  autoComplete="new-password"
+                  textContentType="newPassword"
+                  returnKeyType="next"
+                  blurOnSubmit={true}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.eyeButton}
+                >
+                  {showPassword ? (
+                    <EyeOff size={20} color={theme.textSecondary} />
+                  ) : (
+                    <Eye size={20} color={theme.textSecondary} />
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Confirm Password Input */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: theme.text }]}>
+                Confirm Password
+              </Text>
+              <View
+                style={[
+                  styles.inputContainer,
+                  {
+                    backgroundColor: theme.background,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <Lock size={20} color={theme.textSecondary} />
+                <TextInput
+                  style={[styles.input, { color: theme.text }]}
+                  placeholder="Confirm your password"
+                  placeholderTextColor={theme.textSecondary}
+                  value={formData.confirmPassword}
+                  onChangeText={(value) =>
+                    updateFormData('confirmPassword', value)
+                  }
+                  secureTextEntry={!showConfirmPassword}
+                  autoComplete="new-password"
+                  textContentType="newPassword"
+                  returnKeyType="done"
+                />
+                <TouchableOpacity
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  style={styles.eyeButton}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff size={20} color={theme.textSecondary} />
+                  ) : (
+                    <Eye size={20} color={theme.textSecondary} />
+                  )}
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -443,82 +530,6 @@ const RegisterScreen = () => {
                   updateFormData('interests', interests)
                 }
               />
-            </View>
-
-            {/* Password Input */}
-            <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: theme.text }]}>
-                Password
-              </Text>
-              <View
-                style={[
-                  styles.inputContainer,
-                  {
-                    backgroundColor: theme.background,
-                    borderColor: theme.border,
-                  },
-                ]}
-              >
-                <Lock size={20} color={theme.textSecondary} />
-                <TextInput
-                  style={[styles.input, { color: theme.text }]}
-                  placeholder="Create a password"
-                  placeholderTextColor={theme.textSecondary}
-                  value={formData.password}
-                  onChangeText={(value) => updateFormData('password', value)}
-                  secureTextEntry={!showPassword}
-                  autoComplete="new-password"
-                />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  style={styles.eyeButton}
-                >
-                  {showPassword ? (
-                    <EyeOff size={20} color={theme.textSecondary} />
-                  ) : (
-                    <Eye size={20} color={theme.textSecondary} />
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Confirm Password Input */}
-            <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: theme.text }]}>
-                Confirm Password
-              </Text>
-              <View
-                style={[
-                  styles.inputContainer,
-                  {
-                    backgroundColor: theme.background,
-                    borderColor: theme.border,
-                  },
-                ]}
-              >
-                <Lock size={20} color={theme.textSecondary} />
-                <TextInput
-                  style={[styles.input, { color: theme.text }]}
-                  placeholder="Confirm your password"
-                  placeholderTextColor={theme.textSecondary}
-                  value={formData.confirmPassword}
-                  onChangeText={(value) =>
-                    updateFormData('confirmPassword', value)
-                  }
-                  secureTextEntry={!showConfirmPassword}
-                  autoComplete="new-password"
-                />
-                <TouchableOpacity
-                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                  style={styles.eyeButton}
-                >
-                  {showConfirmPassword ? (
-                    <EyeOff size={20} color={theme.textSecondary} />
-                  ) : (
-                    <Eye size={20} color={theme.textSecondary} />
-                  )}
-                </TouchableOpacity>
-              </View>
             </View>
 
             {/* Create Account Button */}

@@ -68,12 +68,12 @@ const LoginScreen = () => {
         >
           {/* Header Section */}
           <View style={styles.headerSection}>
-              <Image
-                source={require('../../assets/images/logo.png')}
-                style={styles.logo}
-                contentFit="contain"
-                tintColor={theme.primary}
-              />
+            <Image
+              source={require('../../assets/images/logo.png')}
+              style={styles.logo}
+              contentFit="contain"
+              tintColor={theme.primary}
+            />
             <Text style={[styles.welcomeText, { color: theme.textSecondary }]}>
               Welcome back! Sign in to continue your journey
             </Text>
@@ -111,6 +111,13 @@ const LoginScreen = () => {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoComplete="email"
+                  textContentType="emailAddress"
+                  returnKeyType="next"
+                  blurOnSubmit={false}
+                  onSubmitEditing={() => {
+                    // Don't auto-focus password if email is being autofilled
+                    // Let user manually tap password field
+                  }}
                 />
               </View>
             </View>
@@ -138,6 +145,9 @@ const LoginScreen = () => {
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
                   autoComplete="password"
+                  textContentType="password"
+                  returnKeyType="done"
+                  onSubmitEditing={handleLogin}
                 />
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}

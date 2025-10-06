@@ -1,10 +1,10 @@
 // App Configuration Constants
 export const APP_CONFIG = {
   // Dating app specific settings
-  MAX_PROFILE_DISTANCE: 5000, // meters (5 km default)
+  MAX_PROFILE_DISTANCE: 500, // meters (0.5 km)
   MIN_USER_AGE: 18,
-  MAX_USER_AGE: 80,
-  DEFAULT_AGE_RANGE: [20, 35] as [number, number],
+  MAX_USER_AGE: 99,
+  DEFAULT_AGE_RANGE: [18, 99] as [number, number],
   MAX_INTERESTS_COUNT: 10,
   MIN_BIO_LENGTH: 10,
   MAX_BIO_LENGTH: 500,

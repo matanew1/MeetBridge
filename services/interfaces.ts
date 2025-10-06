@@ -54,6 +54,11 @@ export interface IDiscoveryService {
   syncDiscoveryQueue(userId: string): Promise<number>;
   cleanDuplicatesInQueue(userId: string): Promise<number>;
   clearDiscoveryQueue(userId: string): Promise<void>;
+  // Real-time updates
+  subscribeToDiscoveryQueueUpdates(
+    userId: string,
+    onUpdate: (profiles: User[]) => void
+  ): () => void; // Returns unsubscribe function
 }
 
 // Matching Service
