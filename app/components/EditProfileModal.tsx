@@ -82,7 +82,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     location: user?.location || '',
     coordinates: user?.coordinates || undefined,
     dateOfBirth: getInitialDate(),
-    height: user?.height || 170, // Default to 170cm
+    height: user?.height !== undefined && user?.height > 0 ? user.height : 170, // Preserve existing height if valid, default to 170cm
     gender: user?.gender || 'other',
     image: user?.image || '',
     images: user?.images ? [...user.images] : [],
@@ -138,6 +138,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
         date.setFullYear(date.getFullYear() - 18);
         return date;
       };
+      console.log('USER: ', user);
 
       setFormData({
         name: user?.name || '',
@@ -145,7 +146,8 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
         location: user?.location || '',
         coordinates: user?.coordinates || undefined,
         dateOfBirth: getInitialDate(),
-        height: user?.height || 170,
+        height:
+          user?.height !== undefined && user?.height > 0 ? user.height : 170, // Preserve existing height if valid
         gender: user?.gender || 'other',
         image: user?.image || '',
         images: user?.images ? [...user.images] : [],
@@ -324,16 +326,17 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           colors={[theme.primary, theme.primaryVariant]}
           style={styles.header}
         >
-          <TouchableOpacity
-            style={[
-              styles.closeButton,
-              { backgroundColor: 'rgba(255, 255, 255, 0.2)' },
-            ]}
-            onPress={onClose}
-          >
-            <X size={24} color="white" />
-          </TouchableOpacity>
-
+          {user?.isProfileComplete && (
+            <TouchableOpacity
+              style={[
+                styles.closeButton,
+                { backgroundColor: 'rgba(255, 255, 255, 0.2)' },
+              ]}
+              onPress={onClose}
+            >
+              <X size={24} color="white" />
+            </TouchableOpacity>
+          )}
           <Text style={[styles.headerTitle, { color: 'white' }]}>
             Edit Profile
           </Text>

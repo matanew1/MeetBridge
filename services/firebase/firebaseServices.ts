@@ -3135,6 +3135,7 @@ export class FirebaseAuthService implements IAuthService {
         zodiacSign: zodiacSign,
         image: profileData.image || '',
         gender: profileData.gender || 'other',
+        height: profileData.height || 170, // Include height from registration
         bio: profileData.bio || '',
         interests: profileData.interests || [],
         location: profileData.location || '',
@@ -3183,6 +3184,8 @@ export class FirebaseAuthService implements IAuthService {
         createdAt: serverTimestamp(),
         lastSeen: serverTimestamp(),
         isOnline: true,
+        isProfileComplete: profileData.isProfileComplete ?? false,
+        hasSeenTutorial: profileData.hasSeenTutorial ?? false,
       });
 
       try {

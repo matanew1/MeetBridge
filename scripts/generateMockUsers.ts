@@ -12,10 +12,6 @@ import {
 import { geohashForLocation } from 'geofire-common';
 import * as readline from 'readline';
 
-//CHECK: when unmatch make sure to remove from both users related collections the chats in both users ✅ (Implemented in unmatchProfile - deletes match, conversation, all messages, creates 24h ban both directions)
-//CHECK: on match make sure image occur in both users animations ✅ (matchedUser data includes image field, used in EnhancedMatchAnimation)
-//CHECK: notification for message received ✅ (Implemented in sendMessage with broadcastMessageNotification)
-//CHECK: improve the register and login UI add them the logo.png both ✅ (Added logo to both login and register screens)
 //TODO: make sure everything is LTR on english and RTL on hebrew
 //TODO: when there is a suggestion for email, dont skip fields that has already value ( jump to password  field)
 //TODO: toggle button show my status online/offline to others users everywhere (connection and in chat)

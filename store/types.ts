@@ -30,6 +30,8 @@ export interface User {
   };
   notificationsEnabled?: boolean;
   pushToken?: string;
+  isProfileComplete?: boolean; // Track if user has completed initial profile setup
+  hasSeenTutorial?: boolean; // Track if user has seen the onboarding tutorial
 }
 
 // Removed: UserProfile alias (use User directly)

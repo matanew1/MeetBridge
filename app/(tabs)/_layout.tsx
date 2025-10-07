@@ -1,4 +1,4 @@
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import {
   Search,
   MessageCircleMore,
@@ -24,9 +24,17 @@ export default function TabLayout() {
   const { t } = useTranslation();
   const { isDarkMode, toggleDarkMode } = useTheme();
   const { user } = useAuth();
+  const router = useRouter();
   const theme = isDarkMode ? darkTheme : lightTheme;
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+
+  // Redirect to profile completion if needed
+  useEffect(() => {
+    if (user && !user.isProfileComplete) {
+      router.replace('/auth/complete-profile');
+    }
+  }, [user]);
 
   // Load notification settings on mount
   useEffect(() => {

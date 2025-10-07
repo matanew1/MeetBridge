@@ -150,9 +150,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               lastLocationUpdate: serverTimestamp(),
             });
 
-            console.log('✅ Location updated in Firebase:', {
-              lat: location.latitude.toFixed(4),
-              lon: location.longitude.toFixed(4),
+            console.log('✅ Location updated in Firebase (ULTRA-PRECISE):', {
+              lat: location.latitude.toFixed(7), // 7 decimals for ±1m precision
+              lon: location.longitude.toFixed(7),
+              accuracy: location.accuracy
+                ? `±${Math.round(location.accuracy)}m`
+                : 'unknown',
+              geohash,
             });
 
             // Update local user state
@@ -171,9 +175,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
         },
         {
-          accuracy: Location.Accuracy.Balanced,
-          timeInterval: 60000, // Every 60 seconds
-          distanceInterval: 100, // Every 100 meters
+          // ULTRA-PRECISE settings for 5-500m range
+          accuracy: Location.Accuracy.BestForNavigation, // Maximum GPS precision
+          timeInterval: 15000, // Every 15 seconds for fresh data
+          distanceInterval: 5, // Every 5 meters - critical for nearby detection!
         }
       );
 

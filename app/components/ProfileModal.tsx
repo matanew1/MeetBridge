@@ -25,6 +25,7 @@ import {
   CheckCircle,
   Activity,
   Star,
+  Sparkles,
 } from 'lucide-react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -36,6 +37,7 @@ import { PREDEFINED_INTERESTS } from '../../constants/interests';
 import ZodiacBadge from './ZodiacBadge';
 import { calculateAge } from '../../utils/dateUtils';
 import { useUserStore } from '../../store/userStore';
+import OnboardingTutorial from './OnboardingTutorial';
 
 interface ProfileModalProps {
   visible: boolean;
@@ -53,6 +55,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const theme = isDarkMode ? darkTheme : lightTheme;
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   const handleLogout = () => {
     setShowLogoutConfirm(true);
@@ -534,6 +537,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           <View style={styles.actionsSection}>
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: theme.surface }]}
+              onPress={() => setShowTutorial(true)}
+            >
+              <Sparkles size={20} color={theme.primary} />
+              <Text style={[styles.actionText, { color: theme.text }]}>
+                View Tutorial
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: theme.surface }]}
               onPress={handleSettings}
             >
               <Settings size={20} color={theme.primary} />
@@ -612,6 +625,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         visible={showEditProfile}
         onClose={() => setShowEditProfile(false)}
         onSave={handleSaveProfile}
+      />
+
+      {/* Onboarding Tutorial */}
+      <OnboardingTutorial
+        visible={showTutorial}
+        onComplete={async () => {
+          setShowTutorial(false);
+          // Update tutorial status if needed
+          if (user && !user.hasSeenTutorial) {
+            await updateProfile({ hasSeenTutorial: true });
+          }
+        }}
       />
     </Modal>
   );
