@@ -151,8 +151,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             });
 
             console.log('✅ Location updated in Firebase (ULTRA-PRECISE):', {
-              lat: location.latitude.toFixed(7), // 7 decimals for ±1m precision
-              lon: location.longitude.toFixed(7),
+              lat: location.latitude.toFixed(9), // 9 decimals for ±1m precision
+              lon: location.longitude.toFixed(9),
               accuracy: location.accuracy
                 ? `±${Math.round(location.accuracy)}m`
                 : 'unknown',

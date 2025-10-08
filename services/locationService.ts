@@ -157,48 +157,57 @@ class LocationService {
         }
       }
 
-      // MAXIMUM PRECISION for 5-500m range detection
-      // BestForNavigation + strict maximumAge for GPS lock
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.BestForNavigation, // Maximum accuracy: GPS + WiFi + cellular
-        maximumAge: 0, // Force fresh GPS reading - NO cached data
-        timeout: 30000, // 30s timeout to ensure GPS lock for ±5m accuracy
-      });
-
-      const locationData: LocationCoordinates = {
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        accuracy: location.coords.accuracy,
-        timestamp: location.timestamp,
-      };
-
-      // Warn if accuracy isn't optimal for 5-500m range
-      if (locationData.accuracy && locationData.accuracy > 15) {
-        console.warn('⚠️ Location accuracy suboptimal for 5-500m range:', {
-          accuracy: `±${Math.round(locationData.accuracy)}m`,
-          target: '±5-10m',
-          tip: 'Move to open area for better GPS signal',
+      // Try up to 5 times to get a location with accuracy <= 20m
+      let locationData: LocationCoordinates | null = null;
+      for (let attempt = 1; attempt <= 5; attempt++) {
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.BestForNavigation,
+          maximumAge: 0,
+          timeout: 30000,
         });
+        locationData = {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          accuracy: location.coords.accuracy,
+          timestamp: location.timestamp,
+        };
+        if (locationData.accuracy && locationData.accuracy <= 20) {
+          break;
+        } else {
+          console.warn(
+            `⚠️ Location accuracy not optimal (attempt ${attempt}): ±${Math.round(
+              locationData.accuracy || 999
+            )}m`
+          );
+          if (attempt < 5) await new Promise((res) => setTimeout(res, 1000));
+        }
       }
 
-      // Cache the location
-      this.lastKnownLocation = locationData;
+      if (!locationData) throw new Error('Could not get location');
 
+      if (locationData.accuracy && locationData.accuracy > 20) {
+        console.warn(
+          '⚠️ Final location accuracy is poor after 5 attempts:',
+          `±${Math.round(locationData.accuracy)}m`
+        );
+      }
+
+      this.lastKnownLocation = locationData;
+      const quality =
+        locationData.accuracy && locationData.accuracy <= 10
+          ? '✅ EXCELLENT'
+          : locationData.accuracy && locationData.accuracy <= 20
+          ? '✓ GOOD'
+          : '⚠️ FAIR';
       console.log('📍 ULTRA-PRECISE location obtained (5-500m optimized):', {
-        lat: locationData.latitude.toFixed(7), // 7 decimals = ~1cm precision
+        lat: locationData.latitude.toFixed(7),
         lon: locationData.longitude.toFixed(7),
         accuracy: locationData.accuracy
           ? `±${Math.round(locationData.accuracy)}m`
           : 'unknown',
-        quality:
-          locationData.accuracy && locationData.accuracy <= 10
-            ? '✅ EXCELLENT'
-            : locationData.accuracy && locationData.accuracy <= 20
-            ? '✓ GOOD'
-            : '⚠️ FAIR',
+        quality,
         timestamp: new Date(locationData.timestamp).toLocaleTimeString(),
       });
-
       return locationData;
     } catch (error) {
       console.error('Error getting current location:', error);
@@ -571,30 +580,22 @@ class LocationService {
       bounds.push([prefix, prefix + '~']);
     }
 
-    console.log(
-      `🔍 MAXIMUM PRECISION query (P9 storage + neighbor expansion):`,
-      {
-        center: {
-          lat: center.latitude.toFixed(7),
-          lon: center.longitude.toFixed(7),
-        },
-        radiusKm: radiusInKm,
-        radiusMeters: Math.round(radiusInKm * 1000),
-        boundsCount: bounds.length,
-        boundsSample: bounds[0],
-        effectivePrecision,
-        effectiveAccuracy: this.getGeohashAccuracy(effectivePrecision),
-        storagePrecision: 9,
-        storageAccuracy: '±4.8m',
-        strategy:
-          effectivePrecision === 9
-            ? 'P9 storage + P6 query (neighbor-safe)'
-            : 'Wide query + exact distance filter',
-        note: `Catches ALL users within ${Math.round(
-          radiusInKm * 1000
-        )}m, filters to ±5m accuracy`,
-      }
-    );
+    console.log(`🔍 ULTRA-PRECISE query bounds (5-500m optimized):`, {
+      center: {
+        lat: center.latitude.toFixed(7),
+        lon: center.longitude.toFixed(7),
+      },
+      radiusKm: radiusInKm,
+      radiusMeters: Math.round(radiusInKm * 1000),
+      boundsCount: bounds.length,
+      boundsSample: bounds[0],
+      queryPrecision,
+      queryAccuracy: this.getGeohashAccuracy(queryPrecision),
+      storagePrecision: 9,
+      storageAccuracy: '±4.8m',
+      strategy: 'High-precision query + exact distance filter',
+      note: `Detects users within ±5m accuracy`,
+    });
 
     return bounds;
   }

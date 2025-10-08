@@ -145,6 +145,26 @@ export const useUserStore = create<UserState>((set, get) => ({
     const cachedUser = cacheService.get<User>('currentUser');
     if (cachedUser) {
       set({ currentUser: cachedUser });
+      // Sync search filters with cached user preferences
+      const { searchFilters } = get();
+      if (cachedUser.preferences?.interestedIn) {
+        const updatedFilters = {
+          ...searchFilters,
+          gender: cachedUser.preferences.interestedIn,
+          ageRange: cachedUser.preferences?.ageRange || searchFilters.ageRange,
+          maxDistance:
+            cachedUser.preferences?.maxDistance || searchFilters.maxDistance,
+        };
+        console.log(
+          '✅ Auto-syncing search filters with cached user preferences:',
+          {
+            oldGender: searchFilters.gender,
+            newGender: updatedFilters.gender,
+            cachedPreferences: cachedUser.preferences,
+          }
+        );
+        set({ searchFilters: updatedFilters });
+      }
       return;
     }
 
@@ -160,6 +180,29 @@ export const useUserStore = create<UserState>((set, get) => ({
             response.data,
             CACHE_TTL.CURRENT_USER
           );
+
+          // Sync search filters with user preferences immediately
+          const { searchFilters } = get();
+          if (response.data.preferences?.interestedIn) {
+            const updatedFilters = {
+              ...searchFilters,
+              gender: response.data.preferences.interestedIn,
+              ageRange:
+                response.data.preferences?.ageRange || searchFilters.ageRange,
+              maxDistance:
+                response.data.preferences?.maxDistance ||
+                searchFilters.maxDistance,
+            };
+            console.log(
+              '✅ Auto-syncing search filters with user preferences:',
+              {
+                oldGender: searchFilters.gender,
+                newGender: updatedFilters.gender,
+                userPreferences: response.data.preferences,
+              }
+            );
+            set({ searchFilters: updatedFilters });
+          }
         }
       } else {
         set({ error: response.message || 'Failed to load user profile' });
@@ -180,6 +223,22 @@ export const useUserStore = create<UserState>((set, get) => ({
         set({ currentUser: response.data });
         // Invalidate and update cache
         cacheService.set('currentUser', response.data, CACHE_TTL.CURRENT_USER);
+
+        // Sync search filters with updated user preferences
+        const { searchFilters } = get();
+        if (response.data?.preferences?.interestedIn) {
+          set({
+            searchFilters: {
+              ...searchFilters,
+              gender: response.data.preferences.interestedIn,
+              ageRange:
+                response.data.preferences?.ageRange || searchFilters.ageRange,
+              maxDistance:
+                response.data.preferences?.maxDistance ||
+                searchFilters.maxDistance,
+            },
+          });
+        }
       } else {
         set({ error: response.message || 'Failed to update profile' });
       }
