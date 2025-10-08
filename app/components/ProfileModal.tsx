@@ -330,7 +330,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             )}
 
             {/* Location Card */}
-            {user.location && (
+            {user.coordinates && (
               <View
                 style={[styles.infoCard, { backgroundColor: theme.surface }]}
               >
@@ -340,11 +340,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     Location
                   </Text>
                 </View>
-                <Text
-                  style={[styles.cardContent, { color: theme.textSecondary }]}
-                >
-                  {user.location}
-                </Text>
                 {user.coordinates && (
                   <Text
                     style={[
@@ -411,6 +406,36 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 style={[styles.cardContent, { color: theme.textSecondary }]}
               >
                 {getGenderDisplay(user.gender)}
+              </Text>
+            </View>
+
+            <View style={[styles.infoCard, { backgroundColor: theme.surface }]}>
+              <View style={styles.cardHeader}>
+                <Users size={20} color={theme.primary} />
+                <Text style={[styles.cardTitle, { color: theme.text }]}>
+                  Height
+                </Text>
+              </View>
+              <Text
+                style={[styles.cardContent, { color: theme.textSecondary }]}
+              >
+                {user.height ? `${user.height} cm` : 'Not set'}
+              </Text>
+            </View>
+
+                        <View style={[styles.infoCard, { backgroundColor: theme.surface }]}>
+              <View style={styles.cardHeader}>
+                <Users size={20} color={theme.primary} />
+                <Text style={[styles.cardTitle, { color: theme.text }]}>
+                  Height
+                </Text>
+              </View>
+              <Text
+                style={[styles.cardContent, { color: theme.textSecondary }]}
+              >
+                {user.dateOfBirth
+                  ? new Date(user.dateOfBirth).toLocaleDateString('en-GB')
+                  : 'Not set'}
               </Text>
             </View>
 
