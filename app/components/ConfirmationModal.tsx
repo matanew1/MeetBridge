@@ -31,7 +31,9 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
   return (
     <View style={styles.centeredModalOverlay}>
-      <View style={[styles.confirmationModal, { backgroundColor: theme.surface }]}>
+      <View
+        style={[styles.confirmationModal, { backgroundColor: theme.surface }]}
+      >
         <View
           style={[
             styles.confirmationIcon,
@@ -159,3 +161,5 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
 });
+
+export default ConfirmationModal;
