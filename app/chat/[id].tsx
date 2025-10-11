@@ -194,6 +194,23 @@ const MessageItem: React.FC<MessageItemProps> = memo(
 );
 
 const ChatScreen = () => {
+  // Set current user's online status in Firestore when entering/leaving chat
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const { doc, updateDoc } = require('firebase/firestore');
+    const { db } = require('../../services/firebase/config');
+    const userDocRef = doc(db, 'users', currentUser.id);
+    // Set online true on mount
+    updateDoc(userDocRef, { isOnline: true }).catch((err) => {
+      console.error('Failed to set online status:', err);
+    });
+    // Set online false on unmount
+    return () => {
+      updateDoc(userDocRef, { isOnline: false }).catch((err) => {
+        console.error('Failed to unset online status:', err);
+      });
+    };
+  }, [currentUser?.id]);
   const { t } = useTranslation();
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
@@ -220,8 +237,46 @@ const ChatScreen = () => {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const flatListRef = useRef<FlatList>(null);
 
-  // Get real-time presence for the other user
-  const { isOnline, lastSeenText } = usePresence(otherUserId);
+  // Get real-time presence for the other user using Firestore directly
+  const [isOnline, setIsOnline] = useState(false);
+  const [lastSeenText, setLastSeenText] = useState('');
+
+  useEffect(() => {
+    if (!otherUserId) return;
+    const { doc, onSnapshot } = require('firebase/firestore');
+    const { db } = require('../../services/firebase/config');
+    const userDocRef = doc(db, 'users', otherUserId);
+    const unsubscribe = onSnapshot(userDocRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const userData = snapshot.data();
+        setIsOnline(userData.isOnline || false);
+        // Format lastSeen as text
+        let lastSeen =
+          userData.lastSeen?.toDate?.() ||
+          (userData.lastSeen?.seconds
+            ? new Date(userData.lastSeen.seconds * 1000)
+            : null);
+        if (lastSeen) {
+          const now = new Date();
+          const diff = Math.floor((now.getTime() - lastSeen.getTime()) / 1000);
+          if (userData.isOnline) {
+            setLastSeenText('Online');
+          } else if (diff < 60) {
+            setLastSeenText('Last seen just now');
+          } else if (diff < 3600) {
+            setLastSeenText(`Last seen ${Math.floor(diff / 60)} min ago`);
+          } else if (diff < 86400) {
+            setLastSeenText(`Last seen ${Math.floor(diff / 3600)} hr ago`);
+          } else {
+            setLastSeenText(`Last seen ${Math.floor(diff / 86400)} days ago`);
+          }
+        } else {
+          setLastSeenText('Offline');
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, [otherUserId]);
 
   // Animation values
   const headerSlideAnim = useSharedValue(-50);
@@ -548,6 +603,8 @@ const ChatScreen = () => {
     const { db } = require('../../services/firebase/config');
 
     const userDocRef = doc(db, 'users', otherUserId);
+
+    console.log('👁️ isonline', userDocRef);
 
     const unsubscribe = onSnapshot(
       userDocRef,

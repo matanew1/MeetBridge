@@ -179,14 +179,9 @@ const MatchModal: React.FC<MatchModalProps> = ({
     >
       <Animated.View style={[styles.overlay, overlayStyle]}>
         <View style={styles.container}>
-          {/* Close button */}
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <X size={24} color="#FFF" />
-          </TouchableOpacity>
-
           {/* Heart Circle with Blink Animation */}
           <Animated.View style={[styles.heartCircle, heartStyle]}>
-            <Heart size={120} color="#FFF" fill="#FFF" />
+            <Heart size={60} color="#FFF" fill="#FFF" />
           </Animated.View>
 
           {/* Match text */}
@@ -216,7 +211,7 @@ const MatchModal: React.FC<MatchModalProps> = ({
             </View>
           </Animated.View>
 
-          {/* Send Message button */}
+          {/* Send Message button (swiping button) */}
           <Animated.View style={[styles.buttonsContainer, buttonsStyle]}>
             <TouchableOpacity
               style={styles.sendMessageButton}
@@ -257,8 +252,8 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   heartCircle: {
-    width: 280,
-    height: 280,
+    width: 140,
+    height: 140,
     borderRadius: 140,
     backgroundColor: '#C77DFF',
     justifyContent: 'center',
