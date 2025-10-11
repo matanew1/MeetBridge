@@ -17,6 +17,7 @@ import * as readline from 'readline';
 //FIX: move save of edit profile modal in the bottom after all fields
 //FIX: add popup on filter button "Set your filters to discover people nearby" will happen only once at registeration level
 //FIX: notification only to target user not to all users
+//FIX: notification sound (optional)
 
 //TODO: toggle button show my status online/offline to others users everywhere (connection and in chat)
 //TODO: is discovery search show online users only toggle on

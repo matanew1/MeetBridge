@@ -26,9 +26,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   ArrowLeft,
   Send,
-  Phone,
-  Video,
-  MoveHorizontal as MoreHorizontal,
+  Ellipsis,
   Heart,
   User,
   X,
@@ -876,12 +874,6 @@ const ChatScreen = () => {
             </View>
           </View>
           <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.actionButton}>
-              <Phone size={20} color={theme.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton}>
-              <Video size={20} color={theme.primary} />
-            </TouchableOpacity>
             <TouchableOpacity
               style={styles.actionButton}
               onPress={() => {
@@ -889,7 +881,7 @@ const ChatScreen = () => {
                 setShowOptionsMenu(true);
               }}
             >
-              <MoreHorizontal size={20} color={theme.textSecondary} />
+              <Ellipsis size={20} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
         </Animated.View>

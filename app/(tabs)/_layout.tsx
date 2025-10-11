@@ -27,7 +27,6 @@ export default function TabLayout() {
   const router = useRouter();
   const theme = isDarkMode ? darkTheme : lightTheme;
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
   // Redirect to profile completion if needed
   useEffect(() => {
@@ -35,15 +34,6 @@ export default function TabLayout() {
       router.replace('/auth/complete-profile');
     }
   }, [user]);
-
-  // Load notification settings on mount
-  useEffect(() => {
-    const loadNotificationSettings = async () => {
-      const settings = await notificationService.loadSettings();
-      setNotificationsEnabled(settings.enabled);
-    };
-    loadNotificationSettings();
-  }, []);
 
   const handleProfilePress = () => {
     setShowProfileModal(true);
@@ -53,11 +43,6 @@ export default function TabLayout() {
     setShowProfileModal(false);
   };
 
-  const handleToggleNotifications = async () => {
-    const newState = await notificationService.toggleNotifications(user?.id);
-    setNotificationsEnabled(newState);
-  };
-
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
@@ -65,19 +50,11 @@ export default function TabLayout() {
         style={[styles.header, { backgroundColor: theme.headerBackground }]}
       >
         <View style={styles.headerLeft}>
-          <TouchableOpacity
-            style={[
-              styles.notificationButton,
-              { backgroundColor: theme.primaryVariant },
-            ]}
-            onPress={handleToggleNotifications}
-          >
-            {notificationsEnabled ? (
-              <Bell size={20} color={theme.primary} />
-            ) : (
-              <BellOff size={20} color={theme.textSecondary} />
-            )}
-          </TouchableOpacity>
+          <Text style={[styles.logoText, { color: theme.primary }]}>
+            MeetBridge
+          </Text>
+        </View>
+        <View style={styles.headerRight}>
           <TouchableOpacity
             style={[
               styles.darkModeButton,
@@ -91,20 +68,20 @@ export default function TabLayout() {
               <Moon size={20} color={theme.primary} />
             )}
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.profileButton}
+            onPress={handleProfilePress}
+          >
+            <Image
+              source={
+                user?.image
+                  ? { uri: user.image }
+                  : require('../../assets/images/placeholder.png')
+              }
+              style={styles.headerProfile}
+            />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={styles.profileButton}
-          onPress={handleProfilePress}
-        >
-          <Image
-            source={
-              user?.image
-                ? { uri: user.image }
-                : require('../../assets/images/placeholder.png')
-            }
-            style={styles.headerProfile}
-          />
-        </TouchableOpacity>
       </View>
       <Tabs
         screenOptions={{
@@ -201,6 +178,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  logoImage: {
+    width: 30,
+    height: 30,
+  },
+  logoText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    fontFamily: 'Satoshi',
   },
   profileButton: {
     width: 40,
