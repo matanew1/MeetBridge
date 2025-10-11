@@ -16,7 +16,7 @@ const resources = {
       // Search Screen
       search: {
         title: 'Discover People',
-        searchingPerfectMatch: 'Searching for the perfect match...',
+        searchingPerfectMatch: 'Searching for nearby profiles...',
         searching: 'Searching...',
         newSearch: 'New Search',
         loading: 'Loading...',

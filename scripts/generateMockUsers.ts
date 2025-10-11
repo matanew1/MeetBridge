@@ -12,8 +12,12 @@ import {
 import { geohashForLocation } from 'geofire-common';
 import * as readline from 'readline';
 
-//TODO: make sure everything is LTR on english and RTL on hebrew
-//TODO: when there is a suggestion for email, dont skip fields that has already value ( jump to password  field)
+
+//FIX: fix slider range in filter modal to 5-500m
+//FIX: move save of edit profile modal in the bottom after all fields
+//FIX: add popup on filter button "Set your filters to discover people nearby" will happen only once at registeration level
+//FIX: notification only to target user not to all users
+
 //TODO: toggle button show my status online/offline to others users everywhere (connection and in chat)
 //TODO: is discovery search show online users only toggle on
 //TODO: add search by name in connections tab

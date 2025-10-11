@@ -27,9 +27,6 @@ export default function DiscoveryAnimation({
   // Animation values
   const rotation = useSharedValue(0);
   const scale = useSharedValue(1);
-  const cardOffset1 = useSharedValue(0);
-  const cardOffset2 = useSharedValue(0);
-  const cardOffset3 = useSharedValue(0);
   const sparkleOpacity = useSharedValue(0);
   const heartScale = useSharedValue(1);
 
@@ -47,33 +44,6 @@ export default function DiscoveryAnimation({
       withSequence(
         withSpring(1.25, { damping: 3, stiffness: 120 }),
         withSpring(1, { damping: 3, stiffness: 120 })
-      ),
-      -1,
-      true
-    );
-
-    cardOffset1.value = withRepeat(
-      withSequence(
-        withTiming(-20, { duration: 1800, easing: Easing.bezier(0.45, 0, 0.55, 1) }),
-        withTiming(0, { duration: 1800, easing: Easing.bezier(0.45, 0, 0.55, 1) })
-      ),
-      -1,
-      true
-    );
-
-    cardOffset2.value = withRepeat(
-      withSequence(
-        withTiming(20, { duration: 2200, easing: Easing.bezier(0.45, 0, 0.55, 1) }),
-        withTiming(0, { duration: 2200, easing: Easing.bezier(0.45, 0, 0.55, 1) })
-      ),
-      -1,
-      true
-    );
-
-    cardOffset3.value = withRepeat(
-      withSequence(
-        withTiming(-15, { duration: 2000, easing: Easing.bezier(0.45, 0, 0.55, 1) }),
-        withTiming(0, { duration: 2000, easing: Easing.bezier(0.45, 0, 0.55, 1) })
       ),
       -1,
       true
@@ -105,18 +75,6 @@ export default function DiscoveryAnimation({
 
   const centerStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
-  }));
-
-  const card1Style = useAnimatedStyle(() => ({
-    transform: [{ translateY: cardOffset1.value }],
-  }));
-
-  const card2Style = useAnimatedStyle(() => ({
-    transform: [{ translateY: cardOffset2.value }],
-  }));
-
-  const card3Style = useAnimatedStyle(() => ({
-    transform: [{ translateY: cardOffset3.value }],
   }));
 
   const sparkleStyle = useAnimatedStyle(() => ({
@@ -157,23 +115,6 @@ export default function DiscoveryAnimation({
                 backgroundColor: `${theme.primary}10`,
               },
             ]}
-          />
-        </Animated.View>
-
-        {/* Floating profile cards */}
-        <Animated.View style={[styles.floatingCard, styles.card1, card1Style]}>
-          <View
-            style={[styles.miniCard, { backgroundColor: theme.cardBackground }]}
-          />
-        </Animated.View>
-        <Animated.View style={[styles.floatingCard, styles.card2, card2Style]}>
-          <View
-            style={[styles.miniCard, { backgroundColor: theme.cardBackground }]}
-          />
-        </Animated.View>
-        <Animated.View style={[styles.floatingCard, styles.card3, card3Style]}>
-          <View
-            style={[styles.miniCard, { backgroundColor: theme.cardBackground }]}
           />
         </Animated.View>
 
@@ -255,32 +196,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 16,
     elevation: 12,
-  },
-  floatingCard: {
-    position: 'absolute',
-  },
-  miniCard: {
-    width: 70,
-    height: 90,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  card1: {
-    top: 40,
-    left: 30,
-  },
-  card2: {
-    top: 50,
-    right: 20,
-  },
-  card3: {
-    bottom: 60,
-    left: '50%',
-    marginLeft: -30,
   },
   sparkle: {
     position: 'absolute',
