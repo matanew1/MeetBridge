@@ -504,6 +504,52 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
             ? matchedUserDoc.data()
             : null;
 
+          // Send match notification to the target user (only from the user with smaller ID to avoid duplicates)
+          if (userId < targetUserId) {
+            try {
+              const currentUserDoc = await getDoc(doc(db, 'users', userId));
+              const currentUserData = currentUserDoc.exists()
+                ? currentUserDoc.data()
+                : null;
+              const currentUserToken = currentUserData?.pushToken;
+
+              const targetUserDoc = await getDoc(
+                doc(db, 'users', targetUserId)
+              );
+              const targetUserData = targetUserDoc.exists()
+                ? targetUserDoc.data()
+                : null;
+              const targetUserToken = targetUserData?.pushToken;
+
+              // Don't send notification if both users have the same push token (same device)
+              if (
+                currentUserToken &&
+                targetUserToken &&
+                currentUserToken === targetUserToken
+              ) {
+                console.log(
+                  '📱 Same push token, skipping match notification to avoid self-notification'
+                );
+              } else {
+                const currentUserName = currentUserDoc.exists()
+                  ? currentUserDoc.data().name || 'Someone'
+                  : 'Someone';
+
+                notificationService
+                  .broadcastMatchNotification(
+                    targetUserId,
+                    currentUserName,
+                    matchResult.matchId
+                  )
+                  .catch((err) => {
+                    console.error('Failed to send match notification:', err);
+                  });
+              }
+            } catch (notifError) {
+              console.error('Error preparing match notification:', notifError);
+            }
+          }
+
           return {
             data: {
               isMatch: true,
@@ -963,7 +1009,29 @@ export class FirebaseMatchingService implements IMatchingService {
         batch.delete(doc(db, 'conversations', conversationId));
       }
 
-      // Create 24h dislike blocks
+      // Update existing like interactions to dislike with 24h expiration
+      const existingInteractionsQuery = query(
+        collection(db, 'interactions'),
+        where('userId', 'in', [userId, targetUserId]),
+        where('targetUserId', 'in', [userId, targetUserId]),
+        where('type', '==', 'like')
+      );
+      const existingInteractionsSnapshot = await getDocs(
+        existingInteractionsQuery
+      );
+
+      existingInteractionsSnapshot.docs.forEach((interactionDoc) => {
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + 24);
+
+        batch.update(interactionDoc.ref, {
+          type: 'dislike',
+          createdAt: serverTimestamp(),
+          expiresAt,
+        });
+      });
+
+      // Create 24h dislike blocks (in case no existing interactions)
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 24);
 
@@ -1339,20 +1407,36 @@ export class FirebaseChatService implements IChatService {
       if (recipientId) {
         try {
           const senderDoc = await getDoc(doc(db, 'users', message.senderId));
-          const senderName = senderDoc.exists()
-            ? senderDoc.data().name
-            : 'Someone';
+          const senderData = senderDoc.exists() ? senderDoc.data() : null;
+          const senderToken = senderData?.pushToken;
 
-          notificationService
-            .broadcastMessageNotification(
-              recipientId,
-              senderName,
-              message.text,
-              conversationId
-            )
-            .catch((err) => {
-              console.error('Failed to send message notification:', err);
-            });
+          const recipientDoc = await getDoc(doc(db, 'users', recipientId));
+          const recipientData = recipientDoc.exists()
+            ? recipientDoc.data()
+            : null;
+          const recipientToken = recipientData?.pushToken;
+
+          // Don't send notification if sender and recipient have the same push token (same device)
+          if (senderToken && recipientToken && senderToken === recipientToken) {
+            console.log(
+              '📱 Same push token, skipping message notification to avoid self-notification'
+            );
+          } else {
+            const senderName = senderDoc.exists()
+              ? senderDoc.data().name
+              : 'Someone';
+
+            notificationService
+              .broadcastMessageNotification(
+                recipientId,
+                senderName,
+                message.text,
+                conversationId
+              )
+              .catch((err) => {
+                console.error('Failed to send message notification:', err);
+              });
+          }
         } catch (notifError) {
           console.error('Error preparing notification:', notifError);
         }
