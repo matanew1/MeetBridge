@@ -263,6 +263,44 @@ export default function LovedScreen() {
   const contentSlideAnim = React.useRef(new Animated.Value(50)).current;
   const contentFadeAnim = React.useRef(new Animated.Value(0)).current;
 
+  // Get liked and matched profiles from store with useMemo for performance
+  const likedProfilesData = useMemo(() => {
+    console.log(
+      '📋 Raw liked profiles:',
+      likedProfilesDataRaw.length,
+      likedProfilesDataRaw.map((p) => p.id)
+    );
+    // Deduplicate profiles by ID using Set for O(1) lookup
+    const seenIds = new Set<string>();
+    return likedProfilesDataRaw.filter((profile) => {
+      if (seenIds.has(profile.id)) return false;
+      seenIds.add(profile.id);
+      return true;
+    });
+  }, [likedProfilesDataRaw]);
+
+  const matchedProfilesData = useMemo(() => {
+    console.log(
+      '💑 Raw matched profiles:',
+      matchedProfilesDataRaw.length,
+      matchedProfilesDataRaw.map((p) => p.id)
+    );
+    // Deduplicate profiles by ID using Set for O(1) lookup
+    const seenIds = new Set<string>();
+    return matchedProfilesDataRaw.filter((profile) => {
+      if (seenIds.has(profile.id)) return false;
+      seenIds.add(profile.id);
+      return true;
+    });
+  }, [matchedProfilesDataRaw]);
+
+  // Get only liked profiles that are not matches
+  const onlyLikedProfiles = useMemo(() => {
+    // Use Set for O(1) lookup instead of some() which is O(n)
+    const matchedIds = new Set(matchedProfilesData.map((p) => p.id));
+    return likedProfilesData.filter((profile) => !matchedIds.has(profile.id));
+  }, [likedProfilesData, matchedProfilesData]);
+
   // Load profiles on component mount
   useEffect(() => {
     // Start header and tab animations
@@ -416,44 +454,6 @@ export default function LovedScreen() {
       unsubscribe2();
     };
   }, [selectedProfile]);
-
-  // Get liked and matched profiles from store with useMemo for performance
-  const likedProfilesData = useMemo(() => {
-    console.log(
-      '📋 Raw liked profiles:',
-      likedProfilesDataRaw.length,
-      likedProfilesDataRaw.map((p) => p.id)
-    );
-    // Deduplicate profiles by ID using Set for O(1) lookup
-    const seenIds = new Set<string>();
-    return likedProfilesDataRaw.filter((profile) => {
-      if (seenIds.has(profile.id)) return false;
-      seenIds.add(profile.id);
-      return true;
-    });
-  }, [likedProfilesDataRaw]);
-
-  const matchedProfilesData = useMemo(() => {
-    console.log(
-      '💑 Raw matched profiles:',
-      matchedProfilesDataRaw.length,
-      matchedProfilesDataRaw.map((p) => p.id)
-    );
-    // Deduplicate profiles by ID using Set for O(1) lookup
-    const seenIds = new Set<string>();
-    return matchedProfilesDataRaw.filter((profile) => {
-      if (seenIds.has(profile.id)) return false;
-      seenIds.add(profile.id);
-      return true;
-    });
-  }, [matchedProfilesDataRaw]);
-
-  // Get only liked profiles that are not matches
-  const onlyLikedProfiles = useMemo(() => {
-    // Use Set for O(1) lookup instead of some() which is O(n)
-    const matchedIds = new Set(matchedProfilesData.map((p) => p.id));
-    return likedProfilesData.filter((profile) => !matchedIds.has(profile.id));
-  }, [likedProfilesData, matchedProfilesData]);
 
   // Memoized handlers for better performance
   const handleMessage = useCallback(

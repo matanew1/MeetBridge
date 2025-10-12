@@ -193,22 +193,6 @@ const MessageItem: React.FC<MessageItemProps> = memo(
 
 const ChatScreen = () => {
   // Set current user's online status in Firestore when entering/leaving chat
-  useEffect(() => {
-    if (!currentUser?.id) return;
-    const { doc, updateDoc } = require('firebase/firestore');
-    const { db } = require('../../services/firebase/config');
-    const userDocRef = doc(db, 'users', currentUser.id);
-    // Set online true on mount
-    updateDoc(userDocRef, { isOnline: true }).catch((err) => {
-      console.error('Failed to set online status:', err);
-    });
-    // Set online false on unmount
-    return () => {
-      updateDoc(userDocRef, { isOnline: false }).catch((err) => {
-        console.error('Failed to unset online status:', err);
-      });
-    };
-  }, [currentUser?.id]);
   const { t } = useTranslation();
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
@@ -238,6 +222,71 @@ const ChatScreen = () => {
   // Get real-time presence for the other user using Firestore directly
   const [isOnline, setIsOnline] = useState(false);
   const [lastSeenText, setLastSeenText] = useState('');
+
+  // Animation values
+  const headerSlideAnim = useSharedValue(-50);
+  const headerFadeAnim = useSharedValue(0);
+  const inputSlideAnim = useSharedValue(50);
+  const inputFadeAnim = useSharedValue(0);
+  const heartScale = useSharedValue(1);
+  const heartOpacity = useSharedValue(1);
+
+  // Memoized values for better performance
+  const conversation = useMemo(
+    () => conversations.find((conv) => conv.id === id),
+    [conversations, id]
+  );
+
+  const otherUserId = useMemo(
+    () =>
+      conversation?.participants.find(
+        (participantId) => participantId !== currentUser?.id
+      ),
+    [conversation?.participants, currentUser?.id]
+  );
+
+  const foundUser = useMemo(() => {
+    console.log('🔍 Looking for user with ID:', otherUserId);
+    console.log(
+      '🔍 In matchedProfilesData:',
+      matchedProfilesData?.map((p) => p.id)
+    );
+    console.log(
+      '🔍 In discoverProfiles:',
+      discoverProfiles?.map((p) => p.id)
+    );
+
+    if (!otherUserId) return null;
+
+    const matchedUser = matchedProfilesData.find(
+      (profile) => profile.id === otherUserId
+    );
+    const discoverUser = discoverProfiles.find(
+      (profile) => profile.id === otherUserId
+    );
+
+    console.log('🔍 Found matched user:', matchedUser?.name);
+    console.log('🔍 Found discover user:', discoverUser?.name);
+
+    return matchedUser || discoverUser;
+  }, [matchedProfilesData, discoverProfiles, otherUserId]);
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const { doc, updateDoc } = require('firebase/firestore');
+    const { db } = require('../../services/firebase/config');
+    const userDocRef = doc(db, 'users', currentUser.id);
+    // Set online true on mount
+    updateDoc(userDocRef, { isOnline: true }).catch((err) => {
+      console.error('Failed to set online status:', err);
+    });
+    // Set online false on unmount
+    return () => {
+      updateDoc(userDocRef, { isOnline: false }).catch((err) => {
+        console.error('Failed to unset online status:', err);
+      });
+    };
+  }, [currentUser?.id]);
 
   useEffect(() => {
     if (!otherUserId) return;
@@ -275,14 +324,6 @@ const ChatScreen = () => {
     });
     return () => unsubscribe();
   }, [otherUserId]);
-
-  // Animation values
-  const headerSlideAnim = useSharedValue(-50);
-  const headerFadeAnim = useSharedValue(0);
-  const inputSlideAnim = useSharedValue(50);
-  const inputFadeAnim = useSharedValue(0);
-  const heartScale = useSharedValue(1);
-  const heartOpacity = useSharedValue(1);
 
   // Add timeout effect to prevent infinite loading
   useEffect(() => {
@@ -331,46 +372,6 @@ const ChatScreen = () => {
       keyboardWillHide.remove();
     };
   }, []);
-
-  // Memoized values for better performance
-  const conversation = useMemo(
-    () => conversations.find((conv) => conv.id === id),
-    [conversations, id]
-  );
-
-  const otherUserId = useMemo(
-    () =>
-      conversation?.participants.find(
-        (participantId) => participantId !== currentUser?.id
-      ),
-    [conversation?.participants, currentUser?.id]
-  );
-
-  const foundUser = useMemo(() => {
-    console.log('🔍 Looking for user with ID:', otherUserId);
-    console.log(
-      '🔍 In matchedProfilesData:',
-      matchedProfilesData?.map((p) => p.id)
-    );
-    console.log(
-      '🔍 In discoverProfiles:',
-      discoverProfiles?.map((p) => p.id)
-    );
-
-    if (!otherUserId) return null;
-
-    const matchedUser = matchedProfilesData.find(
-      (profile) => profile.id === otherUserId
-    );
-    const discoverUser = discoverProfiles.find(
-      (profile) => profile.id === otherUserId
-    );
-
-    console.log('🔍 Found matched user:', matchedUser?.name);
-    console.log('🔍 Found discover user:', discoverUser?.name);
-
-    return matchedUser || discoverUser;
-  }, [matchedProfilesData, discoverProfiles, otherUserId]);
 
   // Initialize and manage component state more efficiently
   useEffect(() => {

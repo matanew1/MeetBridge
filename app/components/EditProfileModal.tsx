@@ -8,24 +8,20 @@ import {
   TextInput,
   ScrollView,
   Alert,
-  Dimensions,
   Image,
   ActivityIndicator,
   Platform,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { router } from 'expo-router';
 import {
   X,
   Save,
   User as UserIcon,
   MapPin,
   FileText,
-  Heart,
   Users,
   Target,
-  Camera,
   Ruler,
   Plus,
   Trash2,
@@ -41,7 +37,7 @@ import { User } from '../../store/types';
 import { LinearGradient } from 'expo-linear-gradient';
 import AvatarUpload from './AvatarUpload';
 import InterestTagPicker from './InterestTagPicker';
-import ZodiacBadge from './ZodiacBadge';
+import { ZodiacBadge } from './ZodiacBadge';
 import { calculateAge, calculateZodiacSign } from '../../utils/dateUtils';
 
 interface EditProfileModalProps {
@@ -49,8 +45,6 @@ interface EditProfileModalProps {
   onClose: () => void;
   onSave: (userData: Partial<User>) => void;
 }
-
-const { width: screenWidth } = Dimensions.get('window');
 
 export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   visible,
@@ -94,7 +88,6 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     },
   });
 
-  const [newInterest, setNewInterest] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -120,7 +113,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     };
 
     loadUserData();
-  }, [visible]);
+  }, [visible, refreshUserProfile]);
 
   // Update form data whenever user data changes
   useEffect(() => {
@@ -252,26 +245,6 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     return `${day}/${month}/${year}`;
   };
 
-  const addInterest = () => {
-    if (
-      newInterest.trim() &&
-      !formData.interests.includes(newInterest.trim())
-    ) {
-      setFormData((prev) => ({
-        ...prev,
-        interests: [...prev.interests, newInterest.trim()],
-      }));
-      setNewInterest('');
-    }
-  };
-
-  const removeInterest = (interest: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      interests: prev.interests.filter((i) => i !== interest),
-    }));
-  };
-
   const handleImageSelected = (imageUri: string) => {
     setFormData((prev) => ({ ...prev, image: imageUri }));
   };
@@ -301,7 +274,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           images: [...prev.images, imageUri],
         }));
       }
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to pick image');
     }
   };
