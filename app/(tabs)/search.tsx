@@ -478,24 +478,6 @@ export default function SearchScreen() {
     }
   }, [isAuthenticated, isAuthLoading]); // Run when authentication state changes
 
-  // Subscribe to real-time discovery queue updates
-  useEffect(() => {
-    if (!currentUser || !isAuthenticated) {
-      return;
-    }
-
-    console.log('🔔 Setting up real-time discovery queue subscription');
-    const unsubscribe = useUserStore.getState().subscribeToDiscoveryUpdates();
-
-    // Cleanup subscription on unmount or when user changes
-    return () => {
-      if (unsubscribe) {
-        console.log('🔕 Cleaning up real-time discovery queue subscription');
-        unsubscribe();
-      }
-    };
-  }, [currentUser?.id, isAuthenticated]);
-
   // Handle when currentUser changes - update preferences and load profiles
   // Prefetch images for better scrolling performance
   useEffect(() => {
@@ -975,10 +957,6 @@ export default function SearchScreen() {
             });
             console.log(`✅ maxDistance updated to ${distance}m in Firebase`);
 
-            // Clear discovery queue when filters change to get fresh results
-            console.log('🧹 Clearing discovery queue due to filter change...');
-            await discoveryService.clearDiscoveryQueue(currentUser.id);
-
             // Reload current user to get fresh data
             await loadCurrentUser();
 
@@ -1027,10 +1005,6 @@ export default function SearchScreen() {
               `✅ ageRange updated to [${newAgeRange[0]}, ${newAgeRange[1]}] in Firebase`
             );
 
-            // Clear discovery queue when filters change to get fresh results
-            console.log('🧹 Clearing discovery queue due to filter change...');
-            await discoveryService.clearDiscoveryQueue(currentUser.id);
-
             // Reload current user to get fresh data
             await loadCurrentUser();
 
@@ -1058,14 +1032,12 @@ export default function SearchScreen() {
     // Clear discovery queue and refresh profiles
     if (currentUser) {
       try {
-        console.log('🔄 Refresh button pressed - clearing discovery queue...');
+        console.log(
+          '🔄 Refresh button pressed - refreshing discovery profiles...'
+        );
 
         // Haptic feedback
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-        // Clear the queue
-        await discoveryService.clearDiscoveryQueue(currentUser.id);
-        console.log('✅ Discovery queue cleared');
 
         // Trigger the search animation
         setShowAnimation(true);
@@ -1074,7 +1046,7 @@ export default function SearchScreen() {
         // Reload profiles with current filters
         console.log('🔄 Reloading discovery profiles...');
         await loadDiscoverProfiles(true);
-        console.log('✅ Discovery profiles reloaded - Queue refreshed!');
+        console.log('✅ Discovery profiles reloaded!');
 
         // Success haptic feedback
         await Haptics.notificationAsync(

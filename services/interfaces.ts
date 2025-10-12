@@ -50,15 +50,7 @@ export interface IDiscoveryService {
     targetUserId: string,
     reason: string
   ): Promise<ApiResponse<boolean>>;
-  // Queue optimization methods
-  syncDiscoveryQueue(userId: string): Promise<number>;
-  cleanDuplicatesInQueue(userId: string): Promise<number>;
-  clearDiscoveryQueue(userId: string): Promise<void>;
-  // Real-time updates
-  subscribeToDiscoveryQueueUpdates(
-    userId: string,
-    onUpdate: (profiles: User[]) => void
-  ): () => void; // Returns unsubscribe function
+}
 }
 
 // Matching Service

@@ -1,4 +1,6 @@
 // services/firebase/firebaseServices.ts
+// Fixed to remove queue-related methods and simplify
+
 import {
   collection,
   doc,
@@ -16,6 +18,7 @@ import {
   writeBatch,
   onSnapshot,
   Unsubscribe,
+  increment,
 } from 'firebase/firestore';
 import {
   createUserWithEmailAndPassword,
@@ -50,9 +53,6 @@ import notificationService from '../notificationService';
 // Utility Functions
 // ============================================
 
-/**
- * Convert Firestore timestamps to JavaScript Date objects
- */
 const convertTimestamp = (timestamp: any): Date | undefined => {
   if (timestamp?.toDate) return timestamp.toDate();
   if (timestamp?.seconds) return new Date(timestamp.seconds * 1000);
@@ -63,9 +63,6 @@ const convertTimestamp = (timestamp: any): Date | undefined => {
 // Firebase User Profile Service
 // ============================================
 export class FirebaseUserProfileService implements IUserProfileService {
-  /**
-   * Get the current authenticated user's profile
-   */
   async getCurrentUser(): Promise<ApiResponse<User | null>> {
     try {
       const user = auth.currentUser;
@@ -99,9 +96,6 @@ export class FirebaseUserProfileService implements IUserProfileService {
     }
   }
 
-  /**
-   * Update user profile with automatic image upload to Cloudinary
-   */
   async updateProfile(userData: Partial<User>): Promise<ApiResponse<User>> {
     try {
       const user = auth.currentUser;
@@ -109,7 +103,7 @@ export class FirebaseUserProfileService implements IUserProfileService {
 
       const dataToUpdate: Record<string, any> = { ...userData };
 
-      // Handle image upload if it's a local file or base64
+      // Handle image upload if it's a local file
       if (
         typeof dataToUpdate.image === 'string' &&
         (dataToUpdate.image.startsWith('file://') ||
@@ -130,51 +124,6 @@ export class FirebaseUserProfileService implements IUserProfileService {
         }
       }
 
-      // Handle additional images array upload
-      if (
-        Array.isArray(dataToUpdate.images) &&
-        dataToUpdate.images.length > 0
-      ) {
-        console.log('📤 Uploading additional images to Cloudinary...');
-        const uploadedImages: string[] = [];
-
-        for (const imageUri of dataToUpdate.images) {
-          // Check if it's a local file that needs uploading
-          if (
-            typeof imageUri === 'string' &&
-            (imageUri.startsWith('file://') ||
-              imageUri.startsWith('content://') ||
-              imageUri.startsWith('data:') ||
-              imageUri.startsWith('/'))
-          ) {
-            console.log('📤 Uploading additional image:', imageUri);
-            const uploadResult = await storageService.uploadImage(imageUri);
-
-            if (uploadResult.success && uploadResult.secureUrl) {
-              uploadedImages.push(uploadResult.secureUrl);
-              console.log(
-                '✅ Additional image uploaded:',
-                uploadResult.secureUrl
-              );
-            } else {
-              console.error('❌ Failed to upload image:', uploadResult.message);
-              throw new Error(
-                uploadResult.message || 'Additional image upload failed'
-              );
-            }
-          } else {
-            // Already a Cloudinary URL, keep it
-            uploadedImages.push(imageUri);
-          }
-        }
-
-        dataToUpdate.images = uploadedImages;
-        console.log(
-          '✅ All additional images processed:',
-          uploadedImages.length
-        );
-      }
-
       // Handle geohash update if coordinates changed
       if (dataToUpdate.coordinates) {
         const { latitude, longitude } = dataToUpdate.coordinates;
@@ -192,86 +141,26 @@ export class FirebaseUserProfileService implements IUserProfileService {
         }
       });
 
-      // Handle nested preferences object - use dot notation for proper merging
+      // Handle nested preferences with dot notation
       const updateData: Record<string, any> = { updatedAt: serverTimestamp() };
 
       Object.keys(dataToUpdate).forEach((key) => {
         if (key === 'preferences' && typeof dataToUpdate[key] === 'object') {
-          // Use dot notation for nested preferences to merge instead of replace
           const prefs = dataToUpdate[key] as Record<string, any>;
-          console.log('🔧 Processing preferences object:', prefs);
           Object.keys(prefs).forEach((prefKey) => {
             updateData[`preferences.${prefKey}`] = prefs[prefKey];
-            console.log(`🔧 Set preferences.${prefKey} =`, prefs[prefKey]);
           });
         } else {
           updateData[key] = dataToUpdate[key];
         }
       });
 
-      console.log('🔥 Final updateData being sent to Firebase:', updateData);
       const userRef = doc(db, 'users', user.uid);
       await updateDoc(userRef, updateData);
-      console.log('✅ Firebase updateDoc completed successfully');
-
-      // Update all discovery queue entries that contain this user's profile
-      // This ensures real-time updates across all users who have this profile in their queue
-      try {
-        const queueQuery = query(
-          collection(db, 'discovery_queue'),
-          where('profileId', '==', user.uid)
-        );
-        const queueSnapshot = await getDocs(queueQuery);
-
-        if (!queueSnapshot.empty) {
-          console.log(
-            `🔄 Updating ${queueSnapshot.size} discovery queue entries with new profile data`
-          );
-          const batch = writeBatch(db);
-
-          // Prepare update data for queue entries (exclude undefined values)
-          const queueUpdateData: Record<string, any> = {};
-          if (dataToUpdate.name)
-            queueUpdateData['profileData.name'] = dataToUpdate.name;
-          if (dataToUpdate.age !== undefined)
-            queueUpdateData['profileData.age'] = dataToUpdate.age;
-          if (dataToUpdate.bio !== undefined)
-            queueUpdateData['profileData.bio'] = dataToUpdate.bio;
-          if (dataToUpdate.image)
-            queueUpdateData['profileData.image'] = dataToUpdate.image;
-          if (dataToUpdate.images)
-            queueUpdateData['profileData.images'] = dataToUpdate.images;
-          if (dataToUpdate.interests)
-            queueUpdateData['profileData.interests'] = dataToUpdate.interests;
-          if (dataToUpdate.height !== undefined)
-            queueUpdateData['profileData.height'] = dataToUpdate.height;
-          if (dataToUpdate.location)
-            queueUpdateData['profileData.location'] = dataToUpdate.location;
-          if (dataToUpdate.gender)
-            queueUpdateData['profileData.gender'] = dataToUpdate.gender;
-          if (dataToUpdate.zodiacSign)
-            queueUpdateData['profileData.zodiacSign'] = dataToUpdate.zodiacSign;
-
-          queueSnapshot.forEach((queueDoc) => {
-            batch.update(queueDoc.ref, queueUpdateData);
-          });
-
-          await batch.commit();
-          console.log(
-            '✅ Discovery queue entries updated with new profile data'
-          );
-        }
-      } catch (queueError) {
-        console.error('⚠️ Error updating discovery queue:', queueError);
-        // Don't fail the profile update if queue update fails
-      }
 
       // Get updated document
       const updatedDoc = await getDoc(userRef);
       const updatedUserData = updatedDoc.data();
-      console.log('📖 Document read from Firebase after update:', {
-        preferences: updatedUserData?.preferences,
-      });
 
       return {
         data: {
@@ -294,9 +183,6 @@ export class FirebaseUserProfileService implements IUserProfileService {
     }
   }
 
-  /**
-   * Upload profile image to Cloudinary
-   */
   async uploadProfileImage(
     imageBlob: Blob | string
   ): Promise<ApiResponse<string>> {
@@ -314,7 +200,6 @@ export class FirebaseUserProfileService implements IUserProfileService {
         throw new Error(uploadResult.message || 'Image upload failed');
       }
 
-      // Update user's profile with new image URL
       const userRef = doc(db, 'users', user.uid);
       await updateDoc(userRef, {
         image: uploadResult.secureUrl,
@@ -337,9 +222,6 @@ export class FirebaseUserProfileService implements IUserProfileService {
     }
   }
 
-  /**
-   * Delete user profile
-   */
   async deleteProfile(userId: string): Promise<ApiResponse<boolean>> {
     try {
       const user = auth.currentUser;
@@ -367,147 +249,58 @@ export class FirebaseUserProfileService implements IUserProfileService {
 }
 
 // ============================================
-// Firebase Discovery Service
+// Firebase Discovery Service (Simplified)
 // ============================================
 export class FirebaseDiscoveryService implements IDiscoveryService {
   /**
-   * Populate discovery queue for a user
-   * This should be called periodically or when queue is empty
+   * Get discover profiles - simplified direct query
    */
-  private async populateDiscoveryQueue(
-    userId: string,
+  async getDiscoverProfiles(
     filters: SearchFilters,
-    count: number = 50
-  ): Promise<void> {
+    page: number = 1
+  ): Promise<ApiResponse<User[]>> {
     try {
-      // Get current user's data
-      const currentUserDoc = await getDoc(doc(db, 'users', userId));
-      if (!currentUserDoc.exists()) return;
+      const pageSize = 20;
+      const currentUserId = auth.currentUser?.uid;
+
+      if (!currentUserId) {
+        throw new Error('No user logged in');
+      }
+
+      const currentUserDoc = await getDoc(doc(db, 'users', currentUserId));
+      if (!currentUserDoc.exists()) {
+        throw new Error('Current user not found');
+      }
 
       const currentUserData = currentUserDoc.data();
       const userLocation = currentUserData?.coordinates;
 
-      if (!userLocation || !userLocation.latitude || !userLocation.longitude) {
-        console.warn(
-          'User location not set, cannot populate queue',
-          userLocation
-        );
-        return;
+      if (!userLocation?.latitude || !userLocation?.longitude) {
+        console.warn('User location not set');
+        return {
+          data: [],
+          success: true,
+          message: 'Location not available',
+        };
       }
 
-      // Get existing profiles in queue using HashMap for O(1) lookup
-      const existingQueueQuery = query(
-        collection(db, 'discovery_queue'),
-        where('userId', '==', userId),
-        where('shown', '==', false)
-      );
-      const existingQueueSnapshot = await getDocs(existingQueueQuery);
-
-      // Use Map for faster lookups and storing metadata
-      const existingProfilesMap = new Map<
-        string,
-        {
-          docId: string;
-          addedAt: any;
-          score: number;
-        }
-      >();
-
-      existingQueueSnapshot.docs.forEach((doc) => {
-        const data = doc.data();
-        existingProfilesMap.set(data.profileId, {
-          docId: doc.id,
-          addedAt: data.addedAt,
-          score: data.score || 0,
-        });
-      });
-
-      console.log(
-        `📋 Found ${existingProfilesMap.size} existing profiles in queue (using HashMap)`
-      );
-
-      // Get existing interactions to exclude (likes and non-expired dislikes)
-      const interactionsQuery = query(
-        collection(db, 'interactions'),
-        where('userId', '==', userId)
-      );
-      const interactionsSnapshot = await getDocs(interactionsQuery);
-
-      const now = new Date();
-      const interactedUserIds = new Set<string>();
-      const expiredDislikeIds: string[] = [];
-
-      interactionsSnapshot.docs.forEach((doc) => {
-        const data = doc.data();
-        const targetUserId = data.targetUserId;
-
-        // Check if it's a dislike with expiration
-        if (data.type === 'dislike' && data.expiresAt) {
-          const expiresAt = data.expiresAt.toDate
-            ? data.expiresAt.toDate()
-            : new Date(data.expiresAt);
-
-          // If expired, mark for deletion and don't exclude
-          if (expiresAt <= now) {
-            console.log(
-              `⏰ Dislike for ${targetUserId} has expired, will be deleted`
-            );
-            expiredDislikeIds.push(doc.id);
-            return; // Don't add to exclusion set
-          }
-        }
-
-        // Add to exclusion set (likes and non-expired dislikes)
-        interactedUserIds.add(targetUserId);
-      });
-
-      // Delete expired dislikes in the background
-      if (expiredDislikeIds.length > 0) {
-        console.log(`🗑️ Deleting ${expiredDislikeIds.length} expired dislikes`);
-        const deletePromises = expiredDislikeIds.map((docId) =>
-          deleteDoc(doc(db, 'interactions', docId))
-        );
-        Promise.all(deletePromises).catch((error) =>
-          console.error('Error deleting expired dislikes:', error)
-        );
-      }
-
-      // Get existing matches to exclude
-      const matchesQuery1 = query(
-        collection(db, 'matches'),
-        where('user1', '==', userId),
-        where('unmatched', '==', false)
-      );
-      const matchesQuery2 = query(
-        collection(db, 'matches'),
-        where('user2', '==', userId),
-        where('unmatched', '==', false)
-      );
-      const [matches1, matches2] = await Promise.all([
-        getDocs(matchesQuery1),
-        getDocs(matchesQuery2),
+      // Get exclusions
+      const [interactedIds, matchedIds] = await Promise.all([
+        this.getInteractedUserIds(currentUserId),
+        this.getMatchedUserIds(currentUserId),
       ]);
 
-      const matchedUserIds = new Set<string>();
-      matches1.docs.forEach((doc) => matchedUserIds.add(doc.data().user2));
-      matches2.docs.forEach((doc) => matchedUserIds.add(doc.data().user1));
-
-      // Get optimized geohash query bounds (filters.maxDistance is in METERS)
+      // Get query bounds
       const bounds = LocationService.getQueryBoundsMeters(
         userLocation,
         filters.maxDistance
       );
 
-      const potentialProfiles: Array<{
-        profile: User;
-        distance: number;
-        score: number;
-      }> = [];
+      const profiles: User[] = [];
+      const seenIds = new Set<string>([currentUserId]);
 
-      // Query each geohash range
-      for (const bound of bounds) {
-        const [startHash, endHash] = bound;
-
+      // Query users
+      for (const [startHash, endHash] of bounds) {
         const q = query(
           collection(db, 'users'),
           where('geohash', '>=', startHash),
@@ -518,983 +311,47 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         const snapshot = await getDocs(q);
 
         snapshot.forEach((docSnapshot) => {
-          // Skip current user, already interacted, matched users, and already queued users
-          // Using Map.has() for O(1) lookup instead of array iteration
+          const userId = docSnapshot.id;
+
           if (
-            docSnapshot.id === userId ||
-            interactedUserIds.has(docSnapshot.id) ||
-            matchedUserIds.has(docSnapshot.id) ||
-            existingProfilesMap.has(docSnapshot.id)
+            seenIds.has(userId) ||
+            interactedIds.has(userId) ||
+            matchedIds.has(userId)
           ) {
             return;
           }
+          seenIds.add(userId);
 
           const data = docSnapshot.data();
 
-          // Validate and filter
-          if (!data || typeof data.age !== 'number' || !data.gender) {
-            console.log(
-              `⚠️ QUEUE: Invalid data for profile ${docSnapshot.id}:`,
-              {
-                hasData: !!data,
-                hasAge: typeof data?.age === 'number',
-                hasGender: !!data?.gender,
-              }
-            );
-            return;
-          }
+          if (!this.validateUserData(data)) return;
+          if (!this.matchesGenderFilter(currentUserData, data, filters)) return;
+          if (!this.matchesAgeFilter(data, filters)) return;
 
-          // Two-way gender matching (no "both" option):
-          // 1. Current user must be interested in profile's gender
-          const currentUserInterestedInProfile = data.gender === filters.gender;
-
-          // 2. Profile must be interested in current user's gender
-          const profileInterestedIn = data.preferences?.interestedIn;
-          const currentUserGender = currentUserData?.gender || 'other';
-          const profileInterestedInCurrentUser =
-            profileInterestedIn === currentUserGender;
-
-          const matchesGender =
-            currentUserInterestedInProfile && profileInterestedInCurrentUser;
-
-          const matchesAge =
-            data.age >= filters.ageRange[0] && data.age <= filters.ageRange[1];
-
-          // DEBUG: Comprehensive logging for each profile
-          console.log(`👤 QUEUE: Processing ${data.name || 'Unknown'}`, {
-            profileId: docSnapshot.id,
-            profileGender: data.gender,
-            profileInterestedIn: profileInterestedIn,
-            currentUserGender: currentUserGender,
-            currentUserInterestedIn: filters.gender,
-            currentUserInterestedInProfile: currentUserInterestedInProfile
-              ? '✅'
-              : '❌',
-            profileInterestedInCurrentUser: profileInterestedInCurrentUser
-              ? '✅'
-              : '❌',
-            matchesGender: matchesGender ? '✅' : '❌',
-            age: data.age,
-            ageRange: filters.ageRange,
-            matchesAge: matchesAge ? '✅' : '❌',
-            willAdd: matchesGender && matchesAge,
-          });
-
-          if (!matchesGender || !matchesAge) {
-            console.log(
-              `❌ QUEUE: Filtered out ${data.name} - Gender Match: ${
-                matchesGender ? '✅' : '❌'
-              }, Age Match: ${matchesAge ? '✅' : '❌'}`
-            );
-            return;
-          }
-
-          // Calculate distance and score
           if (data.coordinates?.latitude && data.coordinates?.longitude) {
-            try {
-              // distance is now in METERS
-              const distance = LocationService.calculateDistance(
-                userLocation.latitude,
-                userLocation.longitude,
-                data.coordinates.latitude,
-                data.coordinates.longitude
-              );
-
-              console.log(`📏 QUEUE: Distance calculated for ${data.name}`, {
-                distance: distance + 'm',
-                maxDistance: filters.maxDistance + 'm',
-                withinRange: distance <= filters.maxDistance,
-                userLat: userLocation.latitude.toFixed(6),
-                userLon: userLocation.longitude.toFixed(6),
-                profileLat: data.coordinates.latitude.toFixed(6),
-                profileLon: data.coordinates.longitude.toFixed(6),
-                profileGeohash: data.geohash,
-              });
-
-              // Both in METERS
-              if (distance > filters.maxDistance) {
-                console.log(
-                  `❌ QUEUE: ${data.name} filtered by distance: ${distance}m > ${filters.maxDistance}m`
-                );
-                return;
-              }
-
-              // Calculate compatibility score (0-100)
-              const score = this.calculateCompatibilityScore(
-                currentUserData,
-                data,
-                distance
-              );
-
-              potentialProfiles.push({
-                profile: {
-                  id: docSnapshot.id,
-                  ...data,
-                  distance,
-                  lastSeen: convertTimestamp(data.lastSeen),
-                } as User,
-                distance,
-                score,
-              });
-            } catch (error) {
-              console.warn(
-                `Error processing profile ${docSnapshot.id}:`,
-                error
-              );
-            }
-          }
-        });
-      }
-
-      // Sort by score and take top profiles
-      const topProfiles = potentialProfiles
-        .sort((a, b) => b.score - a.score)
-        .slice(0, count);
-
-      // Add to discovery queue
-      const batch = writeBatch(db);
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7); // Expire in 7 days
-
-      topProfiles.forEach(({ profile, distance, score }) => {
-        const queueRef = doc(collection(db, 'discovery_queue'));
-        batch.set(queueRef, {
-          userId,
-          profileId: profile.id,
-          distance,
-          score,
-          addedAt: serverTimestamp(),
-          expiresAt,
-          shown: false,
-        });
-      });
-
-      await batch.commit();
-      console.log(`Added ${topProfiles.length} profiles to discovery queue`);
-    } catch (error) {
-      console.error('Error populating discovery queue:', error);
-    }
-  }
-
-  /**
-   * Calculate compatibility score between users
-   */
-  private calculateCompatibilityScore(
-    currentUser: any,
-    targetUser: any,
-    distanceMeters: number
-  ): number {
-    let score = 100;
-
-    // Distance factor (closer is better) - max 30 points deduction
-    // Penalize 2 points per km (0.002 points per meter)
-    score -= Math.min((distanceMeters / 1000) * 2, 30);
-
-    // Age difference factor - max 20 points deduction
-    const ageDiff = Math.abs((currentUser.age || 25) - (targetUser.age || 25));
-    score -= Math.min(ageDiff * 2, 20);
-
-    // Common interests - add up to 20 points
-    if (currentUser.interests && targetUser.interests) {
-      const commonInterests = currentUser.interests.filter((interest: string) =>
-        targetUser.interests.includes(interest)
-      );
-      score += Math.min(commonInterests.length * 4, 20);
-    }
-
-    // Online status bonus - 10 points
-    if (targetUser.isOnline) {
-      score += 10;
-    }
-
-    // Has photo bonus - 10 points
-    if (
-      targetUser.image ||
-      (targetUser.images && targetUser.images.length > 0)
-    ) {
-      score += 10;
-    }
-
-    // Has bio bonus - 5 points
-    if (targetUser.bio && targetUser.bio.length > 20) {
-      score += 5;
-    }
-
-    return Math.max(0, Math.min(100, score));
-  }
-
-  /**
-   * Get discover profiles from queue (primary method)
-   */
-  async getDiscoverProfiles(
-    filters: SearchFilters,
-    page: number = 1
-  ): Promise<ApiResponse<User[]>> {
-    try {
-      const user = auth.currentUser;
-      if (!user) throw new Error('No user logged in');
-
-      const pageSize = 20;
-
-      // Check discovery queue first
-      const queueQuery = query(
-        collection(db, 'discovery_queue'),
-        where('userId', '==', user.uid),
-        where('shown', '==', false),
-        limit(pageSize)
-      );
-
-      const queueSnapshot = await getDocs(queueQuery);
-
-      // If queue is empty or has less than 5 profiles, repopulate
-      if (queueSnapshot.size < 5) {
-        console.log('Discovery queue low, repopulating...');
-        await this.populateDiscoveryQueue(user.uid, filters, 50);
-
-        // Fetch again after populating
-        const newQueueSnapshot = await getDocs(queueQuery);
-
-        if (newQueueSnapshot.empty) {
-          // Queue still empty, fall back to direct query
-          console.log(
-            'Queue still empty after repopulation, using direct query'
-          );
-          return this.getDiscoverProfilesDirect(filters, page);
-        }
-
-        return this.getProfilesFromQueue(
-          newQueueSnapshot,
-          pageSize,
-          page,
-          filters,
-          user.uid
-        );
-      }
-
-      return this.getProfilesFromQueue(
-        queueSnapshot,
-        pageSize,
-        page,
-        filters,
-        user.uid
-      );
-    } catch (error) {
-      console.error('Error getting discover profiles:', error);
-      return {
-        data: [],
-        success: false,
-        message:
-          error instanceof Error ? error.message : 'Failed to get profiles',
-      };
-    }
-  }
-
-  /**
-   * Helper to get profiles from queue snapshot
-   */
-  private async getProfilesFromQueue(
-    queueSnapshot: any,
-    pageSize: number,
-    page: number,
-    filters: SearchFilters,
-    currentUserId: string
-  ): Promise<ApiResponse<User[]>> {
-    const profiles: User[] = [];
-    const seenProfileIds = new Set<string>();
-
-    // Create a map of profileId to queue data (includes distance)
-    const queueDataMap = new Map<string, any>();
-    queueSnapshot.docs.forEach((doc: any) => {
-      const data = doc.data();
-      queueDataMap.set(data.profileId, data);
-    });
-
-    // Deduplicate profile IDs from queue
-    const profileIds = queueSnapshot.docs
-      .map((doc: any) => doc.data().profileId)
-      .filter((profileId: string) => {
-        if (seenProfileIds.has(profileId)) {
-          console.warn(
-            `⚠️ Duplicate profile ${profileId} found in queue, skipping`
-          );
-          return false;
-        }
-        seenProfileIds.add(profileId);
-        return true;
-      });
-
-    console.log(
-      `🔍 QUEUE FILTER: Applying gender filter - Looking for: ${filters.gender}`
-    );
-
-    // Get current user data for bidirectional matching
-    const currentUserDoc = await getDoc(doc(db, 'users', currentUserId));
-    const currentUserData = currentUserDoc.data();
-    const currentUserGender = currentUserData?.gender || 'other';
-
-    // Fetch actual profile data and apply current filters
-    for (const profileId of profileIds) {
-      try {
-        const profileDoc = await getDoc(doc(db, 'users', profileId));
-        if (profileDoc.exists()) {
-          const data = profileDoc.data();
-          const queueData = queueDataMap.get(profileId);
-
-          // CRITICAL: Apply BIDIRECTIONAL gender filter (no "both" option)
-          // 1. Current user must be interested in profile's gender
-          const currentUserInterestedInProfile = data.gender === filters.gender;
-
-          // 2. Profile must be interested in current user's gender
-          const profileInterestedIn = data.preferences?.interestedIn;
-          const profileInterestedInCurrentUser =
-            profileInterestedIn === currentUserGender;
-
-          const matchesGender =
-            currentUserInterestedInProfile && profileInterestedInCurrentUser;
-
-          const matchesAge =
-            data.age >= filters.ageRange[0] && data.age <= filters.ageRange[1];
-
-          // DEBUG: Log filtering decisions
-          if (!matchesGender) {
-            console.log(
-              `⚠️ QUEUE RETRIEVAL: Gender mismatch - ${data.name} (${data.gender}, looking for: ${profileInterestedIn}) ` +
-                `filtered out. Current user: (${currentUserGender}, looking for: ${filters.gender}). ` +
-                `User→Profile: ${
-                  currentUserInterestedInProfile ? '✅' : '❌'
-                }, Profile→User: ${
-                  profileInterestedInCurrentUser ? '✅' : '❌'
-                }`
+            const distance = LocationService.calculateDistance(
+              userLocation.latitude,
+              userLocation.longitude,
+              data.coordinates.latitude,
+              data.coordinates.longitude
             );
-            continue; // Skip this profile
-          }
 
-          if (!matchesAge) {
-            console.log(
-              `⚠️ QUEUE RETRIEVAL: Age mismatch - ${data.name} (${data.age}) filtered out. Age range: ${filters.ageRange[0]}-${filters.ageRange[1]}`
-            );
-            continue; // Skip this profile
-          }
+            if (distance > filters.maxDistance) return;
 
-          // Profile passes all filters
-          console.log(
-            `✅ QUEUE RETRIEVAL: ${data.name} (${data.gender}, ${data.age}) passes filters`
-          );
-
-          profiles.push({
-            id: profileDoc.id,
-            ...data,
-            distance: queueData?.distance || null, // Include distance from queue
-            lastSeen: convertTimestamp(data.lastSeen),
-          } as User);
-        }
-      } catch (error) {
-        console.warn(`Error fetching profile ${profileId}:`, error);
-      }
-    }
-
-    console.log(`📊 QUEUE RETRIEVAL SUMMARY:`, {
-      totalInQueue: profileIds.length,
-      afterFiltering: profiles.length,
-      filtered: profileIds.length - profiles.length,
-      lookingFor: filters.gender,
-      profiles: profiles.map((p) => `${p.name} (${p.gender})`),
-    });
-
-    return {
-      data: profiles,
-      success: true,
-      message: 'Profiles retrieved successfully',
-      pagination: {
-        page,
-        limit: pageSize,
-        total: profiles.length,
-        hasMore: queueSnapshot.size >= pageSize,
-      },
-    };
-  }
-
-  /**
-   * Mark profile as shown in discovery queue
-   */
-  async markProfileAsShown(userId: string, profileId: string): Promise<void> {
-    try {
-      const queueQuery = query(
-        collection(db, 'discovery_queue'),
-        where('userId', '==', userId),
-        where('profileId', '==', profileId)
-      );
-
-      const queueSnapshot = await getDocs(queueQuery);
-
-      if (!queueSnapshot.empty) {
-        await updateDoc(queueSnapshot.docs[0].ref, {
-          shown: true,
-          shownAt: serverTimestamp(),
-        });
-      }
-    } catch (error) {
-      console.error('Error marking profile as shown:', error);
-    }
-  }
-
-  /**
-   * Remove profile from discovery queue (called after like/dislike/match)
-   */
-  async removeFromQueue(userId: string, profileId: string): Promise<void> {
-    try {
-      const queueQuery = query(
-        collection(db, 'discovery_queue'),
-        where('userId', '==', userId),
-        where('profileId', '==', profileId)
-      );
-
-      const queueSnapshot = await getDocs(queueQuery);
-
-      if (queueSnapshot.empty) {
-        return; // Nothing to remove
-      }
-
-      const batch = writeBatch(db);
-      queueSnapshot.docs.forEach((docSnapshot) => {
-        batch.delete(docSnapshot.ref);
-      });
-
-      await batch.commit();
-      console.log(`🗑️ Removed profile ${profileId} from discovery queue`);
-    } catch (error) {
-      console.error('Error removing from queue:', error);
-    }
-  }
-
-  /**
-   * Subscribe to real-time updates for discovery queue profiles
-   * This ensures that when a profile in the queue updates, the UI reflects changes immediately
-   */
-  subscribeToDiscoveryQueueUpdates(
-    userId: string,
-    onUpdate: (profiles: User[]) => void
-  ): Unsubscribe {
-    const queueQuery = query(
-      collection(db, 'discovery_queue'),
-      where('userId', '==', userId),
-      where('shown', '==', false),
-      orderBy('score', 'desc'),
-      limit(50)
-    );
-
-    console.log('👂 Setting up real-time listener for discovery queue updates');
-
-    const unsubscribe = onSnapshot(
-      queueQuery,
-      (snapshot) => {
-        const profiles: User[] = [];
-
-        snapshot.forEach((docSnapshot) => {
-          const data = docSnapshot.data();
-          if (data.profileData) {
             profiles.push({
-              id: data.profileId,
-              ...data.profileData,
-              distance: data.distance,
+              id: userId,
+              ...data,
+              distance,
+              lastSeen: convertTimestamp(data.lastSeen),
             } as User);
           }
         });
-
-        console.log(`🔄 Discovery queue updated: ${profiles.length} profiles`);
-        onUpdate(profiles);
-      },
-      (error) => {
-        console.error('❌ Error in discovery queue listener:', error);
       }
-    );
-
-    return unsubscribe;
-  }
-
-  /**
-   * Clear all discovery queue entries for a user (useful when filters change)
-   */
-  async clearDiscoveryQueue(userId: string): Promise<void> {
-    try {
-      const queueQuery = query(
-        collection(db, 'discovery_queue'),
-        where('userId', '==', userId)
-      );
-
-      const queueSnapshot = await getDocs(queueQuery);
-
-      if (queueSnapshot.empty) {
-        return;
-      }
-
-      const batch = writeBatch(db);
-      queueSnapshot.docs.forEach((docSnapshot) => {
-        batch.delete(docSnapshot.ref);
-      });
-
-      await batch.commit();
-      console.log(
-        `🧹 Cleared ${queueSnapshot.size} profiles from discovery queue for user ${userId}`
-      );
-    } catch (error) {
-      console.error('Error clearing discovery queue:', error);
-    }
-  }
-
-  /**
-   * Clean duplicate entries in discovery queue for a user using HashMap
-   * Keeps the most recent entry for each unique profileId
-   */
-  async cleanDuplicatesInQueue(userId: string): Promise<number> {
-    try {
-      const queueQuery = query(
-        collection(db, 'discovery_queue'),
-        where('userId', '==', userId)
-      );
-
-      const queueSnapshot = await getDocs(queueQuery);
-
-      if (queueSnapshot.empty) {
-        return 0;
-      }
-
-      // Use HashMap to group by profileId - O(n) instead of O(n²)
-      const profileMap = new Map<string, Array<{ id: string; data: any }>>();
-
-      queueSnapshot.docs.forEach((doc) => {
-        const profileId = doc.data().profileId;
-        if (!profileMap.has(profileId)) {
-          profileMap.set(profileId, []);
-        }
-        profileMap.get(profileId)!.push({ id: doc.id, data: doc.data() });
-      });
-
-      // Find duplicates using Set for O(1) lookups
-      const duplicatesToDelete = new Set<string>();
-
-      profileMap.forEach((docs, profileId) => {
-        if (docs.length > 1) {
-          // Sort by addedAt timestamp, keep the most recent
-          docs.sort((a, b) => {
-            const timeA = a.data.addedAt?.toMillis?.() || 0;
-            const timeB = b.data.addedAt?.toMillis?.() || 0;
-            return timeB - timeA; // Descending (newest first)
-          });
-
-          // Delete all except the first (most recent) using Set
-          for (let i = 1; i < docs.length; i++) {
-            duplicatesToDelete.add(docs[i].id);
-          }
-
-          console.log(
-            `🔍 Found ${docs.length - 1} duplicate(s) for profile ${profileId}`
-          );
-        }
-      });
-
-      if (duplicatesToDelete.size === 0) {
-        console.log('✅ No duplicates found in discovery queue');
-        return 0;
-      }
-
-      // Delete duplicates in batches
-      const batch = writeBatch(db);
-      duplicatesToDelete.forEach((docId) => {
-        batch.delete(doc(db, 'discovery_queue', docId));
-      });
-
-      await batch.commit();
-      console.log(
-        `🗑️ Cleaned ${duplicatesToDelete.size} duplicate entries from discovery queue (using Set)`
-      );
-
-      return duplicatesToDelete.size;
-    } catch (error) {
-      console.error('Error cleaning duplicates in queue:', error);
-      return 0;
-    }
-  }
-
-  /**
-   * Synchronize discovery queue with current interactions and matches
-   * Removes profiles that should not be in queue based on:
-   * - Existing interactions (likes, non-expired dislikes)
-   * - Existing matches
-   * - Self (user's own profile)
-   */
-  async syncDiscoveryQueue(userId: string): Promise<number> {
-    try {
-      console.log(`🔄 Starting queue sync for user ${userId}`);
-
-      // Get all queue entries for user
-      const queueQuery = query(
-        collection(db, 'discovery_queue'),
-        where('userId', '==', userId)
-      );
-      const queueSnapshot = await getDocs(queueQuery);
-
-      if (queueSnapshot.empty) {
-        console.log('📭 Queue is empty, nothing to sync');
-        return 0;
-      }
-
-      console.log(`📋 Found ${queueSnapshot.size} profiles in queue`);
-
-      // Get interactions to check
-      const interactionsQuery = query(
-        collection(db, 'interactions'),
-        where('userId', '==', userId)
-      );
-      const interactionsSnapshot = await getDocs(interactionsQuery);
-
-      const now = new Date();
-      const interactedUserIds = new Set<string>();
-
-      interactionsSnapshot.docs.forEach((doc) => {
-        const data = doc.data();
-        const targetUserId = data.targetUserId;
-
-        // Check if it's a dislike with expiration
-        if (data.type === 'dislike' && data.expiresAt) {
-          const expiresAt = data.expiresAt.toDate
-            ? data.expiresAt.toDate()
-            : new Date(data.expiresAt);
-
-          // If expired, don't exclude
-          if (expiresAt <= now) {
-            return; // Skip expired dislikes
-          }
-        }
-
-        // Add to exclusion set (likes and non-expired dislikes)
-        interactedUserIds.add(targetUserId);
-      });
-
-      // Get matches to check
-      const matchesQuery1 = query(
-        collection(db, 'matches'),
-        where('user1', '==', userId),
-        where('unmatched', '==', false)
-      );
-      const matchesQuery2 = query(
-        collection(db, 'matches'),
-        where('user2', '==', userId),
-        where('unmatched', '==', false)
-      );
-      const [matches1, matches2] = await Promise.all([
-        getDocs(matchesQuery1),
-        getDocs(matchesQuery2),
-      ]);
-
-      const matchedUserIds = new Set<string>();
-      matches1.docs.forEach((doc) => matchedUserIds.add(doc.data().user2));
-      matches2.docs.forEach((doc) => matchedUserIds.add(doc.data().user1));
-
-      console.log(
-        `🔍 Found ${interactedUserIds.size} interactions and ${matchedUserIds.size} matches`
-      );
-
-      // Find profiles that should be removed - using Set for O(1) add operations
-      const profilesToRemove = new Set<string>();
-
-      queueSnapshot.docs.forEach((doc) => {
-        const profileId = doc.data().profileId;
-
-        // Check if should be removed using Set.has() for O(1) lookup
-        if (
-          profileId === userId || // User's own profile
-          interactedUserIds.has(profileId) || // Already interacted (O(1))
-          matchedUserIds.has(profileId) // Already matched (O(1))
-        ) {
-          profilesToRemove.add(doc.id); // O(1) add
-        }
-      });
-
-      if (profilesToRemove.size === 0) {
-        console.log('✅ Queue is already in sync');
-        return 0;
-      }
-
-      console.log(
-        `🗑️ Removing ${profilesToRemove.size} profiles from queue (using Set)`
-      );
-
-      // Remove invalid entries in batches
-      const batch = writeBatch(db);
-      profilesToRemove.forEach((docId) => {
-        batch.delete(doc(db, 'discovery_queue', docId));
-      });
-
-      await batch.commit();
-
-      console.log(
-        `✅ Queue sync complete! Removed ${profilesToRemove.size} profiles`
-      );
-
-      return profilesToRemove.length;
-    } catch (error) {
-      console.error('Error syncing discovery queue:', error);
-      return 0;
-    }
-  }
-
-  /**
-   * Legacy method - fallback for direct geohash queries
-   */
-  private async getDiscoverProfilesDirect(
-    filters: SearchFilters,
-    page: number = 1
-  ): Promise<ApiResponse<User[]>> {
-    try {
-      const user = auth.currentUser;
-      if (!user) throw new Error('No user logged in');
-
-      // Get current user's location
-      const currentUserDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!currentUserDoc.exists()) {
-        throw new Error('Current user not found');
-      }
-
-      const currentUserData = currentUserDoc.data();
-      const userLocation = currentUserData?.coordinates;
-
-      // If user doesn't have location, fall back to basic query without location
-      if (!userLocation || !userLocation.latitude || !userLocation.longitude) {
-        console.warn('User location not set, using basic query', userLocation);
-        return this.getDiscoverProfilesBasic(filters, page, user.uid);
-      }
-
-      // IMPORTANT: Get existing interactions to exclude (likes and non-expired dislikes)
-      const interactionsQuery = query(
-        collection(db, 'interactions'),
-        where('userId', '==', user.uid)
-      );
-      const interactionsSnapshot = await getDocs(interactionsQuery);
-
-      const now = new Date();
-      const interactedUserIds = new Set<string>();
-
-      interactionsSnapshot.docs.forEach((doc) => {
-        const data = doc.data();
-        const targetUserId = data.targetUserId;
-
-        // Check if it's a dislike with expiration
-        if (data.type === 'dislike' && data.expiresAt) {
-          const expiresAt = data.expiresAt.toDate
-            ? data.expiresAt.toDate()
-            : new Date(data.expiresAt);
-
-          // If expired, don't exclude
-          if (expiresAt <= now) {
-            console.log(
-              `⏰ Dislike for ${targetUserId} has expired (direct query)`
-            );
-            return; // Don't add to exclusion set
-          }
-        }
-
-        // Add to exclusion set (likes and non-expired dislikes)
-        interactedUserIds.add(targetUserId);
-      });
-
-      // Get existing matches to exclude
-      const matchesQuery1 = query(
-        collection(db, 'matches'),
-        where('user1', '==', user.uid),
-        where('unmatched', '==', false)
-      );
-      const matchesQuery2 = query(
-        collection(db, 'matches'),
-        where('user2', '==', user.uid),
-        where('unmatched', '==', false)
-      );
-      const [matches1, matches2] = await Promise.all([
-        getDocs(matchesQuery1),
-        getDocs(matchesQuery2),
-      ]);
-
-      const matchedUserIds = new Set<string>();
-      matches1.docs.forEach((doc) => matchedUserIds.add(doc.data().user2));
-      matches2.docs.forEach((doc) => matchedUserIds.add(doc.data().user1));
-
-      console.log(
-        `🔍 Direct Query - Excluding ${interactedUserIds.size} interacted + ${matchedUserIds.size} matched users`
-      );
-
-      // Get geohash query bounds for the search radius
-      // filters.maxDistance is in METERS
-      console.log(`🔍 Starting geohash-based discovery query:`, {
-        userLocation: {
-          lat: userLocation.latitude.toFixed(6),
-          lon: userLocation.longitude.toFixed(6),
-        },
-        maxDistanceMeters: filters.maxDistance,
-        filters: {
-          gender: filters.gender,
-          ageRange: filters.ageRange,
-        },
-      });
-
-      console.log(`👤 CURRENT USER DEBUG:`, {
-        userId: user.uid,
-        gender: currentUserData?.gender || 'not set',
-        lookingFor: filters.gender,
-      });
-
-      console.log(`👤 GENDER FILTER DEBUG:`, {
-        lookingFor: filters.gender,
-        description:
-          filters.gender === 'male'
-            ? 'Looking for MALE profiles'
-            : filters.gender === 'female'
-            ? 'Looking for FEMALE profiles'
-            : 'Looking for ALL profiles',
-      });
-
-      const bounds = LocationService.getQueryBoundsMeters(
-        userLocation,
-        filters.maxDistance
-      );
-
-      const profiles: User[] = [];
-      const pageSize = 20;
-      const seenIds = new Set<string>([user.uid]); // Track seen profiles to avoid duplicates
-      let totalProcessed = 0;
-      let totalSkipped = 0;
-
-      // Query each geohash range
-      for (const bound of bounds) {
-        const [startHash, endHash] = bound;
-
-        const q = query(
-          collection(db, 'users'),
-          where('geohash', '>=', startHash),
-          where('geohash', '<=', endHash),
-          limit(pageSize)
-        );
-
-        const snapshot = await getDocs(q);
-
-        snapshot.forEach((docSnapshot) => {
-          // Skip current user, already seen, interacted, and matched profiles
-          if (
-            seenIds.has(docSnapshot.id) ||
-            interactedUserIds.has(docSnapshot.id) ||
-            matchedUserIds.has(docSnapshot.id)
-          ) {
-            return;
-          }
-          seenIds.add(docSnapshot.id);
-
-          const data = docSnapshot.data();
-
-          // Validate required fields
-          if (!data || typeof data.age !== 'number' || !data.gender) {
-            console.warn(
-              `Skipping profile ${docSnapshot.id}: missing required fields`
-            );
-            return;
-          }
-
-          // Check if profile matches filters - BIDIRECTIONAL (no "both" option)
-          // 1. Current user must be interested in profile's gender
-          const currentUserInterestedInProfile = data.gender === filters.gender;
-
-          // 2. Profile must be interested in current user's gender
-          const profileInterestedIn = data.preferences?.interestedIn;
-          const currentUserGender = currentUserData?.gender || 'other';
-          const profileInterestedInCurrentUser =
-            profileInterestedIn === currentUserGender;
-
-          const matchesGender =
-            currentUserInterestedInProfile && profileInterestedInCurrentUser;
-
-          const matchesAge =
-            data.age >= filters.ageRange[0] && data.age <= filters.ageRange[1];
-
-          // DEBUG: Log gender filtering
-          if (!matchesGender) {
-            console.log(
-              `⚠️ GENDER MISMATCH: ${data.name} (${data.gender}, looking for: ${profileInterestedIn}) ` +
-                `filtered out. Current user: (${currentUserGender}, looking for: ${filters.gender}). ` +
-                `User→Profile: ${
-                  currentUserInterestedInProfile ? '✅' : '❌'
-                }, Profile→User: ${
-                  profileInterestedInCurrentUser ? '✅' : '❌'
-                }`
-            );
-          }
-
-          if (!matchesGender || !matchesAge) return;
-
-          // Calculate actual distance if coordinates exist
-          let distance: number | null = null;
-          if (data.coordinates?.latitude && data.coordinates?.longitude) {
-            try {
-              // distance is now in METERS
-              distance = LocationService.calculateDistance(
-                userLocation.latitude,
-                userLocation.longitude,
-                data.coordinates.latitude,
-                data.coordinates.longitude
-              );
-
-              totalProcessed++;
-
-              // Skip if beyond max distance (both in METERS)
-              if (distance > filters.maxDistance) {
-                totalSkipped++;
-                console.log(
-                  `⏭️  Skipping ${
-                    data.name || docSnapshot.id
-                  }: ${distance}m > ${filters.maxDistance}m`
-                );
-                return;
-              }
-
-              console.log(
-                `✅ Including ${
-                  data.name || docSnapshot.id
-                }: ${distance}m (within ${filters.maxDistance}m)`
-              );
-            } catch (distError) {
-              console.warn(
-                `Error calculating distance for ${docSnapshot.id}:`,
-                distError
-              );
-            }
-          }
-
-          profiles.push({
-            id: docSnapshot.id,
-            ...data,
-            distance,
-            lastSeen: convertTimestamp(data.lastSeen),
-          } as User);
-        });
-      }
-
-      // Remove duplicates and sort by distance
-      const uniqueProfiles = Array.from(
-        new Map(profiles.map((p) => [p.id, p])).values()
-      );
 
       const sortedProfiles = LocationService.sortByDistance(
-        uniqueProfiles,
+        profiles,
         userLocation
       );
-
-      console.log(`📊 Discovery query summary:`, {
-        totalProcessed,
-        totalSkipped,
-        uniqueProfilesFound: uniqueProfiles.length,
-        sortedResults: sortedProfiles.length,
-        distances: sortedProfiles.slice(0, 5).map((p) => ({
-          name: p.name,
-          distanceMeters: p.distance || 'unknown',
-        })),
-      });
 
       return {
         data: sortedProfiles.slice(0, pageSize),
@@ -1518,259 +375,129 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
     }
   }
 
-  /**
-   * Fallback method for profiles without geohash (for migration period)
-   */
-  private async getDiscoverProfilesBasic(
-    filters: SearchFilters,
-    page: number,
-    currentUserId: string
-  ): Promise<ApiResponse<User[]>> {
-    try {
-      const pageSize = 20;
-
-      // IMPORTANT: Get existing interactions to exclude
-      const interactionsQuery = query(
-        collection(db, 'interactions'),
-        where('userId', '==', currentUserId)
-      );
-      const interactionsSnapshot = await getDocs(interactionsQuery);
-
-      const now = new Date();
-      const interactedUserIds = new Set<string>();
-
-      interactionsSnapshot.docs.forEach((doc) => {
-        const data = doc.data();
-        const targetUserId = data.targetUserId;
-
-        // Check if it's a dislike with expiration
-        if (data.type === 'dislike' && data.expiresAt) {
-          const expiresAt = data.expiresAt.toDate
-            ? data.expiresAt.toDate()
-            : new Date(data.expiresAt);
-
-          // If expired, don't exclude
-          if (expiresAt <= now) {
-            return; // Don't add to exclusion set
-          }
-        }
-
-        // Add to exclusion set (likes and non-expired dislikes)
-        interactedUserIds.add(targetUserId);
-      });
-
-      // Get existing matches to exclude
-      const matchesQuery1 = query(
-        collection(db, 'matches'),
-        where('user1', '==', currentUserId),
-        where('unmatched', '==', false)
-      );
-      const matchesQuery2 = query(
-        collection(db, 'matches'),
-        where('user2', '==', currentUserId),
-        where('unmatched', '==', false)
-      );
-      const [matches1, matches2] = await Promise.all([
-        getDocs(matchesQuery1),
-        getDocs(matchesQuery2),
-      ]);
-
-      const matchedUserIds = new Set<string>();
-      matches1.docs.forEach((doc) => matchedUserIds.add(doc.data().user2));
-      matches2.docs.forEach((doc) => matchedUserIds.add(doc.data().user1));
-
-      console.log(
-        `🔍 Basic Query - Excluding ${interactedUserIds.size} interacted + ${matchedUserIds.size} matched users`
-      );
-
-      // Get current user for bidirectional matching
-      const currentUserDoc = await getDoc(doc(db, 'users', currentUserId));
-      const currentUserData = currentUserDoc.data();
-      const currentUserGender = currentUserData?.gender || 'other';
-
-      // Basic query without location filtering
-      let q = query(
-        collection(db, 'users'),
-        where('id', '!=', currentUserId),
-        limit(pageSize)
-      );
-
-      // Add gender filter if not 'both'
-      if (filters.gender !== 'both') {
-        q = query(
-          collection(db, 'users'),
-          where('gender', '==', filters.gender),
-          where('id', '!=', currentUserId),
-          limit(pageSize)
-        );
-      }
-
-      const snapshot = await getDocs(q);
-      const profiles: User[] = [];
-
-      snapshot.forEach((docSnapshot) => {
-        // Skip current user, interacted, and matched users
-        if (
-          docSnapshot.id === currentUserId ||
-          interactedUserIds.has(docSnapshot.id) ||
-          matchedUserIds.has(docSnapshot.id)
-        ) {
-          return;
-        }
-
-        const data = docSnapshot.data();
-
-        // Validate required fields
-        if (!data || typeof data.age !== 'number') {
-          console.warn(
-            `Skipping profile ${docSnapshot.id}: missing required fields`
-          );
-          return;
-        }
-
-        // BIDIRECTIONAL gender matching (no "both" option)
-        // 1. Current user must be interested in profile's gender
-        const currentUserInterestedInProfile = data.gender === filters.gender;
-
-        // 2. Profile must be interested in current user's gender
-        const profileInterestedIn = data.preferences?.interestedIn;
-        const profileInterestedInCurrentUser =
-          profileInterestedIn === currentUserGender;
-
-        const matchesGender =
-          currentUserInterestedInProfile && profileInterestedInCurrentUser;
-
-        if (!matchesGender) {
-          console.log(
-            `⚠️ BASIC: Gender mismatch - ${data.name} (${data.gender}, looking for: ${profileInterestedIn}) ` +
-              `filtered out. Current user: (${currentUserGender}, looking for: ${filters.gender})`
-          );
-          return;
-        }
-
-        // Check age filter
-        const matchesAge =
-          data.age >= filters.ageRange[0] && data.age <= filters.ageRange[1];
-        if (!matchesAge) return;
-
-        profiles.push({
-          id: docSnapshot.id,
-          ...data,
-          distance: null, // No distance available without location
-          lastSeen: convertTimestamp(data.lastSeen),
-        } as User);
-      });
-
-      return {
-        data: profiles,
-        success: true,
-        message: 'Profiles retrieved successfully (basic mode)',
-        pagination: {
-          page,
-          limit: pageSize,
-          total: profiles.length,
-          hasMore: snapshot.size === pageSize,
-        },
-      };
-    } catch (error) {
-      console.error('Error in basic profile discovery:', error);
-      return {
-        data: [],
-        success: false,
-        message:
-          error instanceof Error ? error.message : 'Failed to get profiles',
-      };
-    }
+  private validateUserData(data: any): boolean {
+    return !!(
+      data &&
+      typeof data.age === 'number' &&
+      data.gender &&
+      data.coordinates?.latitude &&
+      data.coordinates?.longitude
+    );
   }
 
-  /**
-   * Like a profile and check for mutual match
-   */
+  private matchesGenderFilter(
+    currentUser: any,
+    targetUser: any,
+    filters: SearchFilters
+  ): boolean {
+    const currentUserGender = currentUser?.gender || 'other';
+    const targetUserGender = targetUser.gender;
+    const targetInterestedIn = targetUser.preferences?.interestedIn;
+
+    const userInterestedInTarget = targetUserGender === filters.gender;
+    const targetInterestedInUser = targetInterestedIn === currentUserGender;
+
+    return userInterestedInTarget && targetInterestedInUser;
+  }
+
+  private matchesAgeFilter(targetUser: any, filters: SearchFilters): boolean {
+    return (
+      targetUser.age >= filters.ageRange[0] &&
+      targetUser.age <= filters.ageRange[1]
+    );
+  }
+
+  private async getInteractedUserIds(userId: string): Promise<Set<string>> {
+    const interactionsQuery = query(
+      collection(db, 'interactions'),
+      where('userId', '==', userId)
+    );
+    const snapshot = await getDocs(interactionsQuery);
+
+    const now = new Date();
+    const interactedIds = new Set<string>();
+
+    snapshot.docs.forEach((doc) => {
+      const data = doc.data();
+      const targetUserId = data.targetUserId;
+
+      if (data.type === 'dislike' && data.expiresAt) {
+        const expiresAt = data.expiresAt.toDate
+          ? data.expiresAt.toDate()
+          : new Date(data.expiresAt);
+
+        if (expiresAt <= now) return;
+      }
+
+      interactedIds.add(targetUserId);
+    });
+
+    return interactedIds;
+  }
+
+  private async getMatchedUserIds(userId: string): Promise<Set<string>> {
+    const [matches1, matches2] = await Promise.all([
+      getDocs(
+        query(
+          collection(db, 'matches'),
+          where('user1', '==', userId),
+          where('unmatched', '==', false)
+        )
+      ),
+      getDocs(
+        query(
+          collection(db, 'matches'),
+          where('user2', '==', userId),
+          where('unmatched', '==', false)
+        )
+      ),
+    ]);
+
+    const matchedIds = new Set<string>();
+    matches1.docs.forEach((doc) => matchedIds.add(doc.data().user2));
+    matches2.docs.forEach((doc) => matchedIds.add(doc.data().user1));
+
+    return matchedIds;
+  }
+
   async likeProfile(
     userId: string,
     targetUserId: string
   ): Promise<
-    ApiResponse<{ isMatch: boolean; matchId?: string; matchedUser?: User }>
+    ApiResponse<{
+      isMatch: boolean;
+      matchId?: string;
+      conversationId?: string;
+      matchedUser?: User;
+    }>
   > {
     try {
-      console.log(`❤️ LIKE: User ${userId} is liking ${targetUserId}`);
+      console.log(`❤️ LIKE: ${userId} → ${targetUserId}`);
 
-      // Remove from discovery queue first
-      await this.removeFromQueue(userId, targetUserId);
-
-      // Check if user already interacted with this profile
-      const existingInteractionQuery = query(
-        collection(db, 'interactions'),
-        where('userId', '==', userId),
-        where('targetUserId', '==', targetUserId)
-      );
-      const existingInteractionSnapshot = await getDocs(
-        existingInteractionQuery
+      const existingInteraction = await this.getInteraction(
+        userId,
+        targetUserId
       );
 
-      console.log(
-        `📋 Existing interaction found: ${!existingInteractionSnapshot.empty}`
-      );
-
-      if (!existingInteractionSnapshot.empty) {
-        const existingType = existingInteractionSnapshot.docs[0].data().type;
-
-        if (existingType === 'like') {
+      if (existingInteraction) {
+        if (existingInteraction.type === 'like') {
           return {
             data: { isMatch: false },
             success: true,
             message: 'Profile already liked',
           };
-        } else {
-          // User previously disliked, update to like
-          await updateDoc(existingInteractionSnapshot.docs[0].ref, {
-            type: 'like',
-            createdAt: serverTimestamp(),
-          });
         }
+        await this.updateInteraction(existingInteraction.id, 'like');
       } else {
-        // Add new like interaction
-        await addDoc(collection(db, 'interactions'), {
-          userId,
-          targetUserId,
-          type: 'like',
-          createdAt: serverTimestamp(),
-        });
-        console.log(
-          `✅ Created new like interaction: ${userId} → ${targetUserId}`
-        );
+        await this.createInteraction(userId, targetUserId, 'like');
       }
 
-      // Check for mutual like (match)
-      const mutualLikeQuery = query(
-        collection(db, 'interactions'),
-        where('userId', '==', targetUserId),
-        where('targetUserId', '==', userId),
-        where('type', '==', 'like')
-      );
+      const mutualLike = await this.checkMutualLike(userId, targetUserId);
 
-      const mutualLikeSnapshot = await getDocs(mutualLikeQuery);
+      if (mutualLike) {
+        const matchResult = await this.createMatch(userId, targetUserId);
 
-      console.log(`🔍 Checking mutual like: ${userId} liked ${targetUserId}`);
-      console.log(`🔍 Looking for: ${targetUserId} liked ${userId}`);
-      console.log(`🔍 Mutual like found: ${!mutualLikeSnapshot.empty}`);
-      console.log(`🔍 Mutual docs count: ${mutualLikeSnapshot.size}`);
-
-      if (!mutualLikeSnapshot.empty) {
-        // Check if match already exists (not unmatched)
-        const [user1, user2] = [userId, targetUserId].sort();
-
-        const existingMatchQuery = query(
-          collection(db, 'matches'),
-          where('user1', '==', user1),
-          where('user2', '==', user2)
-        );
-        const existingMatchSnapshot = await getDocs(existingMatchQuery);
-
-        let matchDoc = existingMatchSnapshot.docs[0];
-
-        if (matchDoc && !matchDoc.data().unmatched) {
-          // Match already exists and is active - get matched user data
+        if (matchResult.success) {
           const matchedUserDoc = await getDoc(doc(db, 'users', targetUserId));
           const matchedUserData = matchedUserDoc.exists()
             ? matchedUserDoc.data()
@@ -1779,8 +506,8 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
           return {
             data: {
               isMatch: true,
-              matchId: matchDoc.id,
-              conversationId: matchDoc.data().conversationId,
+              matchId: matchResult.matchId,
+              conversationId: matchResult.conversationId,
               matchedUser: matchedUserData
                 ? ({
                     id: matchedUserDoc.id,
@@ -1790,116 +517,10 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
                 : undefined,
             },
             success: true,
-            message: 'Match already exists',
+            message: 'Match created successfully',
           };
         }
-
-        // Create new match or reactivate unmatched
-        const batch = writeBatch(db);
-
-        // Create conversation first
-        const conversationRef = doc(collection(db, 'conversations'));
-        const conversationId = conversationRef.id;
-
-        batch.set(conversationRef, {
-          participants: [userId, targetUserId],
-          matchId: '',
-          unreadCount: {
-            [userId]: 0,
-            [targetUserId]: 0,
-          },
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-
-        let matchRef;
-        // Create or update match
-        if (matchDoc && matchDoc.data().unmatched) {
-          // Reactivate unmatched
-          matchRef = matchDoc.ref;
-
-          // Set new expiration to 30 days from now
-          const expiresAt = new Date();
-          expiresAt.setDate(expiresAt.getDate() + 30);
-
-          batch.update(matchRef, {
-            unmatched: false,
-            unmatchedAt: null,
-            unmatchedBy: null,
-            conversationId,
-            createdAt: serverTimestamp(),
-            expiresAt, // Reset expiration for reactivated match
-          });
-
-          // Update conversation with matchId
-          batch.update(conversationRef, {
-            matchId: matchRef.id,
-          });
-        } else {
-          // Create new match
-          matchRef = doc(collection(db, 'matches'));
-
-          // Set expiration to 30 days from now
-          const expiresAt = new Date();
-          expiresAt.setDate(expiresAt.getDate() + 30);
-
-          batch.set(matchRef, {
-            users: [userId, targetUserId],
-            user1,
-            user2,
-            conversationId,
-            unmatched: false,
-            animationPlayed: false, // Animation not yet shown
-            createdAt: serverTimestamp(),
-            expiresAt, // Match expires in 30 days
-          });
-
-          // Update conversation with matchId
-          batch.update(conversationRef, {
-            matchId: matchRef.id,
-          });
-        }
-
-        await batch.commit();
-
-        console.log(`🎉 MATCH CREATED! ${userId} ❤️ ${targetUserId}`);
-        console.log(`💬 Conversation created with ID: ${conversationId}`);
-        console.log(`🔗 Match ID: ${matchRef.id}`);
-
-        // Remove both users from each other's discovery queue
-        await Promise.all([
-          this.removeFromQueue(userId, targetUserId),
-          this.removeFromQueue(targetUserId, userId),
-        ]);
-
-        // Get matched user data
-        const matchedUserDoc = await getDoc(doc(db, 'users', targetUserId));
-        const matchedUserData = matchedUserDoc.exists()
-          ? matchedUserDoc.data()
-          : null;
-
-        console.log(`✅ Match data prepared, returning isMatch: true`);
-        console.log(`💬 Conversation ID: ${conversationId}`);
-
-        return {
-          data: {
-            isMatch: true,
-            matchId: matchRef.id,
-            conversationId: conversationId,
-            matchedUser: matchedUserData
-              ? ({
-                  id: matchedUserDoc.id,
-                  ...matchedUserData,
-                  lastSeen: convertTimestamp(matchedUserData.lastSeen),
-                } as User)
-              : undefined,
-          },
-          success: true,
-          message: 'Match created successfully',
-        };
       }
-
-      console.log(`👍 Like successful, but NO MATCH (no mutual like)`);
 
       return {
         data: { isMatch: false },
@@ -1909,7 +530,7 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
     } catch (error) {
       console.error('Error liking profile:', error);
       return {
-        data: false,
+        data: { isMatch: false },
         success: false,
         message:
           error instanceof Error ? error.message : 'Failed to like profile',
@@ -1917,47 +538,31 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
     }
   }
 
-  /**
-   * Dislike a profile
-   */
   async dislikeProfile(
     userId: string,
     targetUserId: string
   ): Promise<ApiResponse<boolean>> {
     try {
-      // Remove from discovery queue first
-      await this.removeFromQueue(userId, targetUserId);
-
-      // Check if interaction already exists
-      const existingInteractionQuery = query(
-        collection(db, 'interactions'),
-        where('userId', '==', userId),
-        where('targetUserId', '==', targetUserId)
+      const existingInteraction = await this.getInteraction(
+        userId,
+        targetUserId
       );
-      const existingInteractionSnapshot = await getDocs(
-        existingInteractionQuery
-      );
-
-      // Calculate expiration time: 24 hours from now
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 24);
 
-      if (!existingInteractionSnapshot.empty) {
-        // Update existing interaction to dislike with 24-hour expiration
-        await updateDoc(existingInteractionSnapshot.docs[0].ref, {
-          type: 'dislike',
-          createdAt: serverTimestamp(),
-          expiresAt: expiresAt, // Block for 24 hours
-        });
+      if (existingInteraction) {
+        await this.updateInteraction(
+          existingInteraction.id,
+          'dislike',
+          expiresAt
+        );
       } else {
-        // Add new dislike interaction with 24-hour expiration
-        await addDoc(collection(db, 'interactions'), {
+        await this.createInteraction(
           userId,
           targetUserId,
-          type: 'dislike',
-          createdAt: serverTimestamp(),
-          expiresAt: expiresAt, // Block for 24 hours
-        });
+          'dislike',
+          expiresAt
+        );
       }
 
       return {
@@ -1976,9 +581,151 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
     }
   }
 
-  /**
-   * Report a profile
-   */
+  private async getInteraction(
+    userId: string,
+    targetUserId: string
+  ): Promise<{ id: string; type: string } | null> {
+    const q = query(
+      collection(db, 'interactions'),
+      where('userId', '==', userId),
+      where('targetUserId', '==', targetUserId)
+    );
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) return null;
+
+    const docSnap = snapshot.docs[0];
+    return {
+      id: docSnap.id,
+      type: docSnap.data().type,
+    };
+  }
+
+  private async createInteraction(
+    userId: string,
+    targetUserId: string,
+    type: 'like' | 'dislike',
+    expiresAt?: Date
+  ): Promise<void> {
+    const interactionData: any = {
+      userId,
+      targetUserId,
+      type,
+      createdAt: serverTimestamp(),
+    };
+
+    if (expiresAt) {
+      interactionData.expiresAt = expiresAt;
+    }
+
+    await addDoc(collection(db, 'interactions'), interactionData);
+  }
+
+  private async updateInteraction(
+    interactionId: string,
+    type: 'like' | 'dislike',
+    expiresAt?: Date
+  ): Promise<void> {
+    const updateData: any = {
+      type,
+      createdAt: serverTimestamp(),
+    };
+
+    if (expiresAt) {
+      updateData.expiresAt = expiresAt;
+    }
+
+    await updateDoc(doc(db, 'interactions', interactionId), updateData);
+  }
+
+  private async checkMutualLike(
+    userId: string,
+    targetUserId: string
+  ): Promise<boolean> {
+    const q = query(
+      collection(db, 'interactions'),
+      where('userId', '==', targetUserId),
+      where('targetUserId', '==', userId),
+      where('type', '==', 'like')
+    );
+    const snapshot = await getDocs(q);
+
+    return !snapshot.empty;
+  }
+
+  private async createMatch(
+    userId: string,
+    targetUserId: string
+  ): Promise<{ success: boolean; matchId?: string; conversationId?: string }> {
+    try {
+      const [user1, user2] = [userId, targetUserId].sort();
+
+      const existingMatchQuery = query(
+        collection(db, 'matches'),
+        where('user1', '==', user1),
+        where('user2', '==', user2)
+      );
+      const existingMatchSnapshot = await getDocs(existingMatchQuery);
+
+      if (!existingMatchSnapshot.empty) {
+        const matchDoc = existingMatchSnapshot.docs[0];
+        return {
+          success: true,
+          matchId: matchDoc.id,
+          conversationId: matchDoc.data().conversationId,
+        };
+      }
+
+      const batch = writeBatch(db);
+
+      const conversationRef = doc(collection(db, 'conversations'));
+      const conversationId = conversationRef.id;
+
+      batch.set(conversationRef, {
+        participants: [userId, targetUserId],
+        matchId: '',
+        unreadCount: {
+          [userId]: 0,
+          [targetUserId]: 0,
+        },
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      const matchRef = doc(collection(db, 'matches'));
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30);
+
+      batch.set(matchRef, {
+        users: [userId, targetUserId],
+        user1,
+        user2,
+        conversationId,
+        unmatched: false,
+        animationPlayed: false,
+        createdAt: serverTimestamp(),
+        expiresAt,
+      });
+
+      batch.update(conversationRef, {
+        matchId: matchRef.id,
+      });
+
+      await batch.commit();
+
+      console.log('🎉 Match created:', matchRef.id);
+
+      return {
+        success: true,
+        matchId: matchRef.id,
+        conversationId,
+      };
+    } catch (error) {
+      console.error('Error creating match:', error);
+      return { success: false };
+    }
+  }
+
   async reportProfile(
     userId: string,
     targetUserId: string,
@@ -2008,24 +755,27 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
       };
     }
   }
+
+  // REMOVED: subscribeToDiscoveryQueueUpdates (not needed in simplified version)
+  // REMOVED: markProfileAsShown (not needed without queue)
+  // REMOVED: removeFromQueue (not needed without queue)
+  // REMOVED: clearDiscoveryQueue (not needed without queue)
+  // REMOVED: cleanDuplicatesInQueue (not needed without queue)
+  // REMOVED: syncDiscoveryQueue (not needed without queue)
+  // REMOVED: populateDiscoveryQueue (not needed without queue)
 }
 
 // ============================================
 // Firebase Matching Service
 // ============================================
 export class FirebaseMatchingService implements IMatchingService {
-  /**
-   * Get all matches for a user (active matches only)
-   */
   async getMatches(
     userId: string,
     page: number = 1
   ): Promise<ApiResponse<User[]>> {
     try {
       const pageSize = 20;
-      const now = new Date();
 
-      // Query matches where user is user1
       const matchesQuery1 = query(
         collection(db, 'matches'),
         where('user1', '==', userId),
@@ -2034,7 +784,6 @@ export class FirebaseMatchingService implements IMatchingService {
         limit(pageSize)
       );
 
-      // Query matches where user is user2
       const matchesQuery2 = query(
         collection(db, 'matches'),
         where('user2', '==', userId),
@@ -2050,28 +799,11 @@ export class FirebaseMatchingService implements IMatchingService {
 
       const matchedUsers: User[] = [];
       const seenUserIds = new Set<string>();
-      const expiredMatchIds: string[] = [];
 
-      // Process matches from both queries
       const allMatches = [...matchesSnapshot1.docs, ...matchesSnapshot2.docs];
 
       for (const matchDoc of allMatches) {
         const matchData = matchDoc.data();
-
-        // Check if match has expired
-        if (matchData.expiresAt) {
-          const expiresAt = matchData.expiresAt.toDate
-            ? matchData.expiresAt.toDate()
-            : new Date(matchData.expiresAt);
-
-          // If expired, mark for deletion and skip
-          if (expiresAt <= now) {
-            console.log(`⏰ Match ${matchDoc.id} has expired, will be deleted`);
-            expiredMatchIds.push(matchDoc.id);
-            continue; // Skip this match
-          }
-        }
-
         const otherUserId =
           matchData.user1 === userId ? matchData.user2 : matchData.user1;
 
@@ -2090,45 +822,10 @@ export class FirebaseMatchingService implements IMatchingService {
         }
       }
 
-      // Delete expired matches in the background
-      if (expiredMatchIds.length > 0) {
-        console.log(`🗑️ Deleting ${expiredMatchIds.length} expired matches`);
-        const deletePromises = expiredMatchIds.map((docId) =>
-          deleteDoc(doc(db, 'matches', docId))
-        );
-        Promise.all(deletePromises).catch((error) =>
-          console.error('Error deleting expired matches:', error)
-        );
-      }
-
-      // Sort by match creation date
-      matchedUsers.sort((a, b) => {
-        const matchA = allMatches.find((m) => {
-          const data = m.data();
-          return data.user1 === a.id || data.user2 === a.id;
-        });
-        const matchB = allMatches.find((m) => {
-          const data = m.data();
-          return data.user1 === b.id || data.user2 === b.id;
-        });
-
-        if (!matchA || !matchB) return 0;
-
-        const timeA = matchA.data().createdAt?.toMillis() || 0;
-        const timeB = matchB.data().createdAt?.toMillis() || 0;
-        return timeB - timeA;
-      });
-
       return {
-        data: matchedUsers.slice(0, pageSize),
+        data: matchedUsers,
         success: true,
         message: 'Matches retrieved successfully',
-        pagination: {
-          page,
-          limit: pageSize,
-          total: matchedUsers.length,
-          hasMore: matchedUsers.length > pageSize,
-        },
       };
     } catch (error) {
       console.error('Error getting matches:', error);
@@ -2141,16 +838,12 @@ export class FirebaseMatchingService implements IMatchingService {
     }
   }
 
-  /**
-   * Get all liked profiles for a user (that haven't matched yet)
-   */
   async getLikedProfiles(
     userId: string,
     page: number = 1
   ): Promise<ApiResponse<User[]>> {
     try {
       const pageSize = 20;
-      const now = new Date();
 
       const interactionsQuery = query(
         collection(db, 'interactions'),
@@ -2162,86 +855,13 @@ export class FirebaseMatchingService implements IMatchingService {
 
       const interactionsSnapshot = await getDocs(interactionsQuery);
       const likedUsers: User[] = [];
-      const expiredInteractionIds: string[] = [];
 
-      // Get user's matches to filter them out
-      const [user1, user2] = [userId, userId];
-      const matchesQuery1 = query(
-        collection(db, 'matches'),
-        where('user1', '==', userId),
-        where('unmatched', '==', false)
-      );
-      const matchesQuery2 = query(
-        collection(db, 'matches'),
-        where('user2', '==', userId),
-        where('unmatched', '==', false)
-      );
+      const matchedUserIds = await this.getMatchedUserIds(userId);
 
-      const [matchesSnapshot1, matchesSnapshot2] = await Promise.all([
-        getDocs(matchesQuery1),
-        getDocs(matchesQuery2),
-      ]);
-
-      const matchedUserIds = new Set<string>();
-      const expiredMatchIds: string[] = [];
-
-      [...matchesSnapshot1.docs, ...matchesSnapshot2.docs].forEach(
-        (matchDoc) => {
-          const matchData = matchDoc.data();
-
-          // Check if match has expired
-          if (matchData.expiresAt) {
-            const expiresAt = matchData.expiresAt.toDate
-              ? matchData.expiresAt.toDate()
-              : new Date(matchData.expiresAt);
-
-            if (expiresAt <= now) {
-              console.log(
-                `⏰ Match ${matchDoc.id} has expired, will be deleted`
-              );
-              expiredMatchIds.push(matchDoc.id);
-              return; // Skip adding to matchedUserIds
-            }
-          }
-
-          const otherId =
-            matchData.user1 === userId ? matchData.user2 : matchData.user1;
-          matchedUserIds.add(otherId);
-        }
-      );
-
-      // Delete expired matches in the background
-      if (expiredMatchIds.length > 0) {
-        console.log(`🗑️ Deleting ${expiredMatchIds.length} expired matches`);
-        const deletePromises = expiredMatchIds.map((docId) =>
-          deleteDoc(doc(db, 'matches', docId))
-        );
-        Promise.all(deletePromises).catch((error) =>
-          console.error('Error deleting expired matches:', error)
-        );
-      }
-
-      // Fetch liked user profiles (excluding matched ones)
       for (const interactionDoc of interactionsSnapshot.docs) {
         const interactionData = interactionDoc.data();
         const targetUserId = interactionData.targetUserId;
 
-        // Check if interaction has expired
-        if (interactionData.expiresAt) {
-          const expiresAt = interactionData.expiresAt.toDate
-            ? interactionData.expiresAt.toDate()
-            : new Date(interactionData.expiresAt);
-
-          if (expiresAt <= now) {
-            console.log(
-              `⏰ Interaction ${interactionDoc.id} has expired, will be deleted`
-            );
-            expiredInteractionIds.push(interactionDoc.id);
-            continue; // Skip this interaction
-          }
-        }
-
-        // Skip if already matched
         if (matchedUserIds.has(targetUserId)) continue;
 
         const userDoc = await getDoc(doc(db, 'users', targetUserId));
@@ -2256,29 +876,10 @@ export class FirebaseMatchingService implements IMatchingService {
         }
       }
 
-      // Delete expired interactions in the background
-      if (expiredInteractionIds.length > 0) {
-        console.log(
-          `🗑️ Deleting ${expiredInteractionIds.length} expired interactions`
-        );
-        const deletePromises = expiredInteractionIds.map((docId) =>
-          deleteDoc(doc(db, 'interactions', docId))
-        );
-        Promise.all(deletePromises).catch((error) =>
-          console.error('Error deleting expired interactions:', error)
-        );
-      }
-
       return {
         data: likedUsers,
         success: true,
         message: 'Liked profiles retrieved successfully',
-        pagination: {
-          page,
-          limit: pageSize,
-          total: likedUsers.length,
-          hasMore: interactionsSnapshot.size === pageSize,
-        },
       };
     } catch (error) {
       console.error('Error getting liked profiles:', error);
@@ -2293,15 +894,36 @@ export class FirebaseMatchingService implements IMatchingService {
     }
   }
 
-  /**
-   * Unmatch a profile (soft delete - marks as unmatched)
-   */
+  private async getMatchedUserIds(userId: string): Promise<Set<string>> {
+    const [matches1, matches2] = await Promise.all([
+      getDocs(
+        query(
+          collection(db, 'matches'),
+          where('user1', '==', userId),
+          where('unmatched', '==', false)
+        )
+      ),
+      getDocs(
+        query(
+          collection(db, 'matches'),
+          where('user2', '==', userId),
+          where('unmatched', '==', false)
+        )
+      ),
+    ]);
+
+    const matchedIds = new Set<string>();
+    matches1.docs.forEach((doc) => matchedIds.add(doc.data().user2));
+    matches2.docs.forEach((doc) => matchedIds.add(doc.data().user1));
+
+    return matchedIds;
+  }
+
   async unmatchProfile(
     userId: string,
     targetUserId: string
   ): Promise<ApiResponse<boolean>> {
     try {
-      // Find the match document
       const [user1, user2] = [userId, targetUserId].sort();
 
       const matchQuery = query(
@@ -2323,132 +945,48 @@ export class FirebaseMatchingService implements IMatchingService {
       const matchData = matchDoc.data();
       const conversationId = matchData.conversationId;
 
-      console.log(
-        `🗑️ Starting unmatch cleanup for ${userId} ⟷ ${targetUserId}`
-      );
-      console.log(`🗑️ Match ID: ${matchDoc.id}`);
-      console.log(`🗑️ Conversation ID: ${conversationId}`);
-
-      // Use batch for atomic operations
       const batch = writeBatch(db);
 
-      // 1. Delete the match document
       batch.delete(matchDoc.ref);
 
-      // 2. Delete all messages in the conversation subcollection
       if (conversationId) {
-        try {
-          const messagesQuery = query(
-            collection(db, 'conversations', conversationId, 'messages')
-          );
-          const messagesSnapshot = await getDocs(messagesQuery);
+        const messagesQuery = query(
+          collection(db, 'conversations', conversationId, 'messages')
+        );
+        const messagesSnapshot = await getDocs(messagesQuery);
 
-          console.log(
-            `🗑️ Deleting ${messagesSnapshot.size} messages from conversation`
-          );
+        messagesSnapshot.docs.forEach((messageDoc) => {
+          batch.delete(messageDoc.ref);
+        });
 
-          messagesSnapshot.docs.forEach((messageDoc) => {
-            batch.delete(messageDoc.ref);
-          });
-        } catch (error) {
-          console.error('Error deleting messages:', error);
-        }
-
-        // 3. Delete the conversation document
         batch.delete(doc(db, 'conversations', conversationId));
       }
 
-      // 4. Replace interaction with 24-hour dislike ban: userId → targetUserId
-      try {
-        const interaction1Query = query(
-          collection(db, 'interactions'),
-          where('userId', '==', userId),
-          where('targetUserId', '==', targetUserId)
-        );
-        const interaction1Snapshot = await getDocs(interaction1Query);
+      // Create 24h dislike blocks
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 24);
 
-        const expiresAt = new Date();
-        expiresAt.setHours(expiresAt.getHours() + 24); // 24-hour ban
+      const interaction1Ref = doc(collection(db, 'interactions'));
+      batch.set(interaction1Ref, {
+        userId,
+        targetUserId,
+        type: 'dislike',
+        createdAt: serverTimestamp(),
+        expiresAt,
+      });
 
-        if (!interaction1Snapshot.empty) {
-          // Update existing interaction to dislike with expiration
-          interaction1Snapshot.docs.forEach((interactionDoc) => {
-            batch.update(interactionDoc.ref, {
-              type: 'dislike',
-              createdAt: serverTimestamp(),
-              expiresAt: expiresAt,
-            });
-          });
-          console.log(
-            `🚫 Updated interaction to 24h dislike: ${userId} → ${targetUserId}`
-          );
-        } else {
-          // Create new dislike interaction
-          const interactionRef = doc(collection(db, 'interactions'));
-          batch.set(interactionRef, {
-            userId,
-            targetUserId,
-            type: 'dislike',
-            createdAt: serverTimestamp(),
-            expiresAt: expiresAt,
-          });
-          console.log(
-            `🚫 Created 24h dislike interaction: ${userId} → ${targetUserId}`
-          );
-        }
-      } catch (error) {
-        console.error('Error creating unmatch dislike 1:', error);
-      }
+      const interaction2Ref = doc(collection(db, 'interactions'));
+      batch.set(interaction2Ref, {
+        userId: targetUserId,
+        targetUserId: userId,
+        type: 'dislike',
+        createdAt: serverTimestamp(),
+        expiresAt,
+      });
 
-      // 5. Replace interaction with 24-hour dislike ban: targetUserId → userId
-      try {
-        const interaction2Query = query(
-          collection(db, 'interactions'),
-          where('userId', '==', targetUserId),
-          where('targetUserId', '==', userId)
-        );
-        const interaction2Snapshot = await getDocs(interaction2Query);
-
-        const expiresAt = new Date();
-        expiresAt.setHours(expiresAt.getHours() + 24); // 24-hour ban
-
-        if (!interaction2Snapshot.empty) {
-          // Update existing interaction to dislike with expiration
-          interaction2Snapshot.docs.forEach((interactionDoc) => {
-            batch.update(interactionDoc.ref, {
-              type: 'dislike',
-              createdAt: serverTimestamp(),
-              expiresAt: expiresAt,
-            });
-          });
-          console.log(
-            `🚫 Updated interaction to 24h dislike: ${targetUserId} → ${userId}`
-          );
-        } else {
-          // Create new dislike interaction
-          const interactionRef = doc(collection(db, 'interactions'));
-          batch.set(interactionRef, {
-            userId: targetUserId,
-            targetUserId: userId,
-            type: 'dislike',
-            createdAt: serverTimestamp(),
-            expiresAt: expiresAt,
-          });
-          console.log(
-            `🚫 Created 24h dislike interaction: ${targetUserId} → ${userId}`
-          );
-        }
-      } catch (error) {
-        console.error('Error creating unmatch dislike 2:', error);
-      }
-
-      // Commit all operations atomically
       await batch.commit();
 
-      console.log(`✅ UNMATCH COMPLETE! Actions taken:`);
-      console.log(`   ✓ Match document deleted`);
-      console.log(`   ✓ Conversation + all messages deleted`);
-      console.log(`   ✓ 24-hour dislike ban applied (both directions)`);
+      console.log('✅ Unmatch complete');
 
       return {
         data: true,
@@ -2466,9 +1004,6 @@ export class FirebaseMatchingService implements IMatchingService {
     }
   }
 
-  /**
-   * Mark match animation as played to prevent showing it again
-   */
   async markMatchAnimationPlayed(
     matchId: string
   ): Promise<ApiResponse<boolean>> {
@@ -2477,8 +1012,6 @@ export class FirebaseMatchingService implements IMatchingService {
       await updateDoc(matchRef, {
         animationPlayed: true,
       });
-
-      console.log(`✅ Match animation marked as played for match: ${matchId}`);
 
       return {
         data: true,
@@ -2496,9 +1029,6 @@ export class FirebaseMatchingService implements IMatchingService {
     }
   }
 
-  /**
-   * Get detailed information about a match
-   */
   async getMatchDetails(
     userId: string,
     matchId: string
@@ -2534,10 +1064,6 @@ export class FirebaseMatchingService implements IMatchingService {
     }
   }
 
-  /**
-   * Subscribe to new matches for real-time updates
-   * This allows both users to see the match animation when it happens
-   */
   subscribeToMatches(
     userId: string,
     onMatchCreated: (match: {
@@ -2549,7 +1075,6 @@ export class FirebaseMatchingService implements IMatchingService {
   ): Unsubscribe {
     console.log(`🔔 Setting up match listener for user: ${userId}`);
 
-    // Listen for matches where current user is user1
     const matchesQuery1 = query(
       collection(db, 'matches'),
       where('user1', '==', userId),
@@ -2558,7 +1083,6 @@ export class FirebaseMatchingService implements IMatchingService {
       limit(1)
     );
 
-    // Listen for matches where current user is user2
     const matchesQuery2 = query(
       collection(db, 'matches'),
       where('user2', '==', userId),
@@ -2578,7 +1102,6 @@ export class FirebaseMatchingService implements IMatchingService {
           console.log(`🎉 New match detected (as user1): ${matchedUserId}`);
           lastMatchId = change.doc.id;
 
-          // Fetch matched user data
           const userDoc = await getDoc(doc(db, 'users', matchedUserId));
           if (userDoc.exists()) {
             const userData = userDoc.data();
@@ -2606,7 +1129,6 @@ export class FirebaseMatchingService implements IMatchingService {
           console.log(`🎉 New match detected (as user2): ${matchedUserId}`);
           lastMatchId = change.doc.id;
 
-          // Fetch matched user data
           const userDoc = await getDoc(doc(db, 'users', matchedUserId));
           if (userDoc.exists()) {
             const userData = userDoc.data();
@@ -2625,7 +1147,6 @@ export class FirebaseMatchingService implements IMatchingService {
       });
     });
 
-    // Return combined unsubscribe function
     return () => {
       console.log(`🔕 Unsubscribing from match listener for user: ${userId}`);
       unsubscribe1();
@@ -2638,9 +1159,6 @@ export class FirebaseMatchingService implements IMatchingService {
 // Firebase Chat Service
 // ============================================
 export class FirebaseChatService implements IChatService {
-  /**
-   * Get all conversations for a user
-   */
   async getConversations(
     userId: string,
     page: number = 1
@@ -2659,7 +1177,6 @@ export class FirebaseChatService implements IChatService {
       for (const convDoc of conversationsSnapshot.docs) {
         const convData = convDoc.data();
 
-        // Use lastMessage from conversation document (more efficient)
         const lastMessage = convData.lastMessage
           ? {
               id: 'last',
@@ -2681,7 +1198,6 @@ export class FirebaseChatService implements IChatService {
         });
       }
 
-      // Sort by updatedAt (client-side sorting)
       conversations.sort((a, b) => {
         const aTime = a.updatedAt instanceof Date ? a.updatedAt.getTime() : 0;
         const bTime = b.updatedAt instanceof Date ? b.updatedAt.getTime() : 0;
@@ -2712,9 +1228,6 @@ export class FirebaseChatService implements IChatService {
     }
   }
 
-  /**
-   * Get a specific conversation with messages
-   */
   async getConversation(
     conversationId: string,
     page: number = 1
@@ -2750,7 +1263,7 @@ export class FirebaseChatService implements IChatService {
       const conversation: Conversation = {
         id: convDoc.id,
         participants: convData.participants,
-        messages: messages.reverse(), // Reverse to show oldest first
+        messages: messages.reverse(),
         lastMessage: messages[messages.length - 1],
         createdAt: convertTimestamp(convData.createdAt),
         updatedAt: convertTimestamp(convData.updatedAt),
@@ -2779,9 +1292,6 @@ export class FirebaseChatService implements IChatService {
     }
   }
 
-  /**
-   * Send a message in a conversation
-   */
   async sendMessage(
     conversationId: string,
     message: Omit<ChatMessage, 'id' | 'timestamp'>
@@ -2799,7 +1309,6 @@ export class FirebaseChatService implements IChatService {
         messageData
       );
 
-      // Get conversation to determine recipient
       const convDoc = await getDoc(doc(db, 'conversations', conversationId));
       if (!convDoc.exists()) {
         throw new Error('Conversation not found');
@@ -2810,7 +1319,6 @@ export class FirebaseChatService implements IChatService {
         (id: string) => id !== message.senderId
       );
 
-      // Update conversation with last message and increment unread count
       const updates: any = {
         updatedAt: serverTimestamp(),
         lastMessage: {
@@ -2820,7 +1328,6 @@ export class FirebaseChatService implements IChatService {
         },
       };
 
-      // Increment unread count for recipient
       if (recipientId) {
         updates[`unreadCount.${recipientId}`] =
           (convData.unreadCount?.[recipientId] || 0) + 1;
@@ -2828,24 +1335,13 @@ export class FirebaseChatService implements IChatService {
 
       await updateDoc(doc(db, 'conversations', conversationId), updates);
 
-      // Send push notification to recipient
       if (recipientId) {
         try {
-          console.log(
-            `🔔 Attempting to send notification to recipient: ${recipientId}`
-          );
-
-          // Get sender's name
           const senderDoc = await getDoc(doc(db, 'users', message.senderId));
           const senderName = senderDoc.exists()
             ? senderDoc.data().name
             : 'Someone';
 
-          console.log(
-            `📤 Sending notification from ${senderName} to recipient ${recipientId}`
-          );
-
-          // Send notification asynchronously (don't wait for it)
           notificationService
             .broadcastMessageNotification(
               recipientId,
@@ -2853,20 +1349,12 @@ export class FirebaseChatService implements IChatService {
               message.text,
               conversationId
             )
-            .then(() => {
-              console.log(
-                `✅ Notification request completed for ${senderName}`
-              );
-            })
             .catch((err) => {
-              console.error('❌ Failed to send message notification:', err);
+              console.error('Failed to send message notification:', err);
             });
         } catch (notifError) {
-          // Don't fail the message send if notification fails
-          console.error('❌ Error preparing notification:', notifError);
+          console.error('Error preparing notification:', notifError);
         }
-      } else {
-        console.warn('⚠️ No recipientId found, skipping notification');
       }
 
       const newMessage: ChatMessage = {
@@ -2891,9 +1379,6 @@ export class FirebaseChatService implements IChatService {
     }
   }
 
-  /**
-   * Mark messages as read and reset unread count for user
-   */
   async markMessagesAsRead(
     conversationId: string,
     messageIds: string[],
@@ -2902,7 +1387,6 @@ export class FirebaseChatService implements IChatService {
     try {
       const batch = writeBatch(db);
 
-      // Mark individual messages as read
       for (const messageId of messageIds) {
         const messageRef = doc(
           db,
@@ -2917,7 +1401,6 @@ export class FirebaseChatService implements IChatService {
         });
       }
 
-      // Reset unread count for this user in conversation
       const convRef = doc(db, 'conversations', conversationId);
       batch.update(convRef, {
         [`unreadCount.${userId}`]: 0,
@@ -2943,9 +1426,6 @@ export class FirebaseChatService implements IChatService {
     }
   }
 
-  /**
-   * Delete a conversation and all its messages
-   */
   async deleteConversation(
     conversationId: string
   ): Promise<ApiResponse<boolean>> {
@@ -2984,9 +1464,6 @@ export class FirebaseChatService implements IChatService {
 // Firebase Auth Service
 // ============================================
 export class FirebaseAuthService implements IAuthService {
-  /**
-   * Login with email and password
-   */
   async login(
     email: string,
     password: string
@@ -3015,15 +1492,11 @@ export class FirebaseAuthService implements IAuthService {
           isOnline: true,
         });
       } else {
-        // User exists in Auth but not in Firestore - this should not happen normally
-        // Throw error instead of creating defaults to prevent data loss
         console.error(
-          '❌ CRITICAL: User exists in Auth but not in Firestore:',
+          'User exists in Auth but not in Firestore:',
           firebaseUser.uid
         );
-        throw new Error(
-          'User profile not found. Please contact support or try registering again.'
-        );
+        throw new Error('User profile not found. Please contact support.');
       }
 
       const token = await firebaseUser.getIdToken();
@@ -3065,9 +1538,6 @@ export class FirebaseAuthService implements IAuthService {
     }
   }
 
-  /**
-   * Register a new user with email and password
-   */
   async register(
     userData: Partial<User> & { email: string; password: string }
   ): Promise<ApiResponse<{ user: User; token: string }>> {
@@ -3081,7 +1551,6 @@ export class FirebaseAuthService implements IAuthService {
       );
       const firebaseUser = userCredential.user;
 
-      // Calculate age and zodiac from dateOfBirth if provided
       let calculatedAge = profileData.age || 25;
       let zodiacSign = profileData.zodiacSign;
 
@@ -3097,34 +1566,6 @@ export class FirebaseAuthService implements IAuthService {
           age--;
         }
         calculatedAge = age;
-
-        // Calculate zodiac sign
-        const month = birthDate.getMonth() + 1;
-        const day = birthDate.getDate();
-        if ((month === 3 && day >= 21) || (month === 4 && day <= 19))
-          zodiacSign = 'Aries';
-        else if ((month === 4 && day >= 20) || (month === 5 && day <= 20))
-          zodiacSign = 'Taurus';
-        else if ((month === 5 && day >= 21) || (month === 6 && day <= 20))
-          zodiacSign = 'Gemini';
-        else if ((month === 6 && day >= 21) || (month === 7 && day <= 22))
-          zodiacSign = 'Cancer';
-        else if ((month === 7 && day >= 23) || (month === 8 && day <= 22))
-          zodiacSign = 'Leo';
-        else if ((month === 8 && day >= 23) || (month === 9 && day <= 22))
-          zodiacSign = 'Virgo';
-        else if ((month === 9 && day >= 23) || (month === 10 && day <= 22))
-          zodiacSign = 'Libra';
-        else if ((month === 10 && day >= 23) || (month === 11 && day <= 21))
-          zodiacSign = 'Scorpio';
-        else if ((month === 11 && day >= 22) || (month === 12 && day <= 21))
-          zodiacSign = 'Sagittarius';
-        else if ((month === 12 && day >= 22) || (month === 1 && day <= 19))
-          zodiacSign = 'Capricorn';
-        else if ((month === 1 && day >= 20) || (month === 2 && day <= 18))
-          zodiacSign = 'Aquarius';
-        else if ((month === 2 && day >= 19) || (month === 3 && day <= 20))
-          zodiacSign = 'Pisces';
       }
 
       const newUser: User = {
@@ -3135,28 +1576,25 @@ export class FirebaseAuthService implements IAuthService {
         zodiacSign: zodiacSign,
         image: profileData.image || '',
         gender: profileData.gender || 'other',
-        height: profileData.height || 170, // Include height from registration
+        height: profileData.height || 170,
         bio: profileData.bio || '',
         interests: profileData.interests || [],
         location: profileData.location || '',
         preferences: profileData.preferences || {
           ageRange: [18, 99] as [number, number],
-          maxDistance: 500, // meters (500 = 0.5km)
-          interestedIn: 'female' as const, // Removed 'both' option
+          maxDistance: 500,
+          interestedIn: 'female' as const,
         },
       };
 
-      // Generate geohash if coordinates are provided
       let geohash: string | undefined;
       if (profileData.coordinates) {
         geohash = LocationService.generateGeohash(
           profileData.coordinates.latitude,
           profileData.coordinates.longitude
         );
-        console.log('📍 Generated geohash for new user:', geohash);
       }
 
-      // Upload image if provided as local file
       let imageUrl = newUser.image;
       if (
         imageUrl &&
@@ -3165,12 +1603,10 @@ export class FirebaseAuthService implements IAuthService {
           imageUrl.startsWith('data:') ||
           imageUrl.startsWith('/'))
       ) {
-        console.log('📤 Uploading registration image to Cloudinary...');
         const uploadResult = await storageService.uploadImage(imageUrl);
         if (uploadResult.success && uploadResult.secureUrl) {
           imageUrl = uploadResult.secureUrl;
           newUser.image = imageUrl;
-          console.log('✅ Registration image uploaded:', imageUrl);
         }
       }
 
@@ -3231,9 +1667,6 @@ export class FirebaseAuthService implements IAuthService {
     }
   }
 
-  /**
-   * Logout the current user
-   */
   async logout(): Promise<ApiResponse<boolean>> {
     try {
       const user = auth.currentUser;
@@ -3265,9 +1698,6 @@ export class FirebaseAuthService implements IAuthService {
     }
   }
 
-  /**
-   * Refresh authentication token
-   */
   async refreshToken(): Promise<ApiResponse<{ token: string }>> {
     try {
       const user = auth.currentUser;
@@ -3291,9 +1721,6 @@ export class FirebaseAuthService implements IAuthService {
     }
   }
 
-  /**
-   * Send password reset email
-   */
   async forgotPassword(email: string): Promise<ApiResponse<boolean>> {
     try {
       await sendPasswordResetEmail(auth, email);
@@ -3329,9 +1756,6 @@ export class FirebaseAuthService implements IAuthService {
     }
   }
 
-  /**
-   * Reset password for logged-in user
-   */
   async resetPassword(
     token: string,
     newPassword: string
@@ -3374,12 +1798,8 @@ export class FirebaseAuthService implements IAuthService {
     }
   }
 
-  /**
-   * Verify email (placeholder - handled by Firebase auth link)
-   */
   async verifyEmail(token: string): Promise<ApiResponse<boolean>> {
     try {
-      // Firebase handles email verification through links
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       return {
@@ -3398,10 +1818,6 @@ export class FirebaseAuthService implements IAuthService {
     }
   }
 
-  /**
-   * Clean up orphaned authentication records
-   * Useful when a user exists in Firebase Auth but not in Firestore
-   */
   async cleanupOrphanedAuth(
     firebaseUser: FirebaseUser
   ): Promise<ApiResponse<boolean>> {

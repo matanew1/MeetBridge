@@ -52,7 +52,7 @@ const resources = {
       loved: {
         title: 'Matches & Likes',
         matches: 'Matches',
-        liked: 'Liked',
+        liked: 'You Liked',
         noMatches: 'No matches yet',
         noLiked: 'No likes yet',
         startSwiping: 'Start swiping to find matches',

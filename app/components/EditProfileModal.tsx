@@ -98,8 +98,8 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       if (visible) {
         setIsLoading(true);
         try {
-          // Refresh user data from Firebase
-          await refreshUserProfile();
+          // User data should already be fresh from AuthContext
+          // No need to refresh here as it causes infinite loops
         } catch (error) {
           console.error('Error loading user profile:', error);
           Alert.alert(
@@ -113,11 +113,13 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     };
 
     loadUserData();
-  }, [visible, refreshUserProfile]);
+  }, [visible]);
 
-  // Update form data whenever user data changes
+  const [isFormInitialized, setIsFormInitialized] = useState(false);
+
+  // Update form data when modal opens (only once per modal session)
   useEffect(() => {
-    if (user) {
+    if (visible && user && !isFormInitialized) {
       const getInitialDate = () => {
         if (user?.dateOfBirth) {
           const date = new Date(user.dateOfBirth);
@@ -131,7 +133,6 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
         date.setFullYear(date.getFullYear() - 18);
         return date;
       };
-      console.log('USER: ', user);
 
       setFormData({
         name: user?.name || '',
@@ -156,8 +157,16 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
             | 'female', // Removed 'both' option
         },
       });
+      setIsFormInitialized(true);
     }
-  }, [user]);
+  }, [visible, user, isFormInitialized]);
+
+  // Reset form initialization when modal closes
+  useEffect(() => {
+    if (!visible) {
+      setIsFormInitialized(false);
+    }
+  }, [visible]);
 
   const handleSave = async () => {
     if (isSaving) return;

@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useState,
+  useCallback,
   ReactNode,
 } from 'react';
 import { Platform, AppState, AppStateStatus } from 'react-native';
@@ -74,7 +75,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return timestamp;
   };
 
-  const refreshUserProfile = async () => {
+  const refreshUserProfile = useCallback(async () => {
     if (!firebaseUser) return;
 
     try {
@@ -91,7 +92,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (error) {
       console.error('Error refreshing user profile:', error);
     }
-  };
+  }, [firebaseUser]);
 
   // Initialize notifications and start location tracking when user is authenticated
   useEffect(() => {
