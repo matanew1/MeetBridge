@@ -48,6 +48,7 @@ import {
 import storageService from '../storageService';
 import LocationService from '../locationService';
 import notificationService from '../notificationService';
+import { calculateZodiacSign } from '../../utils/dateUtils';
 
 // ============================================
 // Utility Functions
@@ -1566,6 +1567,12 @@ export class FirebaseAuthService implements IAuthService {
           age--;
         }
         calculatedAge = age;
+
+        // Calculate zodiac sign from date of birth if not provided
+        if (!zodiacSign) {
+          zodiacSign =
+            calculateZodiacSign(profileData.dateOfBirth) || undefined;
+        }
       }
 
       const newUser: User = {
@@ -1573,7 +1580,7 @@ export class FirebaseAuthService implements IAuthService {
         name: profileData.name || 'Unknown User',
         age: calculatedAge,
         dateOfBirth: profileData.dateOfBirth || new Date().toISOString(),
-        zodiacSign: zodiacSign,
+        ...(zodiacSign && { zodiacSign }),
         image: profileData.image || '',
         gender: profileData.gender || 'other',
         height: profileData.height || 170,

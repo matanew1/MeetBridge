@@ -71,7 +71,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   };
 
   const [formData, setFormData] = useState({
-    name: user?.name || '',
+    name: user?.name && user.name !== 'Unknown User' ? user.name : '',
     bio: user?.bio || '',
     location: user?.location || '',
     coordinates: user?.coordinates || undefined,
@@ -135,7 +135,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       };
 
       setFormData({
-        name: user?.name || '',
+        name: user?.name && user.name !== 'Unknown User' ? user.name : '',
         bio: user?.bio || '',
         location: user?.location || '',
         coordinates: user?.coordinates || undefined,
