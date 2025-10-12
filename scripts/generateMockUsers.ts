@@ -364,7 +364,7 @@ async function createMockUser(
       },
       geohash,
       preferences: {
-        ageRange: [18, 35],
+        ageRange: [18, 99],
         maxDistance: 500, // 500m in METERS (matches new 5-500m range)
         interestedIn: userData.interestedIn, // Removed duplicate: lookingFor (using preferences.interestedIn)
       },

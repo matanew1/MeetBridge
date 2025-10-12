@@ -336,7 +336,7 @@ export default function SearchScreen() {
   const [matchedUser, setMatchedUser] = useState<any>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [maxDistance, setMaxDistance] = useState(500); // Default to 500m max range (precision 9)
-  const [ageRange, setAgeRange] = useState<[number, number]>([18, 35]); // Default age range 18-35
+  const [ageRange, setAgeRange] = useState<[number, number]>([18, 99]); // Default age range 18-99
   const [showMatchAnimation, setShowMatchAnimation] = useState(false);
   const [matchData, setMatchData] = useState<{
     user: any;
@@ -982,6 +982,9 @@ export default function SearchScreen() {
             // Reload current user to get fresh data
             await loadCurrentUser();
 
+            // Ensure search filters are updated (in case Firebase update failed)
+            updateSearchFilters({ maxDistance: distance });
+
             // Reload profiles with new filter
             loadDiscoverProfiles(true);
           } catch (error) {
@@ -1030,6 +1033,9 @@ export default function SearchScreen() {
 
             // Reload current user to get fresh data
             await loadCurrentUser();
+
+            // Ensure search filters are updated (in case Firebase update failed)
+            updateSearchFilters({ ageRange: newAgeRange });
 
             // Reload profiles with new filter
             loadDiscoverProfiles(true);

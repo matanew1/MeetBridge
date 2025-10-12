@@ -269,7 +269,7 @@ const FilterModal: React.FC<FilterModalProps> = React.memo(
                     <Slider
                       style={styles.slider}
                       minimumValue={18}
-                      maximumValue={35}
+                      maximumValue={99}
                       step={1}
                       value={tempMinAge}
                       onValueChange={handleMinAgeChange}
@@ -292,7 +292,7 @@ const FilterModal: React.FC<FilterModalProps> = React.memo(
                           { color: theme.textSecondary },
                         ]}
                       >
-                        35
+                        99
                       </Text>
                     </View>
                   </View>
@@ -316,7 +316,7 @@ const FilterModal: React.FC<FilterModalProps> = React.memo(
                     <Slider
                       style={styles.slider}
                       minimumValue={18}
-                      maximumValue={35}
+                      maximumValue={99}
                       step={1}
                       value={tempMaxAge}
                       onValueChange={handleMaxAgeChange}
@@ -339,7 +339,7 @@ const FilterModal: React.FC<FilterModalProps> = React.memo(
                           { color: theme.textSecondary },
                         ]}
                       >
-                        35
+                        99
                       </Text>
                     </View>
                   </View>
