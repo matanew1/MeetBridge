@@ -31,6 +31,7 @@ class LocationService {
   private locationWatcher: Location.LocationSubscription | null = null;
   private lastKnownLocation: LocationCoordinates | null = null;
   private readonly CACHE_TTL = 10000; // 10 seconds for high precision
+  private readonly MINIMUM_ACCURACY = 20; // Maximum acceptable accuracy in meters
 
   private constructor() {}
 
@@ -85,16 +86,17 @@ class LocationService {
   }
 
   /**
-   * Get current location with maximum accuracy
+   * Get current location with maximum accuracy, averaging multiple high-precision readings
    */
   async getCurrentLocation(
     forceRefresh: boolean = false
   ): Promise<LocationCoordinates | null> {
     try {
-      // Use cache for recent high-accuracy locations
+      // Check cache for recent high-accuracy locations
       if (!forceRefresh && this.lastKnownLocation) {
         const age = Date.now() - this.lastKnownLocation.timestamp;
-        const isHighAccuracy = (this.lastKnownLocation.accuracy || 999) <= 10;
+        const isHighAccuracy =
+          (this.lastKnownLocation.accuracy || 999) <= this.MINIMUM_ACCURACY;
 
         if (age < this.CACHE_TTL && isHighAccuracy) {
           console.log(
@@ -103,6 +105,15 @@ class LocationService {
             )}s old, ±${Math.round(this.lastKnownLocation.accuracy || 0)}m)`
           );
           return this.lastKnownLocation;
+        } else {
+          console.warn(
+            `⚠️ Invalid cache: accuracy (±${Math.round(
+              this.lastKnownLocation.accuracy || 0
+            )}m) exceeds threshold (${
+              this.MINIMUM_ACCURACY
+            }m) or too old (${Math.round(age / 1000)}s). Clearing cache.`
+          );
+          this.lastKnownLocation = null; // Clear invalid cache
         }
       }
 
@@ -110,50 +121,107 @@ class LocationService {
       if (!hasPermission) {
         const permissionResult = await this.requestLocationPermissions();
         if (!permissionResult.granted) {
-          return this.lastKnownLocation;
+          console.warn(
+            '⚠️ Location permissions not granted. Cannot obtain location.'
+          );
+          return null;
         }
       }
 
-      // Try up to 3 times to get accurate location
-      let locationData: LocationCoordinates | null = null;
-      for (let attempt = 1; attempt <= 3; attempt++) {
+      // Collect multiple high-accuracy locations for averaging
+      const locations: Location.LocationObject[] = [];
+      const maxAttempts = 10;
+      const targetSamples = 3;
+      const accuracyThreshold = 10; // Stricter threshold for better precision
+
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const location = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.BestForNavigation,
           maximumAge: 0,
           timeout: 30000,
         });
 
-        locationData = {
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-          accuracy: location.coords.accuracy,
-          timestamp: location.timestamp,
-        };
-
-        // Accept if accuracy is good enough (≤20m)
-        if (locationData.accuracy && locationData.accuracy <= 20) {
-          break;
+        if (
+          location.coords.accuracy &&
+          location.coords.accuracy <= accuracyThreshold
+        ) {
+          locations.push(location);
+          console.log(
+            `📍 Collected sample ${
+              locations.length
+            }/${targetSamples} (±${Math.round(location.coords.accuracy)}m)`
+          );
+          if (locations.length >= targetSamples) break;
+        } else {
+          console.log(
+            `📍 Discarding low-accuracy sample (±${Math.round(
+              location.coords.accuracy || 0
+            )}m)`
+          );
         }
 
-        if (attempt < 3) await new Promise((res) => setTimeout(res, 1000));
+        if (attempt < maxAttempts) {
+          await new Promise((res) => setTimeout(res, 2000)); // 2s delay between attempts
+        }
       }
 
-      if (!locationData) throw new Error('Could not get location');
+      if (locations.length === 0) {
+        console.warn(
+          '⚠️ No high-accuracy locations obtained after max attempts. Possible emulator or low-quality GPS. Check device settings or use a physical device.'
+        );
+        return null;
+      }
+
+      // Average the coordinates and accuracies
+      let sumLat = 0;
+      let sumLon = 0;
+      let sumAcc = 0;
+      const count = locations.length;
+
+      for (const loc of locations) {
+        sumLat += loc.coords.latitude;
+        sumLon += loc.coords.longitude;
+        sumAcc += loc.coords.accuracy || accuracyThreshold; // Fallback to threshold if null
+      }
+
+      const avgLat = sumLat / count;
+      const avgLon = sumLon / count;
+      const avgAcc = sumAcc / count;
+
+      // Validate final accuracy
+      if (avgAcc > this.MINIMUM_ACCURACY) {
+        console.warn(
+          `⚠️ Averaged location accuracy (±${Math.round(
+            avgAcc
+          )}m) exceeds threshold (${
+            this.MINIMUM_ACCURACY
+          }m). Possible emulator or low-quality GPS. Check device settings or use a physical device.`
+        );
+        return null;
+      }
+
+      const locationData: LocationCoordinates = {
+        latitude: avgLat,
+        longitude: avgLon,
+        accuracy: avgAcc,
+        timestamp: Date.now(), // Use current time for averaged location
+      };
 
       this.lastKnownLocation = locationData;
 
-      console.log('📍 Location obtained:', {
+      console.log('📍 Averaged location obtained:', {
         lat: locationData.latitude.toFixed(7),
         lon: locationData.longitude.toFixed(7),
         accuracy: locationData.accuracy
           ? `±${Math.round(locationData.accuracy)}m`
           : 'unknown',
+        samples: count,
       });
 
       return locationData;
     } catch (error) {
       console.error('Error getting location:', error);
-      return this.lastKnownLocation;
+      return null;
     }
   }
 
@@ -173,6 +241,9 @@ class LocationService {
       if (!hasPermission) {
         const permissionResult = await this.requestLocationPermissions();
         if (!permissionResult.granted) {
+          console.warn(
+            '⚠️ Location permissions not granted. Cannot start watcher.'
+          );
           return false;
         }
       }
@@ -196,6 +267,18 @@ class LocationService {
           },
         },
         (location) => {
+          if (
+            location.coords.accuracy &&
+            location.coords.accuracy > this.MINIMUM_ACCURACY
+          ) {
+            console.warn(
+              `⚠️ Location watcher received low-accuracy data (±${Math.round(
+                location.coords.accuracy
+              )}m). Discarding update. Possible emulator or low-quality GPS. Check device settings or use a physical device.`
+            );
+            return;
+          }
+
           const locationData: LocationCoordinates = {
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
@@ -256,7 +339,6 @@ class LocationService {
     return distanceKm * 1000;
   }
 
-
   /**
    * Generate geohash with precision 9 for 5-500m range
    */
@@ -281,17 +363,10 @@ class LocationService {
    * Get query bounds optimized for 5-500m range
    */
   getQueryBounds(center: Coordinates, radiusInKm: number): [string, string][] {
-    // For small radius (≤0.5km), use precision 6 to avoid too many bounds
-    // This covers the entire area efficiently
-    const effectivePrecision = radiusInKm <= 0.5 ? 6 : 5;
-
-    const centerGeohash = geohashForLocation(
+    const bounds = geohashQueryBounds(
       [center.latitude, center.longitude],
-      effectivePrecision
+      radiusInKm * 1000
     );
-
-    // Use single bound with prefix for efficient querying
-    const bounds: [string, string][] = [[centerGeohash, centerGeohash + '~']];
 
     console.log('🔍 Query bounds (optimized):', {
       center: {
@@ -301,9 +376,8 @@ class LocationService {
       radiusKm: radiusInKm,
       radiusMeters: Math.round(radiusInKm * 1000),
       boundsCount: bounds.length,
-      precision: effectivePrecision,
       storagePrecision: OPTIMAL_PRECISION,
-      strategy: 'Single bound + post-filter for accuracy',
+      strategy: 'Multi-bound precise coverage with post-filter',
     });
 
     return bounds;
@@ -316,8 +390,7 @@ class LocationService {
     center: Coordinates,
     radiusInMeters: number
   ): [string, string][] {
-    const radiusInKm = radiusInMeters / 1000;
-    return this.getQueryBounds(center, radiusInKm);
+    return this.getQueryBounds(center, radiusInMeters / 1000);
   }
 
   /**
@@ -429,7 +502,6 @@ class LocationService {
       return null;
     }
   }
-
 
   /**
    * Reverse geocode coordinates to get address

@@ -799,7 +799,10 @@ export default function ConnectionsScreen() {
           </Text>
           <View style={styles.headerIcons}>
             <TouchableOpacity
-              style={[styles.iconButton, { backgroundColor: theme.surface }]}
+              style={[
+                styles.iconButton,
+                { backgroundColor: theme.surface, borderColor: theme.border },
+              ]}
               onPress={() => {
                 if (!isAuthenticated) {
                   Alert.alert(
@@ -1192,6 +1195,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
   },
   tabsContainer: { flexDirection: 'row', paddingHorizontal: 20 },
   tab: {
