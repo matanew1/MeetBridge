@@ -19,6 +19,26 @@ import {
 import { db, auth } from './config';
 import LocationService from '../locationService';
 
+export interface Comment {
+  id: string;
+  userId: string;
+  userName: string;
+  userImage?: string;
+  text: string;
+  createdAt: Date;
+  isAnonymous?: boolean;
+}
+
+export interface Comment {
+  id: string;
+  userId: string;
+  userName: string;
+  userImage?: string;
+  text: string;
+  createdAt: Date;
+  isAnonymous?: boolean;
+}
+
 export interface MissedConnection {
   id: string;
   userId: string;
@@ -137,6 +157,107 @@ class MissedConnectionsService {
           error instanceof Error
             ? error.message
             : 'Failed to create connection',
+      };
+    }
+  }
+
+  /**
+   * Update a missed connection
+   */
+  async updateConnection(
+    connectionId: string,
+    updates: {
+      description?: string;
+      timeOccurred?: Date;
+      isAnonymous?: boolean;
+      category?: string;
+      tags?: string[];
+    }
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      if (!auth.currentUser) {
+        return {
+          success: false,
+          message: 'User not authenticated',
+        };
+      }
+
+      const connectionRef = doc(db, 'missed_connections', connectionId);
+      const connectionSnap = await getDoc(connectionRef);
+
+      if (!connectionSnap.exists()) {
+        return {
+          success: false,
+          message: 'Connection not found',
+        };
+      }
+
+      const connectionData = connectionSnap.data();
+
+      // Check if user owns this connection
+      if (connectionData.userId !== auth.currentUser.uid) {
+        return {
+          success: false,
+          message: 'You can only edit your own posts',
+        };
+      }
+
+      const updateData: any = {
+        isEdited: true,
+        editedAt: serverTimestamp(),
+      };
+
+      // Handle individual field updates
+      if (updates.description !== undefined) {
+        updateData.description = updates.description;
+      }
+      if (updates.timeOccurred !== undefined) {
+        updateData.timeOccurred = updates.timeOccurred;
+      }
+      if (updates.isAnonymous !== undefined) {
+        updateData.isAnonymous = updates.isAnonymous;
+      }
+      if (updates.category !== undefined) {
+        // Update the location.category by updating the entire location object
+        const currentLocation = connectionData.location;
+        updateData.location = {
+          ...currentLocation,
+          category: updates.category,
+        };
+      }
+      if (updates.tags !== undefined) {
+        updateData.tags = updates.tags;
+      }
+
+      // If changing anonymity, update user info
+      if (updates.isAnonymous !== undefined) {
+        if (updates.isAnonymous) {
+          updateData.userName = 'Anonymous';
+          updateData.userImage = null;
+        } else {
+          // Get current user data
+          const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+          const userData = userDoc.data();
+          updateData.userName = userData?.name || 'Anonymous';
+          updateData.userImage = userData?.image || null;
+        }
+      }
+
+      await updateDoc(connectionRef, updateData);
+
+      console.log('✅ Missed connection updated:', connectionId);
+      return {
+        success: true,
+        message: 'Connection updated successfully',
+      };
+    } catch (error) {
+      console.error('❌ Error updating connection:', error);
+      return {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Failed to update connection',
       };
     }
   }
@@ -449,7 +570,7 @@ class MissedConnectionsService {
     if (filters?.limitCount) {
       q = query(q, limit(filters.limitCount));
     } else {
-      q = query(q, limit(50));
+      q = query(q, limit(1000));
     }
 
     return onSnapshot(q, (snapshot) => {
@@ -659,82 +780,6 @@ class MissedConnectionsService {
   }
 
   /**
-   * Update a connection post (edit)
-   */
-  async updateConnection(
-    connectionId: string,
-    data: {
-      description?: string;
-      tags?: string[];
-      isAnonymous?: boolean;
-    }
-  ): Promise<{ success: boolean; message: string }> {
-    try {
-      const user = auth.currentUser;
-      if (!user) {
-        return { success: false, message: 'User not authenticated' };
-      }
-
-      // Verify ownership
-      const connectionDoc = await getDoc(
-        doc(db, 'missed_connections', connectionId)
-      );
-      if (!connectionDoc.exists()) {
-        return { success: false, message: 'Connection not found' };
-      }
-
-      const connectionData = connectionDoc.data();
-      if (connectionData.userId !== user.uid) {
-        return {
-          success: false,
-          message: 'You can only edit your own connections',
-        };
-      }
-
-      // Get user profile for display info if changing anonymous status
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const userData = userDoc.exists() ? userDoc.data() : null;
-
-      const updateData: any = {
-        isEdited: true,
-        editedAt: serverTimestamp(),
-      };
-
-      if (data.description !== undefined) {
-        updateData.description = data.description;
-      }
-
-      if (data.tags !== undefined) {
-        updateData.tags = data.tags;
-      }
-
-      if (data.isAnonymous !== undefined) {
-        updateData.isAnonymous = data.isAnonymous;
-        updateData.userName = data.isAnonymous
-          ? 'Anonymous'
-          : userData?.name || 'Anonymous';
-        updateData.userImage = data.isAnonymous
-          ? null
-          : userData?.image || null;
-      }
-
-      await updateDoc(doc(db, 'missed_connections', connectionId), updateData);
-
-      console.log('✅ Connection updated:', connectionId);
-      return { success: true, message: 'Connection updated successfully' };
-    } catch (error) {
-      console.error('❌ Error updating connection:', error);
-      return {
-        success: false,
-        message:
-          error instanceof Error
-            ? error.message
-            : 'Failed to update connection',
-      };
-    }
-  }
-
-  /**
    * Real-time listener for comments on a connection
    */
   subscribeToComments(
@@ -937,6 +982,136 @@ class MissedConnectionsService {
   }
 
   /**
+   * Add a comment to a connection
+   */
+  async addComment(
+    connectionId: string,
+    userId: string,
+    text: string,
+    isAnonymous: boolean = false
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      if (!auth.currentUser) {
+        return {
+          success: false,
+          message: 'User not authenticated',
+        };
+      }
+
+      // Get user data for the comment
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      const userData = userDoc.data();
+
+      const commentData = {
+        userId,
+        userName: isAnonymous ? 'Anonymous' : userData?.name || 'Anonymous',
+        userImage: isAnonymous ? null : userData?.image || null,
+        text,
+        createdAt: serverTimestamp(),
+        isAnonymous,
+      };
+
+      // Add comment to subcollection
+      await addDoc(
+        collection(db, 'missed_connections', connectionId, 'comments'),
+        commentData
+      );
+
+      // Update comment count on the connection
+      await updateDoc(doc(db, 'missed_connections', connectionId), {
+        comments: increment(1),
+      });
+
+      console.log('✅ Comment added to connection:', connectionId);
+      return {
+        success: true,
+        message: 'Comment added successfully',
+      };
+    } catch (error) {
+      console.error('❌ Error adding comment:', error);
+      return {
+        success: false,
+        message:
+          error instanceof Error ? error.message : 'Failed to add comment',
+      };
+    }
+  }
+
+  /**
+   * Get comments for a connection
+   */
+  async getComments(
+    connectionId: string
+  ): Promise<{ success: boolean; data: Comment[]; message: string }> {
+    try {
+      const q = query(
+        collection(db, 'missed_connections', connectionId, 'comments'),
+        orderBy('createdAt', 'asc')
+      );
+
+      const querySnapshot = await getDocs(q);
+      const comments: Comment[] = [];
+
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        comments.push({
+          id: doc.id,
+          userId: data.userId,
+          userName: data.userName,
+          userImage: data.userImage,
+          text: data.text,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          isAnonymous: data.isAnonymous || false,
+        });
+      });
+
+      return {
+        success: true,
+        data: comments,
+        message: 'Comments retrieved successfully',
+      };
+    } catch (error) {
+      console.error('❌ Error getting comments:', error);
+      return {
+        success: false,
+        data: [],
+        message:
+          error instanceof Error ? error.message : 'Failed to get comments',
+      };
+    }
+  }
+
+  /**
+   * Subscribe to real-time comment updates
+   */
+  subscribeToComments(
+    connectionId: string,
+    callback: (comments: Comment[]) => void
+  ): Unsubscribe {
+    const q = query(
+      collection(db, 'missed_connections', connectionId, 'comments'),
+      orderBy('createdAt', 'asc')
+    );
+
+    return onSnapshot(q, (querySnapshot) => {
+      const comments: Comment[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        comments.push({
+          id: doc.id,
+          userId: data.userId,
+          userName: data.userName,
+          userImage: data.userImage,
+          text: data.text,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          isAnonymous: data.isAnonymous || false,
+        });
+      });
+      callback(comments);
+    });
+  }
+
+  /**
    * Delete a connection (only by owner)
    */
   async deleteConnection(
@@ -976,6 +1151,158 @@ class MissedConnectionsService {
           error instanceof Error
             ? error.message
             : 'Failed to delete connection',
+      };
+    }
+  }
+
+  /**
+   * Real-time listener for user's own posts
+   */
+  subscribeToUserPosts(
+    userId: string,
+    callback: (connections: MissedConnection[]) => void,
+    limitCount: number = 1000
+  ): Unsubscribe {
+    const q = query(
+      collection(db, 'missed_connections'),
+      where('userId', '==', userId),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
+
+    return onSnapshot(q, (snapshot) => {
+      const connections: MissedConnection[] = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          userId: data.userId,
+          userName: data.userName,
+          userImage: data.userImage,
+          location: data.location,
+          description: data.description,
+          tags: data.tags || [],
+          timeOccurred: convertTimestamp(data.timeOccurred),
+          createdAt: convertTimestamp(data.createdAt),
+          likes: data.likes || 0,
+          likedBy: data.likedBy || [],
+          views: data.views || 0,
+          viewedBy: data.viewedBy || [],
+          claims: data.claims || 0,
+          comments: data.comments || 0,
+          claimed: data.claimed || false,
+          claimedBy: data.claimedBy,
+          verified: data.verified || false,
+          isAnonymous: data.isAnonymous || false,
+          isEdited: data.isEdited || false,
+          editedAt: data.editedAt ? convertTimestamp(data.editedAt) : undefined,
+          savedBy: data.savedBy || [],
+        };
+      });
+
+      callback(connections);
+    });
+  }
+
+  /**
+   * Real-time listener for saved posts
+   */
+  subscribeToSavedPosts(
+    userId: string,
+    callback: (connections: MissedConnection[]) => void,
+    limitCount: number = 1000
+  ): Unsubscribe {
+    const q = query(
+      collection(db, 'missed_connections'),
+      where('savedBy', 'array-contains', userId),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
+
+    return onSnapshot(q, (snapshot) => {
+      const connections: MissedConnection[] = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          userId: data.userId,
+          userName: data.userName,
+          userImage: data.userImage,
+          location: data.location,
+          description: data.description,
+          tags: data.tags || [],
+          timeOccurred: convertTimestamp(data.timeOccurred),
+          createdAt: convertTimestamp(data.createdAt),
+          likes: data.likes || 0,
+          likedBy: data.likedBy || [],
+          views: data.views || 0,
+          viewedBy: data.viewedBy || [],
+          claims: data.claims || 0,
+          comments: data.comments || 0,
+          claimed: data.claimed || false,
+          claimedBy: data.claimedBy,
+          verified: data.verified || false,
+          isAnonymous: data.isAnonymous || false,
+          isEdited: data.isEdited || false,
+          editedAt: data.editedAt ? convertTimestamp(data.editedAt) : undefined,
+          savedBy: data.savedBy || [],
+        };
+      });
+
+      callback(connections);
+    });
+  }
+
+  /**
+   * Get user's interactions (likes, saves, comments) on a connection
+   */
+  async getUserInteractions(
+    connectionId: string,
+    userId: string
+  ): Promise<{
+    success: boolean;
+    data?: {
+      liked: boolean;
+      saved: boolean;
+      commented: boolean;
+    };
+    message: string;
+  }> {
+    try {
+      const connectionDoc = await getDoc(
+        doc(db, 'missed_connections', connectionId)
+      );
+
+      if (!connectionDoc.exists()) {
+        return { success: false, message: 'Connection not found' };
+      }
+
+      const data = connectionDoc.data();
+      const liked = (data.likedBy || []).includes(userId);
+      const saved = (data.savedBy || []).includes(userId);
+
+      // Check if user has commented by looking up in the comments subcollection
+      const commentsQuery = query(
+        collection(db, 'missed_connections', connectionId, 'comments'),
+        where('userId', '==', userId),
+        limit(1)
+      );
+      const commentsSnapshot = await getDocs(commentsQuery);
+      const commented = !commentsSnapshot.empty;
+
+      return {
+        success: true,
+        data: {
+          liked,
+          saved,
+          commented,
+        },
+        message: 'User interactions retrieved successfully',
+      };
+    } catch (error) {
+      console.error('❌ Error getting user interactions:', error);
+      return {
+        success: false,
+        message:
+          error instanceof Error ? error.message : 'Failed to get interactions',
       };
     }
   }

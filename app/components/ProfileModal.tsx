@@ -221,7 +221,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     >
       <View style={[styles.container, { backgroundColor: theme.background }]}>
         {/* Header */}
-        <LinearGradient colors={[theme.primary]} style={styles.header}>
+        <LinearGradient
+          colors={['#8B5CF6', '#A855F7', '#C084FC']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.header}
+        >
           <TouchableOpacity
             style={[
               styles.closeButton,
@@ -423,11 +428,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               </Text>
             </View>
 
-                        <View style={[styles.infoCard, { backgroundColor: theme.surface }]}>
+            <View style={[styles.infoCard, { backgroundColor: theme.surface }]}>
               <View style={styles.cardHeader}>
                 <Users size={20} color={theme.primary} />
                 <Text style={[styles.cardTitle, { color: theme.text }]}>
-                  Height
+                  Date of Birth
                 </Text>
               </View>
               <Text

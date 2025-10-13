@@ -500,6 +500,63 @@ class LocationService {
   }
 
   /**
+   * Reverse geocode coordinates to get address
+   */
+  async reverseGeocode(coordinates: Coordinates): Promise<string | null> {
+    try {
+      const geocodedLocations = await Location.reverseGeocodeAsync({
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+      });
+
+      if (geocodedLocations && geocodedLocations.length > 0) {
+        const location = geocodedLocations[0];
+        const addressParts = [
+          location.name,
+          location.street,
+          location.city,
+          location.region,
+          location.country,
+        ].filter(Boolean);
+
+        // Return the most specific address available
+        return addressParts.length > 0 ? addressParts.join(', ') : null;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error reverse geocoding:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get current location with address
+   */
+  async getCurrentLocationWithAddress(): Promise<{
+    coordinates: LocationCoordinates;
+    address: string | null;
+  } | null> {
+    try {
+      const coordinates = await this.getCurrentLocation();
+      if (!coordinates) return null;
+
+      const address = await this.reverseGeocode({
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+      });
+
+      return {
+        coordinates,
+        address,
+      };
+    } catch (error) {
+      console.error('Error getting location with address:', error);
+      return null;
+    }
+  }
+
+  /**
    * Validate coordinates
    */
   validateCoordinates(latitude: number, longitude: number): boolean {

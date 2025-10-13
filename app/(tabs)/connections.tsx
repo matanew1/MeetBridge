@@ -15,6 +15,8 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -25,7 +27,6 @@ import {
   MessageCircle,
   Navigation,
   X,
-  RefreshCw,
   Zap,
   Eye,
   TrendingUp,
@@ -33,8 +34,11 @@ import {
   Trash2,
   MoreVertical,
   Bookmark,
+  Send,
+  ChevronDown,
 } from 'lucide-react-native';
-import { useTranslation } from 'react-i18next';
+import { MapPin, Users } from 'lucide-react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -350,6 +354,13 @@ const ConnectionItem: React.FC<ConnectionItemProps> = React.memo(
       prevProps.isSaved === nextProps.isSaved &&
       prevProps.connection.likes === nextProps.connection.likes &&
       prevProps.connection.comments === nextProps.connection.comments &&
+      prevProps.connection.description === nextProps.connection.description &&
+      prevProps.connection.timeOccurred.getTime() ===
+        nextProps.connection.timeOccurred.getTime() &&
+      prevProps.connection.isAnonymous === nextProps.connection.isAnonymous &&
+      prevProps.connection.location.category ===
+        nextProps.connection.location.category &&
+      prevProps.connection.isEdited === nextProps.connection.isEdited &&
       prevProps.theme === nextProps.theme
     );
   }
@@ -357,7 +368,6 @@ const ConnectionItem: React.FC<ConnectionItemProps> = React.memo(
 
 // Main Component
 export default function ConnectionsScreen() {
-  const { t } = useTranslation();
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
   const router = useRouter();
@@ -365,66 +375,120 @@ export default function ConnectionsScreen() {
 
   const [connections, setConnections] = useState<MissedConnection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'my' | 'saved'>('all');
+  const [unsubscribe, setUnsubscribe] = useState<(() => void) | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingConnection, setEditingConnection] =
+    useState<MissedConnection | null>(null);
+  const [editForm, setEditForm] = useState({
+    description: '',
+    category: 'restaurant',
+    timeOccurred: new Date(),
+    isAnonymous: false,
+  });
+  const [createForm, setCreateForm] = useState({
+    description: '',
+    category: 'restaurant',
+    timeOccurred: new Date(),
+    isAnonymous: false,
+  });
+  const [currentLocation, setCurrentLocation] = useState<{
+    coordinates: { latitude: number; longitude: number };
+    address: string | null;
+  } | null>(null);
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
 
-  // Load connections
-  const loadConnections = useCallback(
-    async (isRefresh = false) => {
-      if (isRefresh) {
-        setIsRefreshing(true);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } else {
-        setIsLoading(true);
-      }
-
-      let result;
-      if (activeTab === 'my') {
-        result = await missedConnectionsService.getUserPosts(
-          user?.id || '',
-          50
-        );
-      } else if (activeTab === 'saved') {
-        result = await missedConnectionsService.getSavedPosts(
-          user?.id || '',
-          50
-        );
-      } else {
-        result = await missedConnectionsService.getConnections({
-          limitCount: 50,
-        });
-      }
-
-      if (result.success) {
-        setConnections(result.data);
-        if (isRefresh) {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  // Detect location when modal opens
+  useEffect(() => {
+    if (showCreateModal && !currentLocation && !isDetectingLocation) {
+      const detectLocation = async () => {
+        setIsDetectingLocation(true);
+        try {
+          const locationData =
+            await LocationService.getCurrentLocationWithAddress();
+          if (locationData) {
+            setCurrentLocation(locationData);
+          } else {
+            Alert.alert(
+              'Location Error',
+              'Unable to detect your current location. Please try again.'
+            );
+          }
+        } catch (error) {
+          console.error('Error detecting location:', error);
+          Alert.alert(
+            'Location Error',
+            'Unable to detect your current location. Please try again.'
+          );
+        } finally {
+          setIsDetectingLocation(false);
         }
-      } else {
-        Alert.alert('Error', result.message);
-      }
+      };
+      detectLocation();
+    }
+  }, [showCreateModal, currentLocation, isDetectingLocation]);
 
-      setIsLoading(false);
-      setIsRefreshing(false);
-    },
-    [activeTab, user?.id]
+  // Reset location when modal closes
+  useEffect(() => {
+    if (!showCreateModal) {
+      setCurrentLocation(null);
+      setIsDetectingLocation(false);
+    }
+  }, [showCreateModal]);
+
+  // Refresh connections when screen comes into focus (e.g., returning from comments)
+  useFocusEffect(
+    useCallback(() => {
+      // Real-time listeners handle updates automatically
+      return () => {};
+    }, [])
   );
 
-  useEffect(() => {
-    loadConnections();
+  const [isCreating, setIsCreating] = useState(false);
 
-    // Real-time subscription for "All Posts"
-    if (activeTab === 'all') {
-      const unsubscribe = missedConnectionsService.subscribeToConnections(
+  useEffect(() => {
+    // Clean up previous subscription
+    if (unsubscribe) {
+      unsubscribe();
+    }
+
+    setIsLoading(true);
+
+    let newUnsubscribe: () => void;
+
+    if (activeTab === 'my' && user?.id) {
+      newUnsubscribe = missedConnectionsService.subscribeToUserPosts(
+        user.id,
         (updatedConnections) => {
           setConnections(updatedConnections);
+          setIsLoading(false);
         },
-        { limitCount: 50 }
+        1000
       );
-
-      return () => unsubscribe();
+    } else if (activeTab === 'saved' && user?.id) {
+      newUnsubscribe = missedConnectionsService.subscribeToSavedPosts(
+        user.id,
+        (updatedConnections) => {
+          setConnections(updatedConnections);
+          setIsLoading(false);
+        },
+        1000
+      );
+    } else {
+      newUnsubscribe = missedConnectionsService.subscribeToConnections(
+        (updatedConnections) => {
+          setConnections(updatedConnections);
+          setIsLoading(false);
+        },
+        { limitCount: 1000 }
+      );
     }
-  }, [activeTab, loadConnections]);
+
+    setUnsubscribe(() => newUnsubscribe);
+    setIsLoading(false); // Set loading to false after setting up the listener
+
+    return () => newUnsubscribe();
+  }, [activeTab, user?.id]);
 
   // Handlers
   const handleLike = useCallback(
@@ -460,10 +524,10 @@ export default function ConnectionsScreen() {
 
       if (!result.success) {
         Alert.alert('Error', result.message);
-        loadConnections();
+        // Real-time listeners will handle state updates
       }
     },
-    [isAuthenticated, user?.id, loadConnections]
+    [isAuthenticated, user?.id]
   );
 
   const handleSave = useCallback(
@@ -498,10 +562,120 @@ export default function ConnectionsScreen() {
 
       if (!result.success) {
         Alert.alert('Error', result.message);
-        loadConnections();
+        // Real-time listeners will handle state updates
       }
     },
-    [isAuthenticated, user?.id, loadConnections]
+    [isAuthenticated, user?.id]
+  );
+
+  const handleCreatePost = useCallback(async () => {
+    if (!createForm.description.trim() || !currentLocation) {
+      Alert.alert(
+        'Error',
+        'Please fill in all required fields and ensure location is detected.'
+      );
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      const result = await missedConnectionsService.createConnection({
+        location: {
+          lat: currentLocation.coordinates.latitude,
+          lng: currentLocation.coordinates.longitude,
+          landmark: currentLocation.address || 'Current Location',
+          category: createForm.category,
+          icon: '📍', // Default icon
+        },
+        description: createForm.description,
+        timeOccurred: createForm.timeOccurred,
+        isAnonymous: createForm.isAnonymous,
+      });
+
+      if (result.success) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert('Success!', 'Your missed connection has been posted!');
+        setShowCreateModal(false);
+        setCreateForm({
+          description: '',
+          category: 'restaurant',
+          timeOccurred: new Date(),
+          isAnonymous: false,
+        });
+        // Real-time listeners will update the list automatically
+      } else {
+        Alert.alert('Error', result.message);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to create post. Please try again.');
+    } finally {
+      setIsCreating(false);
+    }
+  }, [createForm, currentLocation]);
+
+  const handleEditPost = useCallback(async () => {
+    if (!editingConnection || !editForm.description.trim()) {
+      Alert.alert('Error', 'Please fill in all required fields.');
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      const result = await missedConnectionsService.updateConnection(
+        editingConnection.id,
+        {
+          description: editForm.description,
+          timeOccurred: editForm.timeOccurred,
+          isAnonymous: editForm.isAnonymous,
+          category: editForm.category,
+        }
+      );
+
+      if (result.success) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+        // Fetch the updated connection immediately
+        const updatedConnection =
+          await missedConnectionsService.getConnectionById(
+            editingConnection.id
+          );
+
+        if (updatedConnection.success && updatedConnection.data) {
+          // Update local state immediately with the fresh data
+          setConnections((prev) =>
+            prev.map((conn) =>
+              conn.id === editingConnection.id ? updatedConnection.data! : conn
+            )
+          );
+        }
+
+        Alert.alert('Success!', 'Your post has been updated!');
+
+        // Close modal and reset form
+        setShowCreateModal(false);
+        setEditingConnection(null);
+        setEditForm({
+          description: '',
+          category: 'restaurant',
+          timeOccurred: new Date(),
+          isAnonymous: false,
+        });
+      } else {
+        Alert.alert('Error', result.message);
+      }
+    } catch (error) {
+      console.error('Error updating post:', error);
+      Alert.alert('Error', 'Failed to update post. Please try again.');
+    } finally {
+      setIsCreating(false);
+    }
+  }, [editingConnection, editForm]);
+
+  const getLatestConnection = useCallback(
+    (connectionId: string) => {
+      return connections.find((conn) => conn.id === connectionId);
+    },
+    [connections]
   );
 
   const renderItem = useCallback(
@@ -541,7 +715,18 @@ export default function ConnectionsScreen() {
         }}
         onComment={() => router.push(`/connections/comments/${connection.id}`)}
         onEdit={() => {
-          // Handle edit
+          // Always get the latest connection data from state
+          const latestConnection = getLatestConnection(connection.id);
+          if (latestConnection) {
+            setEditingConnection(latestConnection);
+            setEditForm({
+              description: latestConnection.description,
+              category: latestConnection.location.category || 'restaurant',
+              timeOccurred: latestConnection.timeOccurred,
+              isAnonymous: latestConnection.isAnonymous || false,
+            });
+            setShowCreateModal(true);
+          }
         }}
         onDelete={async () => {
           Alert.alert(
@@ -558,7 +743,10 @@ export default function ConnectionsScreen() {
                       connection.id
                     );
                   if (result.success) {
-                    loadConnections();
+                    // Real-time listeners will remove the post automatically
+                    Haptics.notificationAsync(
+                      Haptics.NotificationFeedbackType.Success
+                    );
                   }
                 },
               },
@@ -571,8 +759,32 @@ export default function ConnectionsScreen() {
         currentUserId={user?.id}
       />
     ),
-    [theme, user?.id, handleLike, handleSave, loadConnections, router]
+    [theme, user?.id, handleLike, handleSave, router, getLatestConnection]
   );
+
+  useEffect(() => {
+    if (editingConnection && showCreateModal) {
+      const latestConnection = connections.find(
+        (conn) => conn.id === editingConnection.id
+      );
+      if (
+        latestConnection &&
+        (latestConnection.description !== editingConnection.description ||
+          latestConnection.timeOccurred.getTime() !==
+            editingConnection.timeOccurred.getTime() ||
+          latestConnection.isAnonymous !== editingConnection.isAnonymous)
+      ) {
+        // Update with latest data
+        setEditingConnection(latestConnection);
+        setEditForm({
+          description: latestConnection.description,
+          category: latestConnection.location.category || 'restaurant',
+          timeOccurred: latestConnection.timeOccurred,
+          isAnonymous: latestConnection.isAnonymous || false,
+        });
+      }
+    }
+  }, [connections, editingConnection, showCreateModal]);
 
   return (
     <LinearGradient
@@ -588,13 +800,6 @@ export default function ConnectionsScreen() {
           <View style={styles.headerIcons}>
             <TouchableOpacity
               style={[styles.iconButton, { backgroundColor: theme.surface }]}
-              onPress={() => loadConnections(true)}
-              disabled={isRefreshing}
-            >
-              <RefreshCw size={20} color={theme.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.iconButton, { backgroundColor: theme.surface }]}
               onPress={() => {
                 if (!isAuthenticated) {
                   Alert.alert(
@@ -603,7 +808,7 @@ export default function ConnectionsScreen() {
                   );
                   return;
                 }
-                // Handle create post
+                setShowCreateModal(true);
               }}
             >
               <Plus size={20} color={theme.primary} />
@@ -694,6 +899,277 @@ export default function ConnectionsScreen() {
           windowSize={5}
         />
       </SafeAreaView>
+
+      {/* Create Post Modal */}
+      <Modal
+        visible={showCreateModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowCreateModal(false)}
+      >
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View
+            style={[
+              styles.modalContainer,
+              { backgroundColor: theme.background },
+            ]}
+          >
+            {/* Header */}
+            <View
+              style={[styles.modalHeader, { backgroundColor: theme.surface }]}
+            >
+              <TouchableOpacity
+                onPress={() => {
+                  setShowCreateModal(false);
+                  setEditingConnection(null);
+                }}
+                style={styles.modalCloseButton}
+              >
+                <X size={24} color={theme.text} />
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>
+                {editingConnection
+                  ? 'Edit Missed Connection'
+                  : 'Create Missed Connection'}
+              </Text>
+              <View style={styles.modalHeaderSpacer} />
+            </View>
+
+            {/* Content */}
+            <ScrollView
+              style={styles.modalScrollContent}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.modalScrollContainer}
+            >
+              <View style={styles.formContainer}>
+                {/* Location Section */}
+                <View style={styles.formSection}>
+                  <View style={styles.sectionHeader}>
+                    <MapPin size={20} color={theme.primary} />
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                      Your Current Location
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.locationDisplay,
+                      {
+                        backgroundColor: theme.surface,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                  >
+                    {isDetectingLocation ? (
+                      <View style={styles.locationLoading}>
+                        <ActivityIndicator size="small" color={theme.primary} />
+                        <Text
+                          style={[
+                            styles.locationText,
+                            { color: theme.textSecondary },
+                          ]}
+                        >
+                          Detecting your location...
+                        </Text>
+                      </View>
+                    ) : currentLocation ? (
+                      <View style={styles.locationContent}>
+                        <MapPin size={16} color={theme.primary} />
+                        <Text
+                          style={[styles.locationText, { color: theme.text }]}
+                        >
+                          {currentLocation.address ||
+                            `${currentLocation.coordinates.latitude.toFixed(
+                              4
+                            )}, ${currentLocation.coordinates.longitude.toFixed(
+                              4
+                            )}`}
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={styles.locationError}>
+                        <Text
+                          style={[styles.locationText, { color: theme.error }]}
+                        >
+                          Unable to detect location. Please check permissions.
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                {/* Description Section */}
+                <View style={styles.formSection}>
+                  <View style={styles.sectionHeader}>
+                    <MessageCircle size={20} color={theme.primary} />
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                      What happened?
+                    </Text>
+                  </View>
+                  <TextInput
+                    style={[
+                      styles.textArea,
+                      {
+                        backgroundColor: theme.surface,
+                        color: theme.text,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                    placeholder="Describe the person and what you remember..."
+                    placeholderTextColor={theme.textSecondary}
+                    value={
+                      editingConnection
+                        ? editForm.description
+                        : createForm.description
+                    }
+                    onChangeText={(text) =>
+                      editingConnection
+                        ? setEditForm((prev) => ({
+                            ...prev,
+                            description: text,
+                          }))
+                        : setCreateForm((prev) => ({
+                            ...prev,
+                            description: text,
+                          }))
+                    }
+                    multiline
+                    numberOfLines={4}
+                    textAlignVertical="top"
+                  />
+                </View>
+
+                {/* Time Section */}
+                <View style={styles.formSection}>
+                  <View style={styles.sectionHeader}>
+                    <Clock size={20} color={theme.primary} />
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                      When did this happen?
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[
+                      styles.timeSelector,
+                      {
+                        backgroundColor: theme.surface,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                    onPress={() => {
+                      // Could implement time picker here
+                      Alert.alert('Time Selector', 'Time picker would go here');
+                    }}
+                  >
+                    <Clock size={20} color={theme.primary} />
+                    <Text
+                      style={[styles.timeSelectorText, { color: theme.text }]}
+                    >
+                      {(editingConnection
+                        ? editForm.timeOccurred
+                        : createForm.timeOccurred
+                      ).toLocaleString()}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Anonymous Option */}
+                <View style={styles.formSection}>
+                  <TouchableOpacity
+                    style={styles.checkboxContainer}
+                    onPress={() =>
+                      editingConnection
+                        ? setEditForm((prev) => ({
+                            ...prev,
+                            isAnonymous: !prev.isAnonymous,
+                          }))
+                        : setCreateForm((prev) => ({
+                            ...prev,
+                            isAnonymous: !prev.isAnonymous,
+                          }))
+                    }
+                  >
+                    <View
+                      style={[
+                        styles.checkbox,
+                        { borderColor: theme.border },
+                        (editingConnection
+                          ? editForm.isAnonymous
+                          : createForm.isAnonymous) && {
+                          backgroundColor: theme.primary,
+                        },
+                      ]}
+                    >
+                      {(editingConnection
+                        ? editForm.isAnonymous
+                        : createForm.isAnonymous) && (
+                        <Text style={styles.checkmark}>✓</Text>
+                      )}
+                    </View>
+                    <View style={styles.checkboxContent}>
+                      <Text
+                        style={[styles.checkboxLabel, { color: theme.text }]}
+                      >
+                        Post anonymously
+                      </Text>
+                      <Text
+                        style={[
+                          styles.checkboxSubtext,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
+                        Your identity will be hidden from others
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
+
+            {/* Bottom Action Bar */}
+            <View
+              style={[
+                styles.modalBottomBar,
+                { backgroundColor: theme.surface },
+              ]}
+            >
+              <TouchableOpacity
+                onPress={() => {
+                  setShowCreateModal(false);
+                  setEditingConnection(null);
+                }}
+                style={[styles.cancelButton, { borderColor: theme.border }]}
+              >
+                <Text style={[styles.cancelButtonText, { color: theme.text }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={editingConnection ? handleEditPost : handleCreatePost}
+                disabled={isCreating}
+                style={[
+                  styles.postButton,
+                  {
+                    backgroundColor: isCreating ? theme.border : theme.primary,
+                  },
+                ]}
+              >
+                {isCreating ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <>
+                    <Sparkles size={18} color="#FFF" />
+                    <Text style={styles.postButtonText}>
+                      {editingConnection ? 'Update Post' : 'Create Post'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </LinearGradient>
   );
 }
@@ -820,4 +1296,150 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   claimButtonText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
+  // Modal styles
+  modalContainer: { flex: 1 },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+  },
+  modalCloseButton: { padding: 8 },
+  modalTitle: { fontSize: 18, fontWeight: '700' },
+  modalHeaderSpacer: { width: 40 },
+  modalScrollContent: { flex: 1 },
+  modalScrollContainer: { paddingBottom: 100 },
+  formContainer: { padding: 20 },
+  formSection: { marginBottom: 24 },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+  },
+  textArea: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    height: 120,
+    textAlignVertical: 'top',
+  },
+  timeSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+  },
+  timeSelectorText: { fontSize: 16, flex: 1 },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderWidth: 2,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  checkmark: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
+  checkboxContent: { flex: 1 },
+  checkboxLabel: { fontSize: 16, fontWeight: '600', marginBottom: 4 },
+  checkboxSubtext: { fontSize: 14, fontWeight: '400' },
+  locationDisplay: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    minHeight: 50,
+    justifyContent: 'center',
+  },
+  locationLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  locationContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  locationError: {
+    alignItems: 'center',
+  },
+  locationText: { fontSize: 16, flex: 1 },
+  modalBottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.1)',
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  cancelButtonText: { fontSize: 16, fontWeight: '600' },
+  postButton: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+  },
+  postButtonText: { color: '#FFF', fontSize: 16, fontWeight: '600' },
+  locationDisplay: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    minHeight: 50,
+    justifyContent: 'center',
+  },
+  locationLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  locationContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  locationError: {
+    alignItems: 'center',
+  },
+  locationText: { fontSize: 16, flex: 1 },
 });
