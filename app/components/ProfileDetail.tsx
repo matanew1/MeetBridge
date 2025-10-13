@@ -230,23 +230,6 @@ const ProfileDetail = ({
           )}
         </View>
       </ScrollView>
-
-      {/* Unmatch option for matches */}
-      {onMessage && onUnmatch && (
-        <View
-          style={[
-            styles.unmatchSection,
-            { backgroundColor: theme.surface, borderTopColor: theme.border },
-          ]}
-        >
-          <TouchableOpacity
-            style={styles.unmatchButtonDetail}
-            onPress={() => onUnmatch(user.id)}
-          >
-            <Text style={styles.unmatchButtonText}>{t('profile.unmatch')}</Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </SafeAreaView>
   );
 };
@@ -404,6 +387,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'center',
     gap: 10,
+    marginBottom: 50,
   },
   interestChip: {
     backgroundColor: '#E8D5F3',

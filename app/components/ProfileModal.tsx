@@ -56,6 +56,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [fullScreenImage, setFullScreenImage] = useState<
+    string | number | null
+  >(null);
+  const [fullScreenImages, setFullScreenImages] = useState<(string | number)[]>(
+    []
+  );
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   const handleLogout = () => {
     setShowLogoutConfirm(true);
@@ -126,6 +133,41 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const handleSettings = () => {
     // TODO: Navigate to settings screen
     console.log('Settings functionality coming soon!');
+  };
+
+  const handleImagePress = (
+    imageUri: string | number,
+    allImages: (string | number)[],
+    index: number = 0
+  ) => {
+    setFullScreenImage(imageUri);
+    setFullScreenImages(allImages);
+    setCurrentImageIndex(index);
+  };
+
+  const handleCloseFullScreen = () => {
+    setFullScreenImage(null);
+    setFullScreenImages([]);
+    setCurrentImageIndex(0);
+  };
+
+  const handleNextImage = () => {
+    if (fullScreenImages.length > 1) {
+      const nextIndex = (currentImageIndex + 1) % fullScreenImages.length;
+      setCurrentImageIndex(nextIndex);
+      setFullScreenImage(fullScreenImages[nextIndex]);
+    }
+  };
+
+  const handlePrevImage = () => {
+    if (fullScreenImages.length > 1) {
+      const prevIndex =
+        currentImageIndex === 0
+          ? fullScreenImages.length - 1
+          : currentImageIndex - 1;
+      setCurrentImageIndex(prevIndex);
+      setFullScreenImage(fullScreenImages[prevIndex]);
+    }
   };
 
   if (!user) return null;
@@ -263,14 +305,83 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               { backgroundColor: theme.background },
             ]}
           >
-            <Image
-              source={
-                user.image
-                  ? { uri: user.image }
-                  : require('../../assets/images/placeholder.png')
-              }
-              style={styles.profileImage}
-            />
+            <TouchableOpacity
+              onPress={() => {
+                const allImages = [
+                  ...(user.image && user.image.startsWith('http')
+                    ? [user.image]
+                    : []),
+                  ...(user.images || []).filter((img) =>
+                    img.startsWith('http')
+                  ),
+                ];
+                const displayImage =
+                  user.image && user.image.startsWith('http')
+                    ? user.image
+                    : user.images &&
+                      user.images.find((img) => img.startsWith('http'))
+                    ? user.images.find((img) => img.startsWith('http'))
+                    : require('../../assets/images/placeholder.png');
+                console.log('All Images:', allImages);
+                handleImagePress(displayImage, allImages, 0);
+              }}
+            >
+              <Image
+                source={
+                  user.image && user.image.startsWith('http')
+                    ? { uri: user.image }
+                    : user.images &&
+                      user.images.find((img) => img.startsWith('http'))
+                    ? { uri: user.images.find((img) => img.startsWith('http')) }
+                    : require('../../assets/images/placeholder.png')
+                }
+                style={styles.profileImage}
+              />
+            </TouchableOpacity>
+
+            {/* Additional Profile Images */}
+            {user.images &&
+              user.images.filter((img) => img.startsWith('http')).length >
+                0 && (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.additionalImagesContainer}
+                  contentContainerStyle={styles.additionalImagesContent}
+                >
+                  {user.images
+                    .filter((img) => img.startsWith('http'))
+                    .map((imageUri, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        onPress={() => {
+                          const cloudinaryImages = [
+                            ...(user.image && user.image.startsWith('http')
+                              ? [user.image]
+                              : []),
+                            ...user.images!.filter((img) =>
+                              img.startsWith('http')
+                            ),
+                          ];
+                          const imageIndex =
+                            user.image && user.image.startsWith('http')
+                              ? index + 1
+                              : index;
+                          handleImagePress(
+                            imageUri,
+                            cloudinaryImages,
+                            imageIndex
+                          );
+                        }}
+                      >
+                        <Image
+                          source={{ uri: imageUri }}
+                          style={styles.additionalImage}
+                        />
+                      </TouchableOpacity>
+                    ))}
+                </ScrollView>
+              )}
 
             <Text style={[styles.userName, { color: theme.text }]}>
               {user.name || 'Unknown User'}
@@ -668,6 +779,65 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           }
         }}
       />
+
+      {/* Full Screen Image Modal */}
+      <Modal
+        visible={!!fullScreenImage}
+        animationType="fade"
+        presentationStyle="fullScreen"
+        onRequestClose={handleCloseFullScreen}
+      >
+        <View style={styles.fullScreenContainer}>
+          {/* Header */}
+          <View style={styles.fullScreenHeader}>
+            <TouchableOpacity
+              style={styles.fullScreenCloseButton}
+              onPress={handleCloseFullScreen}
+            >
+              <X size={24} color="white" />
+            </TouchableOpacity>
+            {fullScreenImages.length > 1 && (
+              <Text style={styles.imageCounter}>
+                {currentImageIndex + 1} / {fullScreenImages.length}
+              </Text>
+            )}
+            <View style={{ width: 40 }} />
+          </View>
+
+          {/* Image */}
+          <View style={styles.fullScreenImageContainer}>
+            <Image
+              source={
+                typeof fullScreenImage === 'string' &&
+                (fullScreenImage.startsWith('http') ||
+                  fullScreenImage.startsWith('file://'))
+                  ? { uri: fullScreenImage }
+                  : fullScreenImage
+              }
+              style={styles.fullScreenImage}
+              resizeMode="contain"
+            />
+          </View>
+
+          {/* Navigation Controls */}
+          {fullScreenImages.length > 1 && (
+            <>
+              <TouchableOpacity
+                style={[styles.navButton, styles.prevButton]}
+                onPress={handlePrevImage}
+              >
+                <Text style={styles.navButtonText}>‹</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.navButton, styles.nextButton]}
+                onPress={handleNextImage}
+              >
+                <Text style={styles.navButtonText}>›</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </Modal>
     </Modal>
   );
 };
@@ -719,6 +889,21 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 60,
     borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  additionalImagesContainer: {
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  additionalImagesContent: {
+    paddingHorizontal: 20,
+  },
+  additionalImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginRight: 12,
+    borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   userName: {
@@ -1024,6 +1209,70 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Full Screen Image Modal Styles
+  fullScreenContainer: {
+    flex: 1,
+    backgroundColor: 'black',
+  },
+  fullScreenHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
+  fullScreenCloseButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageCounter: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  fullScreenImageContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullScreenImage: {
+    width: screenWidth,
+    height: screenHeight,
+    maxWidth: screenWidth,
+    maxHeight: screenHeight,
+  },
+  navButton: {
+    position: 'absolute',
+    top: '50%',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: -25,
+  },
+  prevButton: {
+    left: 20,
+  },
+  nextButton: {
+    right: 20,
+  },
+  navButtonText: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: 'bold',
   },
 });
 

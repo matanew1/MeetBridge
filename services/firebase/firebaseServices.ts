@@ -112,17 +112,54 @@ export class FirebaseUserProfileService implements IUserProfileService {
           dataToUpdate.image.startsWith('data:') ||
           dataToUpdate.image.startsWith('/'))
       ) {
-        console.log('📤 Uploading image to Cloudinary...');
+        console.log('📤 Uploading main image to Cloudinary...');
         const uploadResult = await storageService.uploadImage(
           dataToUpdate.image
         );
 
         if (uploadResult.success && uploadResult.secureUrl) {
           dataToUpdate.image = uploadResult.secureUrl;
-          console.log('✅ Image uploaded:', dataToUpdate.image);
+          console.log('✅ Main image uploaded:', dataToUpdate.image);
         } else {
           throw new Error(uploadResult.message || 'Image upload failed');
         }
+      }
+
+      // Handle images array upload - upload any local file URIs to Cloudinary
+      if (Array.isArray(dataToUpdate.images)) {
+        console.log('📤 Processing images array...');
+        const uploadedImages: string[] = [];
+
+        for (const imageUri of dataToUpdate.images) {
+          if (
+            typeof imageUri === 'string' &&
+            (imageUri.startsWith('file://') ||
+              imageUri.startsWith('content://') ||
+              imageUri.startsWith('data:') ||
+              imageUri.startsWith('/'))
+          ) {
+            console.log('📤 Uploading additional image to Cloudinary...');
+            const uploadResult = await storageService.uploadImage(imageUri);
+
+            if (uploadResult.success && uploadResult.secureUrl) {
+              uploadedImages.push(uploadResult.secureUrl);
+              console.log(
+                '✅ Additional image uploaded:',
+                uploadResult.secureUrl
+              );
+            } else {
+              console.warn('⚠️ Failed to upload image:', imageUri);
+              // Keep the original URI if upload fails
+              uploadedImages.push(imageUri);
+            }
+          } else {
+            // Keep existing Cloudinary URLs or other valid URLs
+            uploadedImages.push(imageUri);
+          }
+        }
+
+        dataToUpdate.images = uploadedImages;
+        console.log('✅ Images array processed:', dataToUpdate.images);
       }
 
       // Handle geohash update if coordinates changed
