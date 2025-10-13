@@ -1,6 +1,4 @@
 // services/firebase/firebaseServices.ts
-// Fixed to remove queue-related methods and simplify
-
 import {
   collection,
   doc,
@@ -367,7 +365,7 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
           if (!this.matchesAgeFilter(data, filters)) return;
 
           if (data.coordinates?.latitude && data.coordinates?.longitude) {
-            const distance = LocationService.calculateDistance(
+            const distance = LocationService.calculateDistancePrecise(
               userLocation.latitude,
               userLocation.longitude,
               data.coordinates.latitude,
@@ -839,14 +837,6 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
       };
     }
   }
-
-  // REMOVED: subscribeToDiscoveryQueueUpdates (not needed in simplified version)
-  // REMOVED: markProfileAsShown (not needed without queue)
-  // REMOVED: removeFromQueue (not needed without queue)
-  // REMOVED: clearDiscoveryQueue (not needed without queue)
-  // REMOVED: cleanDuplicatesInQueue (not needed without queue)
-  // REMOVED: syncDiscoveryQueue (not needed without queue)
-  // REMOVED: populateDiscoveryQueue (not needed without queue)
 }
 
 // ============================================
@@ -1133,131 +1123,6 @@ export class FirebaseMatchingService implements IMatchingService {
           error instanceof Error ? error.message : 'Failed to update match',
       };
     }
-  }
-
-  async getMatchDetails(
-    userId: string,
-    matchId: string
-  ): Promise<ApiResponse<User>> {
-    try {
-      const userDoc = await getDoc(doc(db, 'users', matchId));
-
-      if (!userDoc.exists()) {
-        throw new Error('User not found');
-      }
-
-      const userData = userDoc.data();
-
-      return {
-        data: {
-          id: userDoc.id,
-          ...userData,
-          lastSeen: convertTimestamp(userData.lastSeen),
-        } as User,
-        success: true,
-        message: 'Match details retrieved successfully',
-      };
-    } catch (error) {
-      console.error('Error getting match details:', error);
-      return {
-        data: {} as User,
-        success: false,
-        message:
-          error instanceof Error
-            ? error.message
-            : 'Failed to get match details',
-      };
-    }
-  }
-
-  subscribeToMatches(
-    userId: string,
-    onMatchCreated: (match: {
-      matchId: string;
-      matchedUserId: string;
-      matchedUser: User;
-      conversationId: string;
-    }) => void
-  ): Unsubscribe {
-    console.log(`🔔 Setting up match listener for user: ${userId}`);
-
-    const matchesQuery1 = query(
-      collection(db, 'matches'),
-      where('user1', '==', userId),
-      where('unmatched', '==', false),
-      orderBy('createdAt', 'desc'),
-      limit(1)
-    );
-
-    const matchesQuery2 = query(
-      collection(db, 'matches'),
-      where('user2', '==', userId),
-      where('unmatched', '==', false),
-      orderBy('createdAt', 'desc'),
-      limit(1)
-    );
-
-    let lastMatchId: string | null = null;
-
-    const unsubscribe1 = onSnapshot(matchesQuery1, async (snapshot) => {
-      snapshot.docChanges().forEach(async (change) => {
-        if (change.type === 'added' && change.doc.id !== lastMatchId) {
-          const matchData = change.doc.data();
-          const matchedUserId = matchData.user2;
-
-          console.log(`🎉 New match detected (as user1): ${matchedUserId}`);
-          lastMatchId = change.doc.id;
-
-          const userDoc = await getDoc(doc(db, 'users', matchedUserId));
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            onMatchCreated({
-              matchId: change.doc.id,
-              matchedUserId,
-              matchedUser: {
-                id: userDoc.id,
-                ...userData,
-                lastSeen: convertTimestamp(userData.lastSeen),
-              } as User,
-              conversationId: matchData.conversationId,
-            });
-          }
-        }
-      });
-    });
-
-    const unsubscribe2 = onSnapshot(matchesQuery2, async (snapshot) => {
-      snapshot.docChanges().forEach(async (change) => {
-        if (change.type === 'added' && change.doc.id !== lastMatchId) {
-          const matchData = change.doc.data();
-          const matchedUserId = matchData.user1;
-
-          console.log(`🎉 New match detected (as user2): ${matchedUserId}`);
-          lastMatchId = change.doc.id;
-
-          const userDoc = await getDoc(doc(db, 'users', matchedUserId));
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            onMatchCreated({
-              matchId: change.doc.id,
-              matchedUserId,
-              matchedUser: {
-                id: userDoc.id,
-                ...userData,
-                lastSeen: convertTimestamp(userData.lastSeen),
-              } as User,
-              conversationId: matchData.conversationId,
-            });
-          }
-        }
-      });
-    });
-
-    return () => {
-      console.log(`🔕 Unsubscribing from match listener for user: ${userId}`);
-      unsubscribe1();
-      unsubscribe2();
-    };
   }
 }
 
@@ -1826,29 +1691,6 @@ export class FirebaseAuthService implements IAuthService {
     }
   }
 
-  async refreshToken(): Promise<ApiResponse<{ token: string }>> {
-    try {
-      const user = auth.currentUser;
-      if (!user) throw new Error('No user logged in');
-
-      const token = await user.getIdToken(true);
-
-      return {
-        data: { token },
-        success: true,
-        message: 'Token refreshed successfully',
-      };
-    } catch (error) {
-      console.error('Error refreshing token:', error);
-      return {
-        data: { token: '' },
-        success: false,
-        message:
-          error instanceof Error ? error.message : 'Failed to refresh token',
-      };
-    }
-  }
-
   async forgotPassword(email: string): Promise<ApiResponse<boolean>> {
     try {
       await sendPasswordResetEmail(auth, email);
@@ -1922,26 +1764,6 @@ export class FirebaseAuthService implements IAuthService {
         data: false,
         success: false,
         message: errorMessage,
-      };
-    }
-  }
-
-  async verifyEmail(token: string): Promise<ApiResponse<boolean>> {
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      return {
-        data: true,
-        success: true,
-        message: 'Email verified successfully',
-      };
-    } catch (error) {
-      console.error('Error verifying email:', error);
-      return {
-        data: false,
-        success: false,
-        message:
-          error instanceof Error ? error.message : 'Failed to verify email',
       };
     }
   }

@@ -244,19 +244,6 @@ class LocationService {
   }
 
   /**
-   * Calculate distance between two coordinates in METERS
-   */
-  calculateDistance(
-    lat1: number,
-    lon1: number,
-    lat2: number,
-    lon2: number
-  ): number {
-    const distanceKm = distanceBetween([lat1, lon1], [lat2, lon2]);
-    return Math.round(distanceKm * 1000); // Convert to meters
-  }
-
-  /**
    * Calculate distance with high precision (includes fractional meters)
    */
   calculateDistancePrecise(
@@ -269,17 +256,6 @@ class LocationService {
     return distanceKm * 1000;
   }
 
-  /**
-   * Calculate distance between coordinate objects
-   */
-  calculateDistanceBetween(from: Coordinates, to: Coordinates): number {
-    return this.calculateDistance(
-      from.latitude,
-      from.longitude,
-      to.latitude,
-      to.longitude
-    );
-  }
 
   /**
    * Generate geohash with precision 9 for 5-500m range
@@ -352,7 +328,7 @@ class LocationService {
     target: Coordinates,
     radiusInMeters: number
   ): boolean {
-    const distance = this.calculateDistance(
+    const distance = this.calculateDistancePrecise(
       center.latitude,
       center.longitude,
       target.latitude,
@@ -373,7 +349,7 @@ class LocationService {
         return location;
       }
       if (location.coordinates) {
-        const distance = this.calculateDistance(
+        const distance = this.calculateDistancePrecise(
           center.latitude,
           center.longitude,
           location.coordinates.latitude,
@@ -386,36 +362,6 @@ class LocationService {
 
     withDistances.sort((a, b) => (a.distance || 0) - (b.distance || 0));
     return withDistances;
-  }
-
-  /**
-   * Batch calculate distances for multiple locations
-   */
-  batchCalculateDistances<T extends { coordinates?: Coordinates }>(
-    locations: T[],
-    center: Coordinates
-  ): Array<T & { distance: number }> {
-    return locations
-      .filter((loc) => loc.coordinates?.latitude && loc.coordinates?.longitude)
-      .map((location) => {
-        const distance = this.calculateDistance(
-          center.latitude,
-          center.longitude,
-          location.coordinates!.latitude,
-          location.coordinates!.longitude
-        );
-        return { ...location, distance };
-      });
-  }
-
-  /**
-   * Format distance for display
-   */
-  formatDistance(meters: number): string {
-    if (meters >= 1000) {
-      return `${(meters / 1000).toFixed(1)}km`;
-    }
-    return `${Math.round(meters)}m`;
   }
 
   /**
@@ -484,20 +430,6 @@ class LocationService {
     }
   }
 
-  /**
-   * Clear location cache
-   */
-  clearCache(): void {
-    this.lastKnownLocation = null;
-    console.log('🗑️ Location cache cleared');
-  }
-
-  /**
-   * Get last known location without GPS query
-   */
-  getLastKnownLocation(): LocationCoordinates | null {
-    return this.lastKnownLocation;
-  }
 
   /**
    * Reverse geocode coordinates to get address
@@ -554,59 +486,6 @@ class LocationService {
       console.error('Error getting location with address:', error);
       return null;
     }
-  }
-
-  /**
-   * Validate coordinates
-   */
-  validateCoordinates(latitude: number, longitude: number): boolean {
-    return (
-      latitude >= -90 &&
-      latitude <= 90 &&
-      longitude >= -180 &&
-      longitude <= 180 &&
-      !isNaN(latitude) &&
-      !isNaN(longitude)
-    );
-  }
-
-  /**
-   * Filter locations within radius
-   */
-  filterByRadius<T extends { coordinates?: Coordinates }>(
-    locations: T[],
-    center: Coordinates,
-    radiusInMeters: number
-  ): T[] {
-    return locations.filter((location) => {
-      if (!location.coordinates) return false;
-
-      const distance = this.calculateDistance(
-        center.latitude,
-        center.longitude,
-        location.coordinates.latitude,
-        location.coordinates.longitude
-      );
-
-      return distance <= radiusInMeters;
-    });
-  }
-
-  /**
-   * Get performance metrics
-   */
-  getPerformanceMetrics(): {
-    lastLocationAge: string;
-    watcherActive: boolean;
-  } {
-    const lastLocationAge = this.lastKnownLocation
-      ? `${Math.round((Date.now() - this.lastKnownLocation.timestamp) / 1000)}s`
-      : 'N/A';
-
-    return {
-      lastLocationAge,
-      watcherActive: this.locationWatcher !== null,
-    };
   }
 }
 

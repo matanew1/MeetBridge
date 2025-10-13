@@ -341,7 +341,7 @@ class MissedConnectionsService {
       // Apply location filter (near you)
       if (filters?.nearLocation) {
         connections = connections.filter((conn) => {
-          const distance = LocationService.calculateDistance(
+          const distance = LocationService.calculateDistancePrecise(
             filters.nearLocation!.lat,
             filters.nearLocation!.lng,
             conn.location.lat,

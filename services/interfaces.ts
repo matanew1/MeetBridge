@@ -62,7 +62,6 @@ export interface IMatchingService {
     targetUserId: string
   ): Promise<ApiResponse<boolean>>;
   markMatchAnimationPlayed(matchId: string): Promise<ApiResponse<boolean>>;
-  getMatchDetails(userId: string, matchId: string): Promise<ApiResponse<User>>;
 }
 
 // Chat Service
@@ -108,13 +107,11 @@ export interface IAuthService {
     userData: Partial<User> & { email: string; password: string }
   ): Promise<ApiResponse<{ user: User; token: string }>>;
   logout(): Promise<ApiResponse<boolean>>;
-  refreshToken(): Promise<ApiResponse<{ token: string }>>;
   forgotPassword(email: string): Promise<ApiResponse<boolean>>;
   resetPassword(
     token: string,
     newPassword: string
   ): Promise<ApiResponse<boolean>>;
-  verifyEmail(token: string): Promise<ApiResponse<boolean>>;
   cleanupOrphanedAuth(
     firebaseUser: FirebaseUser
   ): Promise<ApiResponse<boolean>>;
