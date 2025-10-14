@@ -417,7 +417,8 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
       typeof data.age === 'number' &&
       data.gender &&
       data.coordinates?.latitude &&
-      data.coordinates?.longitude
+      data.coordinates?.longitude &&
+      data.isProfileComplete === true
     );
   }
 
@@ -426,14 +427,9 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
     targetUser: any,
     filters: SearchFilters
   ): boolean {
-    const currentUserGender = currentUser?.gender || 'other';
+    if (!filters.gender) return true;
     const targetUserGender = targetUser.gender;
-    const targetInterestedIn = targetUser.preferences?.interestedIn;
-
-    const userInterestedInTarget = targetUserGender === filters.gender;
-    const targetInterestedInUser = targetInterestedIn === currentUserGender;
-
-    return userInterestedInTarget && targetInterestedInUser;
+    return targetUserGender === filters.gender;
   }
 
   private matchesAgeFilter(targetUser: any, filters: SearchFilters): boolean {

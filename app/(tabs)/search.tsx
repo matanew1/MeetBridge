@@ -17,8 +17,8 @@ import {
   FlatList,
   ActivityIndicator,
   ListRenderItemInfo,
+  AppState,
 } from 'react-native';
-import * as Haptics from 'expo-haptics';
 import { Heart, X, Filter, RefreshCw } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
@@ -447,7 +447,7 @@ export default function SearchScreen() {
       setMaxDistance(maxDistanceMeters);
       setAgeRange(userAgeRange as [number, number]);
       updateSearchFilters({
-        gender: currentUser.preferences?.interestedIn || 'female', // Default to female if not set
+        gender: currentUser.preferences?.interestedIn,
         ageRange: userAgeRange,
         location: currentUser.location || '',
         maxDistance: maxDistanceMeters,
@@ -520,16 +520,33 @@ export default function SearchScreen() {
       // Cleanup load timer
       return () => clearTimeout(loadTimer);
     }
-  }, [currentUser?.id]); // Only run when user ID changes (initial load)
+  }, [currentUser]); // Run when currentUser changes (including coordinates updates)
 
-  // Cleanup debounce timer on unmount
+  // Auto-reload discovery profiles every 10 seconds
   useEffect(() => {
-    return () => {
-      if (filterDebounceTimer.current) {
-        clearTimeout(filterDebounceTimer.current);
+    if (!currentUser || !isAuthenticated) return;
+
+    const interval = setInterval(() => {
+      console.log('⏰ Auto-reloading discovery profiles (30 second interval)');
+      loadDiscoverProfiles(true);
+    }, 30 * 1000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [currentUser?.id, isAuthenticated, loadDiscoverProfiles]);
+
+  // Reload when app comes back to foreground
+  useEffect(() => {
+    if (!currentUser || !isAuthenticated) return;
+
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        console.log('📱 App became active - reloading discovery profiles');
+        loadDiscoverProfiles(true);
       }
-    };
-  }, []);
+    });
+
+    return () => subscription?.remove();
+  }, [currentUser?.id, isAuthenticated, loadDiscoverProfiles]);
 
   // Handle when isSearching changes (from button trigger or auto-trigger)
   useEffect(() => {
@@ -1036,9 +1053,6 @@ export default function SearchScreen() {
           '🔄 Refresh button pressed - refreshing discovery profiles...'
         );
 
-        // Haptic feedback
-        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
         // Trigger the search animation
         setShowAnimation(true);
         triggerSearchAnimation();
@@ -1047,15 +1061,8 @@ export default function SearchScreen() {
         console.log('🔄 Reloading discovery profiles...');
         await loadDiscoverProfiles(true);
         console.log('✅ Discovery profiles reloaded!');
-
-        // Success haptic feedback
-        await Haptics.notificationAsync(
-          Haptics.NotificationFeedbackType.Success
-        );
       } catch (error) {
         console.error('❌ Error refreshing discovery queue:', error);
-        // Error haptic feedback
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
     } else {
       // Just trigger animation if no user
@@ -1063,7 +1070,6 @@ export default function SearchScreen() {
       triggerSearchAnimation();
     }
   };
-
   const handleMessage = (userId: string) => {
     // Find conversation with this user
     const conversation = useUserStore

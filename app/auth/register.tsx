@@ -81,7 +81,6 @@ const RegisterScreen = () => {
         preferences: {
           ageRange: [18, 99] as [number, number],
           maxDistance: 500, // default to 500m
-          interestedIn: 'female' as 'male' | 'female',
         },
       };
 

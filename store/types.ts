@@ -43,7 +43,7 @@ export interface MatchProfile extends User {
 }
 
 export interface SearchFilters {
-  gender: 'male' | 'female'; // Only male or female, no "both" option
+  gender?: 'male' | 'female'; // Only male or female, no "both" option
   ageRange: [number, number];
   maxDistance: number; // Max distance in METERS
   interests?: string[];
