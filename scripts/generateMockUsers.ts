@@ -12,7 +12,6 @@ import {
 import { geohashForLocation } from 'geofire-common';
 import * as readline from 'readline';
 
-
 //FIX: fix slider range in filter modal to 5-500m
 //FIX: move save of edit profile modal in the bottom after all fields
 //FIX: add popup on filter button "Set your filters to discover people nearby" will happen only once at registeration level
@@ -38,9 +37,9 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Base location - Will be set from user input or default to Tel Aviv
-let BASE_LAT = 32.081273; // Default: Tel Aviv
-let BASE_LON = 34.890642; // Default: Tel Aviv
+// Base location - Will be set from user input or default to Kriyat Ono
+let BASE_LAT = 32.053783; // Default: Kriyat Ono
+let BASE_LON = 34.858582; // Default: Kriyat Ono
 
 // Helper function to generate random location near base
 function generateNearbyLocation(distanceMeters: number): {
@@ -97,102 +96,102 @@ function getRandomPlaceholderImage(
 // Wide spread of distances for comprehensive filter testing: 50m to 4500m
 const mockUsers = [
   {
-    name: 'Sarah',
+    name: 'שרה',
     age: 25,
     gender: 'female' as const,
     interestedIn: 'male' as const,
-    bio: 'Love hiking and beach volleyball 🏐',
-    interests: ['Sports', 'Nature', 'Travel', 'Music'],
+    bio: 'אוהבת טיולים וקרבסט בים 🏐',
+    interests: ['ספורט', 'טבע', 'טיולים', 'מוזיקה'],
     height: 168,
     distanceMeters: 5, // 5m away - very close!
   },
   {
-    name: 'Yael',
+    name: 'יעל',
     age: 23,
     gender: 'female' as const,
     interestedIn: 'male' as const,
-    bio: 'Foodie and coffee enthusiast ☕',
-    interests: ['Food', 'Photography', 'Art', 'Music'],
+    bio: 'חובבת אוכל וקפה ☕',
+    interests: ['אוכל', 'צילום', 'אמנות', 'מוזיקה'],
     height: 165,
     distanceMeters: 25, // 25m away
   },
   {
-    name: 'Maya',
+    name: 'מאיה',
     age: 27,
     gender: 'female' as const,
     interestedIn: 'male' as const,
-    bio: 'Yoga instructor & wellness coach 🧘‍♀️',
-    interests: ['Fitness', 'Nature', 'Wellness', 'Meditation'],
+    bio: 'מדריכת יוגה ומאמנת בריאות 🧘‍♀️',
+    interests: ['כושר', 'טבע', 'בריאות', 'מדיטציה'],
     height: 170,
     distanceMeters: 50, // 50m away
   },
   {
-    name: 'Noa',
+    name: 'נועה',
     age: 24,
     gender: 'female' as const,
     interestedIn: 'male' as const,
-    bio: 'Tech enthusiast and gamer 🎮',
-    interests: ['Gaming', 'Technology', 'Movies', 'Anime'],
+    bio: 'חובבת טכנולוגיה וגיימרית 🎮',
+    interests: ['גיימינג', 'טכנולוגיה', 'סרטים', 'אנימה'],
     height: 162,
     distanceMeters: 100, // 100m away
   },
   {
-    name: 'Tamar',
+    name: 'תמר',
     age: 26,
     gender: 'female' as const,
     interestedIn: 'male' as const,
-    bio: 'Artist and dreamer 🎨',
-    interests: ['Art', 'Music', 'Theater', 'Photography'],
+    bio: 'אמנית וחולמת 🎨',
+    interests: ['אמנות', 'מוזיקה', 'תיאטרון', 'צילום'],
     height: 172,
     distanceMeters: 200, // 200m away
   },
   {
-    name: 'Dan',
+    name: 'דן',
     age: 28,
     gender: 'male' as const,
     interestedIn: 'female' as const,
-    bio: 'Entrepreneur and adventure seeker 🚀',
-    interests: ['Business', 'Travel', 'Sports', 'Technology'],
+    bio: 'יזם וחובב הרפתקאות 🚀',
+    interests: ['עסקים', 'טיולים', 'ספורט', 'טכנולוגיה'],
     height: 180,
     distanceMeters: 10, // 10m away - very close!
   },
   {
-    name: 'Ori',
+    name: 'אורי',
     age: 26,
     gender: 'male' as const,
     interestedIn: 'female' as const,
-    bio: 'Music producer and DJ 🎧',
-    interests: ['Music', 'Nightlife', 'Travel', 'Art'],
+    bio: 'מפיק מוזיקה ודי ג׳יי 🎧',
+    interests: ['מוזיקה', 'חיי לילה', 'טיולים', 'אמנות'],
     height: 178,
     distanceMeters: 75, // 75m away
   },
   {
-    name: 'Avi',
+    name: 'אבי',
     age: 29,
     gender: 'male' as const,
     interestedIn: 'female' as const,
-    bio: 'Chef and food lover 👨‍🍳',
-    interests: ['Food', 'Cooking', 'Wine', 'Travel'],
+    bio: 'שף וחובב אוכל 👨‍🍳',
+    interests: ['אוכל', 'בישול', 'יין', 'טיולים'],
     height: 182,
     distanceMeters: 150, // 150m away
   },
   {
-    name: 'Tom',
+    name: 'תום',
     age: 25,
     gender: 'male' as const,
     interestedIn: 'female' as const,
-    bio: 'Software engineer and book nerd 📚',
-    interests: ['Technology', 'Reading', 'Gaming', 'Science'],
+    bio: 'מהנדס תוכנה וחובב ספרים 📚',
+    interests: ['טכנולוגיה', 'קריאה', 'גיימינג', 'מדע'],
     height: 175,
     distanceMeters: 300, // 300m away
   },
   {
-    name: 'Eitan',
+    name: 'איתן',
     age: 27,
     gender: 'male' as const,
     interestedIn: 'female' as const,
-    bio: 'Fitness trainer and sports enthusiast 💪',
-    interests: ['Fitness', 'Sports', 'Health', 'Nature'],
+    bio: 'מאמן כושר וחובב ספורט 💪',
+    interests: ['כושר', 'ספורט', 'בריאות', 'טבע'],
     height: 185,
     distanceMeters: 500, // 500m away - max distance
   },
@@ -202,73 +201,73 @@ const mockUsers = [
 const mockPosts = [
   {
     description:
-      "Saw someone reading 'The Great Gatsby' at the coffee shop today ☕📚. We made eye contact and smiled. Would love to chat about books!",
-    tags: ['books', 'coffee', 'meeting'],
+      "ראיתי אותך קורא את 'הגטסבי הגדול' בבית הקפה היום ☕📚. עשינו קשר עיניים וחייכנו. מת על לדבר על ספרים!",
+    tags: ['ספרים', 'קפה', 'פגישה'],
     locationIcon: '☕',
-    locationName: 'Cafe Noir',
+    locationName: 'קפה נואר',
   },
   {
     description:
-      'Amazing dance performance at the street festival today! 💃🎵 The energy was incredible. Anyone else there?',
-    tags: ['dance', 'festival', 'music'],
+      'מופע ריקוד מטורף בפסטיבל הרחוב היום! 💃🎵 האנרגיה הייתה פשוט מדהימה. מישהו אחר היה שם?',
+    tags: ['ריקוד', 'פסטיבל', 'מוזיקה'],
     locationIcon: '🎪',
-    locationName: 'Rothschild Boulevard',
+    locationName: 'כיכר העיר',
   },
   {
     description:
-      'Beautiful sunset at the beach 🌅 Shared a moment with someone special. Hope to see you again!',
-    tags: ['beach', 'sunset', 'romance'],
+      'שקיעה מדהימה בחוף 🌅 חלקתי רגע עם מישהו מיוחד. מקווה שניפגש שוב!',
+    tags: ['חוף', 'שקיעה', 'רומנטיקה'],
     locationIcon: '🏖️',
-    locationName: 'Tel Aviv Beach',
+    locationName: 'חוף הים',
   },
   {
     description:
-      'Late night pizza run 🍕 Laughed so hard at the jokes. Best random encounter ever!',
-    tags: ['food', 'nightlife', 'funny'],
+      'יציאה לפיצה באמצע הלילה 🍕 צחקתי כל כך מהבדיחות שלך. המפגש הכי מגניב שהיה לי!',
+    tags: ['אוכל', 'חיי לילה', 'מצחיק'],
     locationIcon: '🍕',
-    locationName: 'Pizza Paradise',
+    locationName: 'פיצה פרדייז',
   },
   {
     description:
-      'Morning yoga in the park 🧘‍♀️ Peaceful vibes. Caught your eye a few times 😊',
-    tags: ['yoga', 'park', 'wellness'],
+      'יוגה בבוקר בפארק 🧘‍♀️ אווירה כל כך רגועה. תפסתי אותך מסתכל עליי כמה פעמים 😊',
+    tags: ['יוגה', 'פארק', 'בריאות'],
     locationIcon: '🌳',
-    locationName: 'Yarkon Park',
+    locationName: 'פארק העיר',
   },
   {
     description:
-      'Bumped into you at the bookstore 📖 We were reaching for the same book! Fate? 😄',
-    tags: ['books', 'fate', 'reading'],
+      'נתקלתי בך בחנות הספרים 📖 שנינו הלכנו לאותו ספר! גורל או מה? 😄',
+    tags: ['ספרים', 'גורל', 'קריאה'],
     locationIcon: '📚',
-    locationName: 'Central Library',
+    locationName: 'הספרייה העירונית',
   },
   {
     description:
-      'That eye contact on the train 🚊 My stop came too soon. Still thinking about it...',
-    tags: ['train', 'commute', 'missed'],
+      'קשר עיניים מטורף ברכבת 🚊 התחנה שלי הגיעה יותר מדי מהר. עדיין חושב על זה...',
+    tags: ['רכבת', 'נסיעה', 'פספסתי'],
     locationIcon: '🚊',
-    locationName: 'Light Rail Station',
+    locationName: 'תחנת הרכבת',
   },
 ];
 
 // Mock comments for posts
 const mockComments = [
-  'That was me! Would love to reconnect! 😊',
-  'I think I saw you there too!',
-  'Beautiful story, hope you find them! ❤️',
-  'This is so sweet!',
-  'Good luck! 🍀',
-  'Was this yesterday?',
-  'I was there too! Amazing vibe!',
-  'Hope this works out for you!',
-  'Love this! Keep us updated 😍',
-  'Sending positive vibes! ✨',
+  'זה אני! מת על להתחבר שוב! 😊',
+  'אני חושב שראיתי אותך שם גם!',
+  'סיפור מקסים, מקווה שתמצא אותו! ❤️',
+  'זה כל כך חמוד!',
+  'בהצלחה! 🍀',
+  'זה היה אתמול?',
+  'הייתי שם גם! אווירה מטורפת!',
+  'מקווה שזה יצליח לך!',
+  'אוהב את זה! עדכן אותנו 😍',
+  'שולח אנרגיות טובות! ✨',
 ];
 
 async function createMockUser(
   userData: (typeof mockUsers)[0],
   index: number,
-  locationName: string = 'Tel Aviv, Israel'
+  locationName: string = 'Kriyat Ono, Israel'
 ) {
   const email = `mock${index + 1}@meetbridge.test`;
   const password = 'Test1234!';
@@ -288,14 +287,14 @@ async function createMockUser(
 
     // Generate location near base coordinates
     const location = generateNearbyLocation(userData.distanceMeters);
-    // Use precision 9 for ~4.8m accuracy (HIGH PRECISION for 5-500m range)
-    // Precision 9 provides:
-    // - Excellent accuracy (±4.8m) - perfect for close proximity matching
+    // Use precision 10 for ~1.2m accuracy (ULTRA HIGH PRECISION for 5-500m range)
+    // Precision 10 provides:
+    // - Excellent accuracy (±1.2m) - perfect for very close proximity matching
     // - Essential for 5-500m distance range
-    // - More granular location tracking
+    // - Ultra granular location tracking
     const geohash = geohashForLocation(
       [location.latitude, location.longitude],
-      9
+      10
     );
 
     // Verify actual distance for debugging
@@ -320,8 +319,8 @@ async function createMockUser(
       actualDistanceMeters: actualDistance,
       deviation: Math.abs(actualDistance - userData.distanceMeters) + 'm',
       geohash,
-      geohashPrecision: 9,
-      geohashAccuracy: '±4.8m',
+      geohashPrecision: 10,
+      geohashAccuracy: '±1.2m',
     });
 
     // Calculate date of birth from age
@@ -541,7 +540,7 @@ async function getUserLocation(): Promise<{
       '  1. Use your CURRENT device location (requires location services)'
     );
     console.log('  2. Enter coordinates manually');
-    console.log('  3. Use default Tel Aviv location');
+    console.log('  3. Use default Kriyat Ono location');
     console.log('');
 
     rl.question('Choose option (1/2/3) [default: 3]: ', (answer) => {
@@ -556,19 +555,19 @@ async function getUserLocation(): Promise<{
           'You can find your coordinates at: https://www.latlong.net/\n'
         );
 
-        rl.question('Enter latitude (e.g., 32.081273): ', (lat) => {
-          rl.question('Enter longitude (e.g., 34.890642): ', (lon) => {
-            rl.question('Enter location name (e.g., Tel Aviv): ', (name) => {
+        rl.question('Enter latitude (e.g., 32.053783): ', (lat) => {
+          rl.question('Enter longitude (e.g., 34.858582): ', (lon) => {
+            rl.question('Enter location name (e.g., Kriyat Ono): ', (name) => {
               rl.close();
               const latitude = parseFloat(lat.trim());
               const longitude = parseFloat(lon.trim());
 
               if (isNaN(latitude) || isNaN(longitude)) {
-                console.log('❌ Invalid coordinates, using Tel Aviv default');
+                console.log('❌ Invalid coordinates, using Kriyat Ono default');
                 resolve({
-                  lat: 32.081273,
-                  lon: 34.890642,
-                  locationName: 'Tel Aviv, Israel',
+                  lat: 32.053783,
+                  lon: 34.858582,
+                  locationName: 'Kriyat Ono, Israel',
                 });
               } else {
                 resolve({
@@ -585,19 +584,19 @@ async function getUserLocation(): Promise<{
           '\nEnter your coordinates (you can find them at https://www.latlong.net/)\n'
         );
 
-        rl.question('Enter latitude (e.g., 32.081273): ', (lat) => {
-          rl.question('Enter longitude (e.g., 34.890642): ', (lon) => {
-            rl.question('Enter location name (e.g., Tel Aviv): ', (name) => {
+        rl.question('Enter latitude (e.g., 32.053783): ', (lat) => {
+          rl.question('Enter longitude (e.g., 34.858582): ', (lon) => {
+            rl.question('Enter location name (e.g., Kriyat Ono): ', (name) => {
               rl.close();
               const latitude = parseFloat(lat.trim());
               const longitude = parseFloat(lon.trim());
 
               if (isNaN(latitude) || isNaN(longitude)) {
-                console.log('❌ Invalid coordinates, using Tel Aviv default');
+                console.log('❌ Invalid coordinates, using Kriyat Ono default');
                 resolve({
-                  lat: 32.081273,
-                  lon: 34.890642,
-                  locationName: 'Tel Aviv, Israel',
+                  lat: 32.053783,
+                  lon: 34.858582,
+                  locationName: 'Kriyat Ono, Israel',
                 });
               } else {
                 console.log(`✅ Using coordinates: ${latitude}, ${longitude}`);
@@ -612,11 +611,11 @@ async function getUserLocation(): Promise<{
         });
       } else {
         rl.close();
-        console.log('✅ Using default Tel Aviv location');
+        console.log('✅ Using default Kriyat Ono location');
         resolve({
-          lat: 32.081273,
-          lon: 34.890642,
-          locationName: 'Tel Aviv, Israel',
+          lat: 32.053783,
+          lon: 34.858582,
+          locationName: 'Kriyat Ono, Israel',
         });
       }
     });
@@ -625,6 +624,11 @@ async function getUserLocation(): Promise<{
 
 async function generateAllMockUsers() {
   console.log('🚀 Starting mock user generation...');
+  console.log('');
+  console.log(
+    '📍 IMPORTANT: Make sure to choose option 3 (default) to use Kriyat Ono coordinates!'
+  );
+  console.log('   This ensures users are created near your actual location.');
   console.log('');
 
   // Get user's preferred location
@@ -636,6 +640,15 @@ async function generateAllMockUsers() {
   console.log(`   Latitude: ${BASE_LAT}`);
   console.log(`   Longitude: ${BASE_LON}`);
   console.log(`   Location: ${userLocation.locationName}`);
+  console.log(
+    `   Base Geohash (precision 10): ${geohashForLocation(
+      [BASE_LAT, BASE_LON],
+      10
+    )}`
+  );
+  console.log(
+    `   Note: All mock users will be generated within 500m of this location`
+  );
   console.log('');
 
   const results = [];
@@ -674,7 +687,10 @@ async function generateAllMockUsers() {
     );
     console.log('User preferences maxDistance: 500m');
     console.log('✅ All users are within the 500m discoverable range!');
-    console.log('🎯 Geohash precision: 9 (±4.8m accuracy)');
+    console.log('🎯 Geohash precision: 10 (±1.2m accuracy)');
+    console.log(
+      '🔍 Make sure your app queries with geohash precision 8-9 for 500m range'
+    );
 
     // Step 2: Create posts
     const successfulUsers = results

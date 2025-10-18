@@ -19,7 +19,7 @@ import {
   ListRenderItemInfo,
   AppState,
 } from 'react-native';
-import { Heart, X, Filter, RefreshCw } from 'lucide-react-native';
+import { Heart, X, Filter } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import Animated, {
@@ -348,11 +348,15 @@ export default function SearchScreen() {
   const [animatingOutCards, setAnimatingOutCards] = useState<Set<string>>(
     new Set()
   );
+  const [refreshing, setRefreshing] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isPulling, setIsPulling] = useState(false);
+  const flatListRef = useRef<FlatList>(null);
+  const processedMatchesRef = useRef<Set<string>>(new Set());
 
-  // Track processed matches to prevent duplicate animations
-  const processedMatchesRef = React.useRef<Set<string>>(new Set());
+  // Animation values
+  const pulseAnimation = useSharedValue(0);
 
-  // Zustand store
   const {
     searchFilters,
     matchProfiles,
@@ -422,10 +426,7 @@ export default function SearchScreen() {
     ageRange,
   ]);
 
-  // Animation values
-  const pulseAnimation = useSharedValue(0);
-
-  const updateUserPreferences = () => {
+  const updateUserPreferences = useCallback(() => {
     // Update search filters based on user preferences
     if (currentUser) {
       let maxDistanceMeters = currentUser.preferences?.maxDistance || 500; // Default to 500m max range
@@ -449,11 +450,10 @@ export default function SearchScreen() {
       updateSearchFilters({
         gender: currentUser.preferences?.interestedIn,
         ageRange: userAgeRange,
-        location: currentUser.location || '',
         maxDistance: maxDistanceMeters,
       });
     }
-  };
+  }, [currentUser, updateSearchFilters]);
 
   // Handle authentication redirect
   useEffect(() => {
@@ -521,32 +521,6 @@ export default function SearchScreen() {
       return () => clearTimeout(loadTimer);
     }
   }, [currentUser]); // Run when currentUser changes (including coordinates updates)
-
-  // Auto-reload discovery profiles every 10 seconds
-  useEffect(() => {
-    if (!currentUser || !isAuthenticated) return;
-
-    const interval = setInterval(() => {
-      console.log('⏰ Auto-reloading discovery profiles (30 second interval)');
-      loadDiscoverProfiles(true);
-    }, 30 * 1000); // 30 seconds
-
-    return () => clearInterval(interval);
-  }, [currentUser?.id, isAuthenticated, loadDiscoverProfiles]);
-
-  // Reload when app comes back to foreground
-  useEffect(() => {
-    if (!currentUser || !isAuthenticated) return;
-
-    const subscription = AppState.addEventListener('change', (nextAppState) => {
-      if (nextAppState === 'active') {
-        console.log('📱 App became active - reloading discovery profiles');
-        loadDiscoverProfiles(true);
-      }
-    });
-
-    return () => subscription?.remove();
-  }, [currentUser?.id, isAuthenticated, loadDiscoverProfiles]);
 
   // Handle when isSearching changes (from button trigger or auto-trigger)
   useEffect(() => {
@@ -947,6 +921,58 @@ export default function SearchScreen() {
     setShowFilterModal(true);
   };
 
+  const onRefresh = useCallback(async () => {
+    console.log('🔄 Pull-to-refresh triggered');
+    setRefreshing(true);
+    try {
+      await loadDiscoverProfiles(true);
+      console.log('✅ Profiles refreshed successfully');
+    } catch (error) {
+      console.error('❌ Error refreshing profiles:', error);
+    } finally {
+      setRefreshing(false);
+      setPullDistance(0);
+      setIsPulling(false);
+    }
+  }, [loadDiscoverProfiles]);
+
+  // Custom pull-to-refresh handlers
+  const handleScrollBeginDrag = useCallback(() => {
+    setIsPulling(true);
+  }, []);
+
+  const handleScrollEndDrag = useCallback(
+    (event: any) => {
+      const { contentOffset } = event.nativeEvent;
+      if (contentOffset.y < -80 && !refreshing) {
+        // Trigger refresh only when finger is released and pull distance is sufficient
+        onRefresh();
+      } else {
+        // Reset pull state if not refreshing
+        setPullDistance(0);
+        setIsPulling(false);
+      }
+    },
+    [refreshing, onRefresh]
+  );
+
+  const handleScroll = useCallback(
+    (event: any) => {
+      const { contentOffset } = event.nativeEvent;
+      if (isPulling && contentOffset.y < 0) {
+        setPullDistance(Math.abs(contentOffset.y));
+      }
+    },
+    [isPulling]
+  );
+
+  const handleMomentumScrollEnd = useCallback(() => {
+    if (!refreshing) {
+      setPullDistance(0);
+      setIsPulling(false);
+    }
+  }, [refreshing]);
+
   // Debounce timer for filter changes
   const filterDebounceTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -1045,31 +1071,6 @@ export default function SearchScreen() {
     ]
   );
 
-  const handleSearchButton = async () => {
-    // Clear discovery queue and refresh profiles
-    if (currentUser) {
-      try {
-        console.log(
-          '🔄 Refresh button pressed - refreshing discovery profiles...'
-        );
-
-        // Trigger the search animation
-        setShowAnimation(true);
-        triggerSearchAnimation();
-
-        // Reload profiles with current filters
-        console.log('🔄 Reloading discovery profiles...');
-        await loadDiscoverProfiles(true);
-        console.log('✅ Discovery profiles reloaded!');
-      } catch (error) {
-        console.error('❌ Error refreshing discovery queue:', error);
-      }
-    } else {
-      // Just trigger animation if no user
-      setShowAnimation(true);
-      triggerSearchAnimation();
-    }
-  };
   const handleMessage = (userId: string) => {
     // Find conversation with this user
     const conversation = useUserStore
@@ -1202,20 +1203,6 @@ export default function SearchScreen() {
         <View style={styles.headerButtons}>
           <TouchableOpacity
             style={[
-              styles.refreshButton,
-              { backgroundColor: theme.surface, borderColor: theme.border },
-            ]}
-            onPress={handleSearchButton}
-            disabled={isSearching || showAnimation}
-          >
-            {isSearching || showAnimation ? (
-              <ActivityIndicator size="small" color={theme.primary} />
-            ) : (
-              <RefreshCw size={20} color={theme.primary} />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
               styles.filterButton,
               { backgroundColor: theme.surface, borderColor: theme.border },
             ]}
@@ -1226,7 +1213,26 @@ export default function SearchScreen() {
         </View>
       </View>
 
+      {/* Custom Pull-to-Refresh Indicator */}
+      {pullDistance > 0 && (
+        <Animated.View
+          style={[
+            styles.refreshIndicator,
+            {
+              opacity: Math.min(pullDistance / 80, 1),
+              transform: [{ translateY: Math.min(pullDistance / 2, 40) }],
+            },
+          ]}
+        >
+          <ActivityIndicator size="small" color={theme.primary} />
+          <Text style={[styles.refreshText, { color: theme.textSecondary }]}>
+            {pullDistance > 80 ? 'Release to refresh' : 'Pull to refresh'}
+          </Text>
+        </Animated.View>
+      )}
+
       <FlatList
+        ref={flatListRef}
         data={sortedDiscoverProfiles}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
@@ -1243,6 +1249,10 @@ export default function SearchScreen() {
         windowSize={3}
         getItemLayout={getItemLayout}
         scrollEventThrottle={16}
+        onScrollBeginDrag={handleScrollBeginDrag}
+        onScrollEndDrag={handleScrollEndDrag}
+        onScroll={handleScroll}
+        onMomentumScrollEnd={handleMomentumScrollEnd}
       />
 
       {/* Profile Detail Modal */}
@@ -1770,5 +1780,20 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
+  },
+  refreshIndicator: {
+    position: 'absolute',
+    top: 100,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+    paddingVertical: 10,
+  },
+  refreshText: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: 5,
   },
 });
