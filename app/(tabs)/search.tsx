@@ -1165,17 +1165,8 @@ export default function SearchScreen() {
   // Show discover content after animation
   if (isLoadingDiscover) {
     return (
-      <View
-        style={[
-          styles.container,
-          styles.centered,
-          { backgroundColor: theme.background },
-        ]}
-      >
-        <ActivityIndicator size="large" color={theme.primary} />
-        <Text style={[styles.loadingText, { color: theme.text }]}>
-          {t('search.loading')}
-        </Text>
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <DiscoveryAnimation theme={theme} />
       </View>
     );
   }
@@ -1254,6 +1245,13 @@ export default function SearchScreen() {
         onScroll={handleScroll}
         onMomentumScrollEnd={handleMomentumScrollEnd}
       />
+
+      {/* Refreshing Overlay */}
+      {refreshing && (
+        <View style={styles.refreshOverlay}>
+          <DiscoveryAnimation theme={theme} message="Refreshing matches..." />
+        </View>
+      )}
 
       {/* Profile Detail Modal */}
       {showProfileDetail && selectedProfile && (
@@ -1694,6 +1692,16 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     zIndex: 1000,
+  },
+  refreshOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 500,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   centeredModalOverlay: {
     position: 'absolute',
