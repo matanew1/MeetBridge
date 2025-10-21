@@ -195,6 +195,96 @@ const mockUsers = [
     height: 185,
     distanceMeters: 500, // 500m away - max distance
   },
+  {
+    name: 'יוסי',
+    age: 30,
+    gender: 'male' as const,
+    interestedIn: 'female' as const,
+    bio: 'צלם מקצועי ומטייל בעולם 📸',
+    interests: ['צילום', 'טיולים', 'אמנות', 'טבע'],
+    height: 178,
+    distanceMeters: 15, // 15m away
+  },
+  {
+    name: 'רון',
+    age: 24,
+    gender: 'male' as const,
+    interestedIn: 'female' as const,
+    bio: 'סטודנט למדעי המחשב וגיימר 🎮',
+    interests: ['גיימינג', 'טכנולוגיה', 'מדע', 'אנימה'],
+    height: 172,
+    distanceMeters: 35, // 35m away
+  },
+  {
+    name: 'עומר',
+    age: 29,
+    gender: 'male' as const,
+    interestedIn: 'female' as const,
+    bio: 'מוזיקאי וחובב ג׳אז 🎷',
+    interests: ['מוזיקה', 'ג׳אז', 'אמנות', 'חיי לילה'],
+    height: 180,
+    distanceMeters: 80, // 80m away
+  },
+  {
+    name: 'גל',
+    age: 26,
+    gender: 'male' as const,
+    interestedIn: 'female' as const,
+    bio: 'חובב אוכל ומבקר מסעדות 🍽️',
+    interests: ['אוכל', 'בישול', 'יין', 'טיולים'],
+    height: 176,
+    distanceMeters: 120, // 120m away
+  },
+  {
+    name: 'ניר',
+    age: 31,
+    gender: 'male' as const,
+    interestedIn: 'female' as const,
+    bio: 'רופא וחובב ריצה 🏃‍♂️',
+    interests: ['כושר', 'ריצה', 'בריאות', 'מדע'],
+    height: 183,
+    distanceMeters: 180, // 180m away
+  },
+  {
+    name: 'אלון',
+    age: 28,
+    gender: 'male' as const,
+    interestedIn: 'female' as const,
+    bio: 'יזם טכנולוגי ומשקיע 💼',
+    interests: ['עסקים', 'טכנולוגיה', 'השקעות', 'חדשנות'],
+    height: 179,
+    distanceMeters: 250, // 250m away
+  },
+  {
+    name: 'שי',
+    age: 25,
+    gender: 'male' as const,
+    interestedIn: 'female' as const,
+    bio: 'חובב סרטים וקולנוע 🎬',
+    interests: ['סרטים', 'קולנוע', 'תיאטרון', 'אמנות'],
+    height: 174,
+    distanceMeters: 400, // 400m away
+  },
+  {
+    name: 'ליאור',
+    age: 27,
+    gender: 'male' as const,
+    interestedIn: 'female' as const,
+    bio: 'מדריך טיולים וחובב הרפתקאות 🗺️',
+    interests: ['טיולים', 'הרפתקאות', 'טבע', 'צילום'],
+    height: 181,
+    distanceMeters: 45, // 45m away
+  },
+  {
+    name: 'דור',
+    age: 29,
+    gender: 'male' as const,
+    interestedIn: 'female' as const,
+    bio: 'אדריכל ומעצב פנים 🏗️',
+    interests: ['אדריכלות', 'עיצוב', 'אמנות', 'חדשנות'],
+    height: 177,
+    distanceMeters: 90, // 90m away
+  },
 ];
 
 // Mock posts data - will be created by random users

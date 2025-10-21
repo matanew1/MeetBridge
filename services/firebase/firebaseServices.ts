@@ -429,7 +429,14 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
   ): boolean {
     if (!filters.gender) return true;
     const targetUserGender = targetUser.gender;
-    return targetUserGender === filters.gender;
+    const currentUserGender = currentUser.gender;
+    const targetUserInterestedIn = targetUser.preferences?.interestedIn;
+
+    // Check if target user matches the gender current user is interested in
+    if (targetUserGender !== filters.gender) return false;
+
+    // Check if target user is also interested in current user's gender (mutual interest)
+    return targetUserInterestedIn === currentUserGender;
   }
 
   private matchesAgeFilter(targetUser: any, filters: SearchFilters): boolean {
