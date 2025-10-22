@@ -1,0 +1,40 @@
+{
+    "project_info": {
+        "project_number": "331612362377",
+        "firebase_url": "https://meetbridge-b5cdc-default-rtdb.firebaseio.com",
+        "project_id": "meetbridge-b5cdc",
+        "storage_bucket": "meetbridge-b5cdc.firebasestorage.app"
+    },
+    "client": [
+        {
+            "client_info": {
+                "mobilesdk_app_id": "1:331612362377:android:6ad392ab246120d4461858",
+                "android_client_info": {
+                    "package_name": "com.meetbridge.app"
+                }
+            },
+            "oauth_client": [],
+            "api_key": [
+                {
+                    "current_key": "AIzaSyBPdV1BiL67xJes80Gv_tozl1E1ZAqslbk"
+                }
+            ],
+            "services": {
+                "appinvite_service": {
+                    "other_platform_oauth_client": []
+                },
+                "analytics_service": {
+                    "status": 1,
+                    "tracking_id": "G-P32ZYV8LC5"
+                }
+            }
+        }
+    ],
+    "configuration_version": "1",
+    "gcm_default_sender_id": "331612362377",
+    "project_info_additional": {
+        "auth_domain": "meetbridge-b5cdc.firebaseapp.com",
+        "measurement_id": "G-P32ZYV8LC5",
+        "app_id": "1:331612362377:web:6ad392ab246120d4461858"
+    }
+}
