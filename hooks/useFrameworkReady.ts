@@ -8,6 +8,7 @@ declare global {
 
 export function useFrameworkReady() {
   useEffect(() => {
+    // keep existing call but no-op if not present
     window.frameworkReady?.();
   });
 }

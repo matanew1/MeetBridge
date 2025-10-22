@@ -51,7 +51,6 @@ export interface IDiscoveryService {
     reason: string
   ): Promise<ApiResponse<boolean>>;
 }
-}
 
 // Matching Service
 export interface IMatchingService {
