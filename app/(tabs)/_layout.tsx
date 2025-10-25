@@ -18,7 +18,14 @@ import { useAuth } from '../../contexts/AuthContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import ProfileModal from '../components/ProfileModal';
 import notificationService from '../../services/notificationService';
-import '../../i18n';
+import {
+  scale,
+  verticalScale,
+  moderateScale,
+  spacing,
+  borderRadius,
+  deviceInfo,
+} from '../../utils/responsive';
 
 export default function TabLayout() {
   const { t } = useTranslation();
@@ -94,10 +101,12 @@ export default function TabLayout() {
             shadowOffset: { width: 0, height: -2 },
             shadowOpacity: isDarkMode ? 0.3 : 0.1,
             shadowRadius: 8,
-            paddingTop: 12,
-            paddingBottom: 0,
+            paddingTop: spacing.sm,
+            paddingBottom: deviceInfo.isSmallDevice ? spacing.xs : 0,
             marginBottom: 0,
-            height: 90,
+            height: deviceInfo.isSmallDevice
+              ? verticalScale(70)
+              : verticalScale(90),
             position: 'absolute',
             bottom: 0,
             left: 0,
@@ -106,7 +115,9 @@ export default function TabLayout() {
           tabBarActiveTintColor: theme.tabBarActive,
           tabBarInactiveTintColor: theme.tabBarInactive,
           tabBarLabelStyle: {
-            fontSize: 11,
+            fontSize: deviceInfo.isSmallDevice
+              ? moderateScale(10)
+              : moderateScale(11),
             fontWeight: '500',
             marginTop: 1,
           },

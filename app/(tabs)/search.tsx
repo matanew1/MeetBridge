@@ -46,6 +46,16 @@ import { FirebaseDiscoveryService } from '../../services/firebase/firebaseServic
 import { services } from '../../services';
 import notificationService from '../../services/notificationService';
 
+import {
+  scale,
+  verticalScale,
+  moderateScale,
+  getNumColumns,
+  spacing,
+  borderRadius,
+  deviceInfo,
+} from '../../utils/responsive';
+
 const { width, height } = Dimensions.get('window');
 
 interface ProfileCardProps {
@@ -800,7 +810,7 @@ export default function SearchScreen() {
   const keyExtractor = useCallback((item: any) => item.id, []);
 
   const getItemLayout = useCallback((_data: any, index: number) => {
-    const itemWidth = (width - 48) / 2; // 2 columns with padding
+    const itemWidth = (width - spacing.xl) / getNumColumns(120); // Responsive columns with padding
     const row = Math.floor(index / 2);
     return {
       length: itemWidth + 20, // item height + margin

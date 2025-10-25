@@ -1,3 +1,13 @@
+import {
+  scale,
+  verticalScale,
+  moderateScale,
+  fontScale,
+  spacing,
+  borderRadius,
+  iconSize,
+} from '../utils/responsive';
+
 export const lightTheme = {
   // Background colors
   background: '#fcf1fc',
@@ -38,6 +48,64 @@ export const lightTheme = {
   // Card
   cardBackground: '#FFFFFF',
   cardShadow: 'rgba(0, 0, 0, 0.1)',
+
+  // Responsive spacing
+  spacing,
+
+  // Responsive border radius
+  borderRadius,
+
+  // Responsive icon sizes
+  iconSize,
+
+  // Responsive typography
+  typography: {
+    h1: {
+      fontSize: fontScale(32),
+      fontWeight: '700' as const,
+      lineHeight: fontScale(40),
+    },
+    h2: {
+      fontSize: fontScale(28),
+      fontWeight: '600' as const,
+      lineHeight: fontScale(36),
+    },
+    h3: {
+      fontSize: fontScale(24),
+      fontWeight: '600' as const,
+      lineHeight: fontScale(32),
+    },
+    h4: {
+      fontSize: fontScale(20),
+      fontWeight: '500' as const,
+      lineHeight: fontScale(28),
+    },
+    body: {
+      fontSize: fontScale(16),
+      fontWeight: '400' as const,
+      lineHeight: fontScale(24),
+    },
+    caption: {
+      fontSize: fontScale(14),
+      fontWeight: '400' as const,
+      lineHeight: fontScale(20),
+    },
+    small: {
+      fontSize: fontScale(12),
+      fontWeight: '400' as const,
+      lineHeight: fontScale(16),
+    },
+  },
+
+  // Layout
+  layout: {
+    containerPadding: spacing.md,
+    screenPadding: spacing.lg,
+    borderRadius: borderRadius.md,
+    cardPadding: spacing.md,
+    buttonHeight: verticalScale(48),
+    inputHeight: verticalScale(48),
+  },
 };
 
 export const darkTheme = {
@@ -80,37 +148,84 @@ export const darkTheme = {
   // Card
   cardBackground: '#1E1E1E',
   cardShadow: 'rgba(0, 0, 0, 0.3)',
+
+  // Responsive spacing
+  spacing,
+
+  // Responsive border radius
+  borderRadius,
+
+  // Responsive icon sizes
+  iconSize,
+
+  // Responsive typography
+  typography: {
+    h1: {
+      fontSize: fontScale(32),
+      fontWeight: '700' as const,
+      lineHeight: fontScale(40),
+    },
+    h2: {
+      fontSize: fontScale(28),
+      fontWeight: '600' as const,
+      lineHeight: fontScale(36),
+    },
+    h3: {
+      fontSize: fontScale(24),
+      fontWeight: '600' as const,
+      lineHeight: fontScale(32),
+    },
+    h4: {
+      fontSize: fontScale(20),
+      fontWeight: '500' as const,
+      lineHeight: fontScale(28),
+    },
+    body: {
+      fontSize: fontScale(16),
+      fontWeight: '400' as const,
+      lineHeight: fontScale(24),
+    },
+    caption: {
+      fontSize: fontScale(14),
+      fontWeight: '400' as const,
+      lineHeight: fontScale(20),
+    },
+    small: {
+      fontSize: fontScale(12),
+      fontWeight: '400' as const,
+      lineHeight: fontScale(16),
+    },
+  },
+
+  // Layout
+  layout: {
+    containerPadding: spacing.md,
+    screenPadding: spacing.lg,
+    borderRadius: borderRadius.md,
+    cardPadding: spacing.md,
+    buttonHeight: verticalScale(48),
+    inputHeight: verticalScale(48),
+  },
 };
 
 export type Theme = typeof lightTheme;
 
-// Main THEME constant with spacing and other design tokens
+// Legacy THEME constant - kept for backward compatibility
+// Components should migrate to using theme.spacing, theme.borderRadius, etc. from useTheme()
 export const THEME = {
   colors: {
     ...lightTheme,
     white: '#FFFFFF',
     black: '#000000',
   },
-  spacing: {
-    xs: 4,
-    sm: 8,
-    md: 16,
-    lg: 24,
-    xl: 32,
-    xxl: 48,
-  },
-  borderRadius: {
-    sm: 4,
-    md: 8,
-    lg: 16,
-    xl: 24,
-  },
+  spacing: spacing,
+  borderRadius: borderRadius,
   fonts: {
-    small: 12,
-    regular: 16,
-    medium: 18,
-    large: 24,
-    xlarge: 32,
+    small: fontScale(12),
+    regular: fontScale(16),
+    medium: fontScale(18),
+    large: fontScale(24),
+    xlarge: fontScale(32),
   },
   shadows: {
     small: {

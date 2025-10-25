@@ -2,6 +2,13 @@ import React from 'react';
 import { View, StyleSheet, ViewStyle, TouchableOpacity } from 'react-native';
 import { THEME } from '../../../constants/theme';
 import { useTheme } from '../../../contexts/ThemeContext';
+import {
+  scale,
+  verticalScale,
+  moderateScale,
+  spacing,
+  borderRadius,
+} from '../../../utils/responsive';
 
 export type CardVariant = 'elevated' | 'outlined' | 'flat';
 
@@ -24,9 +31,9 @@ const Card: React.FC<CardProps> = ({
 
   const getCardStyle = (): ViewStyle => {
     const baseStyle: ViewStyle = {
-      borderRadius: THEME.borderRadius.lg,
+      borderRadius: borderRadius.lg,
       backgroundColor: theme.cardBackground,
-      padding: THEME.spacing[padding],
+      padding: spacing[padding],
     };
 
     const variantStyles: Record<CardVariant, ViewStyle> = {

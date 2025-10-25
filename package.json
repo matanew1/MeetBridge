@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "start": "npx expo start -c",
-    "tunnel": "npx expo start --tunnel",
+    "tunnel": "npx expo start --tunnel --clear",
     "dev": "EXPO_NO_TELEMETRY=1 npx expo start",
     "build:web": "npx expo export --platform web",
     "lint": "npx expo lint",

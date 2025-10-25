@@ -20,6 +20,14 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import { Image } from 'expo-image';
+import {
+  scale,
+  verticalScale,
+  moderateScale,
+  spacing,
+  borderRadius,
+  deviceInfo,
+} from '../../utils/responsive';
 
 const { width, height } = Dimensions.get('window');
 

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -22,8 +22,25 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
+import {
+  scale,
+  verticalScale,
+  moderateScale,
+  spacing,
+  borderRadius,
+  deviceInfo,
+} from '../../utils/responsive';
 import { PREDEFINED_INTERESTS } from '../../constants/interests';
 import ZodiacBadge from './ZodiacBadge';
+import { auth, db } from '../../services/firebase/config';
+import {
+  doc,
+  getDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+} from 'firebase/firestore';
 
 const { width, height } = Dimensions.get('window');
 
@@ -65,6 +82,43 @@ const ProfileDetail = ({
   const theme = isDarkMode ? darkTheme : lightTheme;
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const imageScrollRef = useRef<FlatList>(null);
+  const [isMatched, setIsMatched] = useState(false);
+  const [checkingMatch, setCheckingMatch] = useState(true);
+
+  // Check if users are already matched
+  useEffect(() => {
+    const checkIfMatched = async () => {
+      try {
+        const currentUserId = auth.currentUser?.uid;
+        if (!currentUserId || !user.id) {
+          setCheckingMatch(false);
+          return;
+        }
+
+        // Check if there's an active match between current user and profile user
+        const [user1, user2] = [currentUserId, user.id].sort();
+
+        const matchQuery = query(
+          collection(db, 'matches'),
+          where('user1', '==', user1),
+          where('user2', '==', user2),
+          where('unmatched', '==', false)
+        );
+
+        const matchSnapshot = await getDocs(matchQuery);
+        const hasMatch = !matchSnapshot.empty;
+
+        setIsMatched(hasMatch);
+      } catch (error) {
+        console.error('Error checking match status:', error);
+        setIsMatched(false);
+      } finally {
+        setCheckingMatch(false);
+      }
+    };
+
+    checkIfMatched();
+  }, [user.id]);
 
   const userImages =
     user.images && user.images.length > 0
@@ -239,67 +293,78 @@ const ProfileDetail = ({
             },
           ]}
         >
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              styles.dislikeButton,
-              isDisliked && { opacity: 0.5 },
-            ]}
-            onPress={() => onDislike(user.id)}
-            disabled={isDisliked}
-          >
-            <X
-              size={24}
-              color={isDisliked ? theme.textSecondary : theme.error}
-            />
-          </TouchableOpacity>
+          {checkingMatch ? (
+            // Show loading state while checking match status
+            <View style={styles.actionButton}>
+              <Text style={{ color: theme.textSecondary }}>Loading...</Text>
+            </View>
+          ) : isMatched ? (
+            // Already matched - show only unmatch and message
+            <>
+              {onUnmatch && (
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.dislikeButton]}
+                  onPress={() => onUnmatch(user.id)}
+                >
+                  <X size={24} color={theme.error} />
+                </TouchableOpacity>
+              )}
 
-          {onMessage && (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.messageButton]}
-              onPress={() => onMessage(user.id)}
-            >
-              <MessageCircle size={24} color={theme.primary} />
-            </TouchableOpacity>
+              {onMessage && (
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.messageButton]}
+                  onPress={() => onMessage(user.id)}
+                >
+                  <MessageCircle size={24} color={theme.primary} />
+                </TouchableOpacity>
+              )}
+            </>
+          ) : (
+            // Not matched yet - show all options
+            <>
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  styles.dislikeButton,
+                  isDisliked && { opacity: 0.5 },
+                ]}
+                onPress={() => onDislike(user.id)}
+                disabled={isDisliked}
+              >
+                <X
+                  size={24}
+                  color={isDisliked ? theme.textSecondary : theme.error}
+                />
+              </TouchableOpacity>
+
+              {onMessage && (
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.messageButton]}
+                  onPress={() => onMessage(user.id)}
+                >
+                  <MessageCircle size={24} color={theme.primary} />
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  styles.likeButton,
+                  isLiked && { opacity: 0.5 },
+                ]}
+                onPress={() => onLike(user.id)}
+                disabled={isLiked}
+              >
+                <Heart
+                  size={24}
+                  color={isLiked ? theme.textSecondary : theme.primary}
+                  fill={isLiked ? theme.primary : 'transparent'}
+                />
+              </TouchableOpacity>
+            </>
           )}
-
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              styles.likeButton,
-              isLiked && { opacity: 0.5 },
-            ]}
-            onPress={() => onLike(user.id)}
-            disabled={isLiked}
-          >
-            <Heart
-              size={24}
-              color={isLiked ? theme.textSecondary : theme.primary}
-              fill={isLiked ? theme.primary : 'transparent'}
-            />
-          </TouchableOpacity>
         </View>
       </ScrollView>
-
-      {/* Unmatch button for matches */}
-      {onUnmatch && (
-        <View
-          style={[
-            styles.unmatchSection,
-            {
-              backgroundColor: theme.surface,
-              borderTopColor: theme.border,
-            },
-          ]}
-        >
-          <TouchableOpacity
-            style={styles.unmatchButtonDetail}
-            onPress={() => onUnmatch(user.id)}
-          >
-            <Text style={styles.unmatchButtonText}>{t('profile.unmatch')}</Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </SafeAreaView>
   );
 };
@@ -504,7 +569,7 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
-    marginBottom: 50,
+    marginBottom: 70,
   },
   actionButton: {
     width: 60,

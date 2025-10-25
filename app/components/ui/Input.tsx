@@ -10,6 +10,14 @@ import {
 } from 'react-native';
 import { THEME } from '../../../constants/theme';
 import { useTheme } from '../../../contexts/ThemeContext';
+import {
+  scale,
+  verticalScale,
+  moderateScale,
+  spacing,
+  borderRadius,
+  fontScale,
+} from '../../../utils/responsive';
 
 interface InputProps extends TextInputProps {
   label?: string;

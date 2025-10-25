@@ -10,6 +10,13 @@ import {
 } from 'react-native';
 import { THEME } from '../../../constants/theme';
 import { useTheme } from '../../../contexts/ThemeContext';
+import {
+  scale,
+  verticalScale,
+  moderateScale,
+  spacing,
+  borderRadius,
+} from '../../../utils/responsive';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 export type ButtonSize = 'small' | 'medium' | 'large';
@@ -39,29 +46,29 @@ const Button: React.FC<ButtonProps> = ({
 
   const getButtonStyle = (): ViewStyle => {
     const baseStyle: ViewStyle = {
-      borderRadius: THEME.borderRadius.md,
+      borderRadius: borderRadius.md,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: THEME.spacing.sm,
+      gap: spacing.sm,
     };
 
     // Size styles
     const sizeStyles: Record<ButtonSize, ViewStyle> = {
       small: {
-        paddingVertical: THEME.spacing.xs,
-        paddingHorizontal: THEME.spacing.md,
-        minHeight: 36,
+        paddingVertical: spacing.xs,
+        paddingHorizontal: spacing.md,
+        minHeight: verticalScale(36),
       },
       medium: {
-        paddingVertical: THEME.spacing.sm,
-        paddingHorizontal: THEME.spacing.lg,
-        minHeight: 44,
+        paddingVertical: spacing.sm,
+        paddingHorizontal: spacing.lg,
+        minHeight: verticalScale(44),
       },
       large: {
-        paddingVertical: THEME.spacing.md,
-        paddingHorizontal: THEME.spacing.xl,
-        minHeight: 52,
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.xl,
+        minHeight: verticalScale(52),
       },
     };
 
