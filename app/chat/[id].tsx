@@ -1034,6 +1034,7 @@ const ChatScreen = () => {
             onLike={() => {}}
             onDislike={() => {}}
             onMessage={handleMessageFromProfile}
+            onUnmatch={handleUnmatch}
           />
         </View>
       )}

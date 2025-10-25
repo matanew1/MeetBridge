@@ -1235,22 +1235,8 @@ export default function SearchScreen() {
             onClose={handleCloseProfile}
             onLike={handleLike}
             onDislike={handleDislike}
-            onMessage={
-              // Only allow messaging if it's a match
-              getMatchedProfiles().some(
-                (match) => match.id === selectedProfile.id
-              )
-                ? handleMessage
-                : undefined
-            }
-            onUnmatch={
-              // Only allow unmatching if it's a match
-              getMatchedProfiles().some(
-                (match) => match.id === selectedProfile.id
-              )
-                ? handleUnmatch
-                : undefined
-            }
+            onMessage={handleMessage}
+            onUnmatch={handleUnmatch}
             isLiked={likedProfiles.includes(selectedProfile.id)}
             isDisliked={dislikedProfiles.includes(selectedProfile.id)}
           />

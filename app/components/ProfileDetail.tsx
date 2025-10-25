@@ -295,9 +295,15 @@ const ProfileDetail = ({
         >
           {checkingMatch ? (
             // Show loading state while checking match status
-            <View style={styles.actionButton}>
-              <Text style={{ color: theme.textSecondary }}>Loading...</Text>
-            </View>
+            <>
+              <View style={styles.actionButton}>
+                <Text style={{ color: theme.textSecondary, fontSize: 12 }}>
+                  Loading...
+                </Text>
+              </View>
+              <View style={styles.actionButton} />
+              <View style={styles.actionButton} />
+            </>
           ) : isMatched ? (
             // Already matched - show only unmatch and message
             <>
@@ -336,15 +342,6 @@ const ProfileDetail = ({
                   color={isDisliked ? theme.textSecondary : theme.error}
                 />
               </TouchableOpacity>
-
-              {onMessage && (
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.messageButton]}
-                  onPress={() => onMessage(user.id)}
-                >
-                  <MessageCircle size={24} color={theme.primary} />
-                </TouchableOpacity>
-              )}
 
               <TouchableOpacity
                 style={[
