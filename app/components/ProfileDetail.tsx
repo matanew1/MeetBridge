@@ -566,7 +566,7 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
-    marginBottom: 70,
+    marginBottom: 90,
   },
   actionButton: {
     width: 60,
