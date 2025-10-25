@@ -242,7 +242,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
     // Optional but important fields
     if (user.bio) completionScore++;
-    if (user.location) completionScore++;
+    if (user.coordinates) completionScore++;
     if (user.interests && user.interests.length > 0) completionScore++;
     if (user.preferences) completionScore++;
 
