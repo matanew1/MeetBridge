@@ -184,6 +184,24 @@ class NotificationService {
   }
 
   /**
+   * Cleanup notification listeners
+   */
+  async cleanup(): Promise<void> {
+    console.log('🔕 Cleaning up notification listeners');
+
+    // Remove notification listeners
+    if (this.notificationListener) {
+      this.notificationListener.remove();
+      this.notificationListener = null;
+    }
+
+    if (this.responseListener) {
+      this.responseListener.remove();
+      this.responseListener = null;
+    }
+  }
+
+  /**
    * Send local notification (for testing or immediate feedback)
    */
   async sendLocalNotification(

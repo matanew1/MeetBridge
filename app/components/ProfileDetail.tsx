@@ -229,7 +229,77 @@ const ProfileDetail = ({
             </View>
           )}
         </View>
+        {/* Action Buttons */}
+        <View
+          style={[
+            styles.actionButtons,
+            {
+              backgroundColor: theme.surface,
+              borderTopColor: theme.border,
+            },
+          ]}
+        >
+          <TouchableOpacity
+            style={[
+              styles.actionButton,
+              styles.dislikeButton,
+              isDisliked && { opacity: 0.5 },
+            ]}
+            onPress={() => onDislike(user.id)}
+            disabled={isDisliked}
+          >
+            <X
+              size={24}
+              color={isDisliked ? theme.textSecondary : theme.error}
+            />
+          </TouchableOpacity>
+
+          {onMessage && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.messageButton]}
+              onPress={() => onMessage(user.id)}
+            >
+              <MessageCircle size={24} color={theme.primary} />
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={[
+              styles.actionButton,
+              styles.likeButton,
+              isLiked && { opacity: 0.5 },
+            ]}
+            onPress={() => onLike(user.id)}
+            disabled={isLiked}
+          >
+            <Heart
+              size={24}
+              color={isLiked ? theme.textSecondary : theme.primary}
+              fill={isLiked ? theme.primary : 'transparent'}
+            />
+          </TouchableOpacity>
+        </View>
       </ScrollView>
+
+      {/* Unmatch button for matches */}
+      {onUnmatch && (
+        <View
+          style={[
+            styles.unmatchSection,
+            {
+              backgroundColor: theme.surface,
+              borderTopColor: theme.border,
+            },
+          ]}
+        >
+          <TouchableOpacity
+            style={styles.unmatchButtonDetail}
+            onPress={() => onUnmatch(user.id)}
+          >
+            <Text style={styles.unmatchButtonText}>{t('profile.unmatch')}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -433,6 +503,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
     paddingVertical: 20,
     borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+    marginBottom: 50,
   },
   actionButton: {
     width: 60,
@@ -460,6 +532,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 20,
     borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
   },
   unmatchButtonDetail: {
     backgroundColor: '#FFEBEE',

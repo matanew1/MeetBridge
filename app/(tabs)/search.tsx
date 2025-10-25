@@ -38,6 +38,7 @@ import MatchModal from '../components/MatchModal';
 import FilterModal from '../components/FilterModal';
 import DiscoveryAnimation from '../components/DiscoveryAnimation';
 import EnhancedMatchAnimation from '../components/EnhancedMatchAnimation';
+import WinkAnimation from '../components/WinkAnimation';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
@@ -56,8 +57,6 @@ interface ProfileCardProps {
     image: string;
     images?: string[];
   };
-  onLike: (id: string) => void;
-  onDislike: (id: string) => void;
   onPress: (user: any) => void;
   isLiked: boolean;
   isDisliked: boolean;
@@ -68,8 +67,6 @@ interface ProfileCardProps {
 const ProfileCard = memo(
   ({
     user,
-    onLike,
-    onDislike,
     onPress,
     isLiked,
     isDisliked,
@@ -225,48 +222,7 @@ const ProfileCard = memo(
             </Text>
           </View>
 
-          {/* Action buttons */}
-          <View style={styles.cardActions}>
-            <TouchableOpacity
-              style={[
-                styles.actionBtn,
-                styles.dislikeBtn,
-                {
-                  backgroundColor: theme.errorBackground,
-                  shadowColor: theme.shadow,
-                },
-              ]}
-              onPress={(e) => {
-                e.stopPropagation();
-                onDislike(user.id);
-              }}
-              disabled={isDisliked || isLiked}
-            >
-              <X size={16} color={theme.error} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.actionBtn,
-                styles.likeBtn,
-                {
-                  backgroundColor: theme.primaryVariant,
-                  shadowColor: theme.shadow,
-                },
-              ]}
-              onPress={(e) => {
-                e.stopPropagation();
-                onLike(user.id);
-              }}
-              disabled={isLiked || isDisliked}
-            >
-              <Heart
-                size={16}
-                color={theme.primary}
-                fill={isLiked ? theme.primary : 'transparent'}
-              />
-            </TouchableOpacity>
-          </View>
+          {/* Action buttons removed - now available in profile detail */}
         </TouchableOpacity>
 
         {user.distance !== null && user.distance !== undefined && (
@@ -338,6 +294,7 @@ export default function SearchScreen() {
   const [maxDistance, setMaxDistance] = useState(500); // Default to 500m max range (precision 9)
   const [ageRange, setAgeRange] = useState<[number, number]>([18, 99]); // Default age range 18-99
   const [showMatchAnimation, setShowMatchAnimation] = useState(false);
+  const [showWinkAnimation, setShowWinkAnimation] = useState(false);
   const [matchData, setMatchData] = useState<{
     user: any;
     matchId: string;
@@ -735,6 +692,13 @@ export default function SearchScreen() {
     (profileId: string) => {
       console.log('handleLike called for profile:', profileId);
 
+      // Show wink animation immediately
+      setShowWinkAnimation(true);
+
+      // Close profile modal
+      setShowProfileDetail(false);
+      setSelectedProfile(null);
+
       // Find the user data before we remove it from the store
       const userToLike = discoverProfiles.find((p) => p.id === profileId);
 
@@ -828,6 +792,10 @@ export default function SearchScreen() {
     setSelectedProfile(null);
   }, []);
 
+  const handleWinkAnimationComplete = useCallback(() => {
+    setShowWinkAnimation(false);
+  }, []);
+
   // FlatList optimization callbacks (defined after handlers to avoid hoisting issues)
   const keyExtractor = useCallback((item: any) => item.id, []);
 
@@ -846,8 +814,6 @@ export default function SearchScreen() {
       <View style={styles.gridItem}>
         <ProfileCard
           user={item}
-          onLike={handleLike}
-          onDislike={handleDislike}
           onPress={handleProfilePress}
           isLiked={likedProfiles.includes(item.id)}
           isDisliked={dislikedProfiles.includes(item.id)}
@@ -857,8 +823,6 @@ export default function SearchScreen() {
       </View>
     ),
     [
-      handleLike,
-      handleDislike,
       handleProfilePress,
       likedProfiles,
       dislikedProfiles,
@@ -1377,6 +1341,13 @@ export default function SearchScreen() {
           theme={theme}
         />
       )}
+
+      {/* Wink Animation */}
+      <WinkAnimation
+        visible={showWinkAnimation}
+        onComplete={handleWinkAnimationComplete}
+        theme={theme}
+      />
     </View>
   );
 }
@@ -1514,25 +1485,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 1,
   },
-  cardActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginTop: 10,
-  },
-  actionBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 3,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-  },
-  dislikeBtn: {},
-  likeBtn: {},
   distanceContainer: {
     position: 'absolute',
     top: 8,

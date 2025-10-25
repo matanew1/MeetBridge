@@ -7,7 +7,7 @@ const resources = {
     translation: {
       // Navigation & Tabs
       tabs: {
-        discover: 'Liked',
+        discover: 'Winks',
         search: 'Search',
         connections: 'Connections',
         chat: 'Chat',
@@ -50,17 +50,17 @@ const resources = {
 
       // Loved/Liked Screen
       loved: {
-        title: 'Matches & Likes',
+        title: 'Matches & Winks',
         matches: 'Matches',
-        liked: 'You Liked',
+        liked: 'You Winked',
         noMatches: 'No matches yet',
-        noLiked: 'No likes yet',
+        noLiked: 'No winks yet',
         startSwiping: 'Start swiping to find matches',
         keepSwiping: 'Keep swiping to find people you like',
         message: 'Message',
         unmatch: 'Unmatch',
-        personLiked: 'person liked',
-        peopleLiked: 'people liked',
+        personLiked: 'person winked',
+        peopleLiked: 'people winked',
         oneMatch: 'match',
         multipleMatches: 'matches',
       },
@@ -74,15 +74,15 @@ const resources = {
         age: 'Age',
         distance: 'Distance',
         sendMessage: 'Send Message',
-        like: 'Like',
+        like: 'Wink',
         pass: 'Pass',
         unmatch: 'Unmatch',
       },
 
       // Actions & Buttons
       actions: {
-        like: 'Like',
-        dislike: 'Dislike',
+        like: 'Wink',
+        dislike: 'Unwink',
         message: 'Message',
         close: 'Close',
         cancel: 'Cancel',
