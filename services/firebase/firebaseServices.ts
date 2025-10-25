@@ -455,6 +455,7 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
 
     const now = new Date();
     const interactedIds = new Set<string>();
+    const expiredDocs: string[] = [];
 
     snapshot.docs.forEach((doc) => {
       const data = doc.data();
@@ -465,11 +466,25 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
           ? data.expiresAt.toDate()
           : new Date(data.expiresAt);
 
-        if (expiresAt <= now) return;
+        if (expiresAt <= now) {
+          // Mark expired interaction for deletion
+          expiredDocs.push(doc.id);
+          return;
+        }
       }
 
       interactedIds.add(targetUserId);
     });
+
+    // Delete expired interactions
+    if (expiredDocs.length > 0) {
+      const batch = writeBatch(db);
+      expiredDocs.forEach((docId) => {
+        const docRef = doc(db, 'interactions', docId);
+        batch.delete(docRef);
+      });
+      await batch.commit();
+    }
 
     return interactedIds;
   }

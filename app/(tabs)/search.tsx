@@ -775,6 +775,10 @@ export default function SearchScreen() {
     (profileId: string) => {
       console.log('handleDislike called for profile:', profileId);
 
+      // Close the profile detail modal when disliking
+      setShowProfileDetail(false);
+      setSelectedProfile(null);
+
       // Add to animating cards immediately for UI feedback
       setAnimatingOutCards((prev) => new Set([...prev, profileId]));
 
