@@ -10,18 +10,23 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
-  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, router } from 'expo-router';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import { Image } from 'expo-image';
 
-const { width, height } = Dimensions.get('window');
+import {
+  scale,
+  verticalScale,
+  moderateScale,
+  spacing,
+  borderRadius,
+  deviceInfo,
+} from '../../utils/responsive';
 
 const RegisterScreen = () => {
   const [formData, setFormData] = useState({
@@ -81,6 +86,7 @@ const RegisterScreen = () => {
         preferences: {
           ageRange: [18, 99] as [number, number],
           maxDistance: 500, // default to 500m
+          interestedIn: 'female' as 'male' | 'female', // default preference
         },
       };
 
@@ -117,10 +123,12 @@ const RegisterScreen = () => {
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           {/* Header Section */}
           <View style={styles.headerSection}>
@@ -129,6 +137,7 @@ const RegisterScreen = () => {
               style={styles.logo}
               contentFit="contain"
               tintColor={theme.primary}
+              transition={300}
             />
             <Text style={[styles.welcomeText, { color: theme.textSecondary }]}>
               Create your account in seconds - we'll set up your profile next!
@@ -137,7 +146,10 @@ const RegisterScreen = () => {
 
           {/* Form Section */}
           <View
-            style={[styles.formSection, { backgroundColor: theme.surface }]}
+            style={[
+              styles.formSection,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+            ]}
           >
             <Text style={[styles.formTitle, { color: theme.text }]}>
               Get Started
@@ -257,20 +269,19 @@ const RegisterScreen = () => {
 
             {/* Create Account Button */}
             <TouchableOpacity
-              style={[styles.createButton, isLoading && styles.disabledButton]}
+              style={[
+                styles.createButton,
+                { backgroundColor: theme.primary, shadowColor: theme.primary },
+                isLoading && styles.disabledButton,
+              ]}
               onPress={handleRegister}
               disabled={isLoading}
             >
-              <LinearGradient
-                colors={[theme.primary, theme.primaryVariant]}
-                style={styles.buttonGradient}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text style={styles.createButtonText}>Create Account</Text>
-                )}
-              </LinearGradient>
+              {isLoading ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={styles.createButtonText}>Create Account</Text>
+              )}
             </TouchableOpacity>
           </View>
 
@@ -300,180 +311,121 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingVertical: 20,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    minHeight: deviceInfo.height,
   },
   headerSection: {
     alignItems: 'center',
-    marginBottom: 32,
-    paddingTop: 20,
-  },
-  logoContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
+    marginBottom: verticalScale(48),
+    paddingTop: verticalScale(40),
   },
   logo: {
-    width: 150,
-    height: 150,
-  },
-  appTitle: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    width: scale(180),
+    height: scale(180),
+    marginBottom: verticalScale(32),
   },
   welcomeText: {
-    fontSize: 16,
+    fontSize: moderateScale(18),
     textAlign: 'center',
-    lineHeight: 24,
-    paddingHorizontal: 20,
+    lineHeight: moderateScale(26),
+    paddingHorizontal: spacing.lg,
+    marginBottom: verticalScale(16),
   },
   formSection: {
-    borderRadius: 24,
-    padding: 32,
-    marginBottom: 24,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    marginBottom: verticalScale(32),
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 12,
+    borderWidth: 1,
   },
   formTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: moderateScale(28),
+    fontWeight: '700',
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: verticalScale(40),
   },
   inputGroup: {
-    marginBottom: 50,
+    marginBottom: verticalScale(28),
   },
   inputLabel: {
-    fontSize: 16,
+    fontSize: moderateScale(16),
     fontWeight: '600',
-    marginBottom: 8,
+    marginBottom: verticalScale(10),
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: Platform.OS === 'ios' ? 16 : 12,
-    gap: 12,
-    minHeight: 36, // ensure a smaller minimum height
+    borderWidth: 2,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical:
+      Platform.OS === 'ios' ? verticalScale(16) : verticalScale(12),
+    gap: spacing.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  inputContainerFocused: {
+    shadowOpacity: 0.15,
+    elevation: 5,
   },
   input: {
     flex: 1,
-    fontSize: 16,
-    minHeight: 24,
+    fontSize: moderateScale(16),
+    minHeight: verticalScale(24),
   },
   eyeButton: {
-    padding: 4,
-  },
-  rowContainer: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  halfWidth: {
-    flex: 1,
-  },
-  dateText: {
-    flex: 1,
-    fontSize: 16,
-    paddingVertical: 2,
-  },
-  pickerContainer: {
-    flex: 1,
-  },
-  picker: {
-    flex: 1,
-    fontSize: 16,
+    padding: spacing.sm,
+    borderRadius: borderRadius.sm,
   },
   createButton: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginTop: 8,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  buttonGradient: {
-    paddingVertical: 18,
+    borderRadius: borderRadius.lg,
+    paddingVertical: verticalScale(20),
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: verticalScale(56),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  disabledButton: {
+    opacity: 0.6,
+    shadowOpacity: 0.15,
+    elevation: 5,
+  },
+  buttonGradient: {
+    paddingVertical: verticalScale(20),
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: verticalScale(56),
   },
   createButtonText: {
     color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  disabledButton: {
-    opacity: 0.7,
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-    gap: 16,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-  },
-  dividerText: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: moderateScale(18),
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   footer: {
     alignItems: 'center',
-    paddingVertical: 20,
-    paddingBottom: 40,
+    paddingVertical: verticalScale(24),
   },
   footerText: {
-    fontSize: 16,
+    fontSize: moderateScale(16),
     textAlign: 'center',
+    lineHeight: moderateScale(24),
   },
   linkText: {
-    fontWeight: '600',
-  },
-  sliderHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-    color: 'black',
-  },
-  sliderLabelContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  sliderValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'black',
-  },
-  slider: {
-    width: '100%',
-    height: 40,
-  },
-  sliderLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 4,
-    color: 'black',
-  },
-  sliderLabel: {
-    fontSize: 12,
-    color: 'black',
+    fontWeight: '900',
   },
 });
 

@@ -10,17 +10,22 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
-  Dimensions,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, router } from 'expo-router';
 import { ArrowLeft, Mail, CheckCircle, Heart } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
-
-const { width, height } = Dimensions.get('window');
+import {
+  scale,
+  verticalScale,
+  moderateScale,
+  spacing,
+  borderRadius,
+  deviceInfo,
+} from '../../utils/responsive';
 
 const ForgotPasswordScreen = () => {
   const [email, setEmail] = useState('');
@@ -63,12 +68,14 @@ const ForgotPasswordScreen = () => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.background }]}
+    >
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
         >
@@ -81,13 +88,14 @@ const ForgotPasswordScreen = () => {
               <ArrowLeft size={24} color={theme.text} />
             </TouchableOpacity>
 
-            <LinearGradient
-              colors={[theme.primary, theme.primaryVariant]}
-              style={styles.logoContainer}
-            >
-              <Heart size={32} color="white" fill="white" />
-            </LinearGradient>
-            
+            <Image
+              source={require('../../assets/images/logo.png')}
+              style={styles.logo}
+              contentFit="contain"
+              tintColor={theme.primary}
+              transition={300}
+            />
+
             <Text style={[styles.title, { color: theme.text }]}>
               Forgot Password?
             </Text>
@@ -99,17 +107,24 @@ const ForgotPasswordScreen = () => {
           </View>
 
           {/* Form Section */}
-          <View style={[styles.formSection, { backgroundColor: theme.surface }]}>
+          <View
+            style={[styles.formSection, { backgroundColor: theme.surface }]}
+          >
             {!emailSent ? (
               <>
                 <View style={styles.inputGroup}>
                   <Text style={[styles.inputLabel, { color: theme.text }]}>
                     Email Address
                   </Text>
-                  <View style={[styles.inputContainer, { 
-                    backgroundColor: theme.background,
-                    borderColor: theme.border 
-                  }]}>
+                  <View
+                    style={[
+                      styles.inputContainer,
+                      {
+                        backgroundColor: theme.background,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                  >
                     <Mail size={20} color={theme.textSecondary} />
                     <TextInput
                       style={[styles.input, { color: theme.text }]}
@@ -125,47 +140,54 @@ const ForgotPasswordScreen = () => {
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.resetButton, isLoading && styles.disabledButton]}
+                  style={[
+                    styles.resetButton,
+                    {
+                      backgroundColor: theme.primary,
+                      shadowColor: theme.primary,
+                    },
+                    isLoading && styles.disabledButton,
+                  ]}
                   onPress={handleForgotPassword}
                   disabled={isLoading}
                 >
-                  <LinearGradient
-                    colors={[theme.primary, theme.primaryVariant]}
-                    style={styles.buttonGradient}
-                  >
-                    {isLoading ? (
-                      <ActivityIndicator color="white" />
-                    ) : (
-                      <Text style={styles.resetButtonText}>
-                        Send Reset Link
-                      </Text>
-                    )}
-                  </LinearGradient>
+                  {isLoading ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Text style={styles.resetButtonText}>Send Reset Link</Text>
+                  )}
                 </TouchableOpacity>
               </>
             ) : (
               <View style={styles.successContainer}>
-                <View style={[styles.successIcon, { backgroundColor: theme.success + '20' }]}>
+                <View
+                  style={[
+                    styles.successIcon,
+                    { backgroundColor: theme.success + '20' },
+                  ]}
+                >
                   <CheckCircle size={60} color={theme.success} />
                 </View>
                 <Text style={[styles.successTitle, { color: theme.text }]}>
                   Email Sent!
                 </Text>
-                <Text style={[styles.successText, { color: theme.textSecondary }]}>
-                  Check your inbox and follow the instructions to reset your password.
+                <Text
+                  style={[styles.successText, { color: theme.textSecondary }]}
+                >
+                  Check your inbox and follow the instructions to reset your
+                  password.
                 </Text>
                 <TouchableOpacity
-                  style={styles.resetButton}
+                  style={[
+                    styles.resetButton,
+                    {
+                      backgroundColor: theme.primary,
+                      shadowColor: theme.primary,
+                    },
+                  ]}
                   onPress={() => setEmailSent(false)}
                 >
-                  <LinearGradient
-                    colors={[theme.primary, theme.primaryVariant]}
-                    style={styles.buttonGradient}
-                  >
-                    <Text style={styles.resetButtonText}>
-                      Send Another Email
-                    </Text>
-                  </LinearGradient>
+                  <Text style={styles.resetButtonText}>Send Another Email</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -197,21 +219,23 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingVertical: 20,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    minHeight: deviceInfo.height,
   },
   headerSection: {
     alignItems: 'center',
-    marginBottom: 40,
-    paddingTop: 20,
+    marginBottom: verticalScale(48),
+    paddingTop: verticalScale(40),
   },
   backButton: {
     position: 'absolute',
     top: 0,
     left: 0,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: scale(48),
+    height: scale(48),
+    borderRadius: scale(24),
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -220,120 +244,131 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 4,
   },
-  logoContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-    marginTop: 40,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
+  logo: {
+    width: scale(180),
+    height: scale(180),
+    marginBottom: verticalScale(32),
+    marginTop: verticalScale(40),
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 12,
+    fontSize: moderateScale(28),
+    fontWeight: '700',
+    marginBottom: verticalScale(12),
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: moderateScale(16),
     textAlign: 'center',
-    lineHeight: 24,
-    paddingHorizontal: 20,
+    lineHeight: moderateScale(24),
+    paddingHorizontal: spacing.lg,
   },
   formSection: {
-    borderRadius: 24,
-    padding: 32,
-    marginBottom: 24,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    marginBottom: verticalScale(32),
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 12,
+    borderWidth: 1,
   },
   inputGroup: {
-    marginBottom: 32,
+    marginBottom: verticalScale(28),
   },
   inputLabel: {
-    fontSize: 16,
+    fontSize: moderateScale(16),
     fontWeight: '600',
-    marginBottom: 8,
+    marginBottom: verticalScale(10),
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: Platform.OS === 'ios' ? 16 : 12,
-    gap: 12,
+    borderWidth: 2,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical:
+      Platform.OS === 'ios' ? verticalScale(16) : verticalScale(12),
+    gap: spacing.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  inputContainerFocused: {
+    shadowOpacity: 0.15,
+    elevation: 5,
   },
   input: {
     flex: 1,
-    fontSize: 16,
-    minHeight: 24,
+    fontSize: moderateScale(16),
+    minHeight: verticalScale(24),
   },
   resetButton: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  buttonGradient: {
-    paddingVertical: 18,
+    borderRadius: borderRadius.lg,
+    paddingVertical: verticalScale(20),
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: verticalScale(56),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  disabledButton: {
+    opacity: 0.6,
+    shadowOpacity: 0.15,
+    elevation: 5,
+  },
+  buttonGradient: {
+    paddingVertical: verticalScale(20),
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: verticalScale(56),
   },
   resetButtonText: {
     color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  disabledButton: {
-    opacity: 0.7,
+    fontSize: moderateScale(18),
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   successContainer: {
     alignItems: 'center',
   },
   successIcon: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: scale(120),
+    height: scale(120),
+    borderRadius: scale(60),
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: verticalScale(24),
   },
   successTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 12,
+    fontSize: moderateScale(24),
+    fontWeight: '700',
+    marginBottom: verticalScale(12),
     textAlign: 'center',
   },
   successText: {
-    fontSize: 16,
+    fontSize: moderateScale(16),
     textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 32,
-    paddingHorizontal: 20,
+    lineHeight: moderateScale(24),
+    marginBottom: verticalScale(32),
+    paddingHorizontal: spacing.lg,
   },
   footer: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: verticalScale(24),
   },
   footerText: {
-    fontSize: 15,
+    fontSize: moderateScale(16),
     textAlign: 'center',
+    lineHeight: moderateScale(24),
   },
   linkText: {
-    fontWeight: '600',
+    fontWeight: '900',
   },
 });
 
