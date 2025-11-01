@@ -786,6 +786,37 @@ export default function ConnectionsScreen() {
     }
   }, [connections, editingConnection, showCreateModal]);
 
+  const renderEmptyState = useCallback(() => {
+    const emptyMessages = {
+      all: {
+        title: 'No missed connections yet',
+        subtitle: 'Be the first to share a missed connection!',
+      },
+      my: {
+        title: 'No posts yet',
+        subtitle: 'Create your first missed connection post',
+      },
+      saved: {
+        title: 'No saved posts',
+        subtitle: 'Save posts to view them here later',
+      },
+    };
+
+    const message = emptyMessages[activeTab];
+
+    return (
+      <View style={styles.emptyState}>
+        <Sparkles size={60} color={theme.textSecondary} />
+        <Text style={[styles.emptyTitle, { color: theme.text }]}>
+          {message.title}
+        </Text>
+        <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+          {message.subtitle}
+        </Text>
+      </View>
+    );
+  }, [activeTab, theme]);
+
   return (
     <LinearGradient
       colors={[theme.background, theme.surfaceVariant]}
@@ -894,8 +925,11 @@ export default function ConnectionsScreen() {
           data={connections}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
+          ListEmptyComponent={renderEmptyState}
           style={styles.list}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={
+            connections.length === 0 ? { flex: 1 } : styles.listContent
+          }
           showsVerticalScrollIndicator={false}
           removeClippedSubviews={true}
           maxToRenderPerBatch={5}
@@ -1187,9 +1221,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 20,
     paddingBottom: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
   },
   title: { fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
   headerIcons: { flexDirection: 'row', gap: 10 },
@@ -1464,4 +1495,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   locationText: { fontSize: 16, flex: 1 },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 40,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 20,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
 });

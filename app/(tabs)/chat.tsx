@@ -415,21 +415,19 @@ export default function ChatScreen() {
       console.log('Final chat items:', chatItems.length);
       setChats(chatItems);
 
-      // Animate content when chats are loaded
-      if (chatItems.length > 0) {
-        Animated.parallel([
-          Animated.timing(contentSlideAnim, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-          Animated.timing(contentFadeAnim, {
-            toValue: 1,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]).start();
-      }
+      // Animate content area (whether empty or with chats)
+      Animated.parallel([
+        Animated.timing(contentSlideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(contentFadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
     } catch (error) {
       console.error('❌ Error in chat screen useEffect:', error);
       setChats([]);
@@ -552,24 +550,22 @@ export default function ChatScreen() {
             },
           ]}
         >
-          {chats.length === 0 ? (
-            renderEmptyState()
-          ) : (
-            <FlatList
-              data={chats}
-              renderItem={renderChatItem}
-              keyExtractor={keyExtractor}
-              extraData={theme}
-              style={styles.chatList}
-              showsVerticalScrollIndicator={false}
-              removeClippedSubviews={true}
-              maxToRenderPerBatch={5}
-              updateCellsBatchingPeriod={50}
-              windowSize={5}
-              initialNumToRender={8}
-              scrollEventThrottle={16}
-            />
-          )}
+          <FlatList
+            data={chats}
+            renderItem={renderChatItem}
+            keyExtractor={keyExtractor}
+            ListEmptyComponent={renderEmptyState}
+            extraData={theme}
+            style={styles.chatList}
+            contentContainerStyle={chats.length === 0 ? { flex: 1 } : undefined}
+            showsVerticalScrollIndicator={false}
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={5}
+            updateCellsBatchingPeriod={50}
+            windowSize={5}
+            initialNumToRender={8}
+            scrollEventThrottle={16}
+          />
         </Animated.View>
       </SafeAreaView>
     </LinearGradient>
@@ -591,9 +587,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 20,
     paddingBottom: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
   },
   title: {
     fontSize: 28,

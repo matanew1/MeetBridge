@@ -805,9 +805,6 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingBottom: 24,
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
   },
   headerTitle: {
     fontSize: 28,

@@ -21,7 +21,8 @@ const resources = {
         newSearch: 'New Search',
         loading: 'Loading...',
         distance: 'm',
-        noProfiles: 'No profiles available. Try adjusting your filters.',
+        noProfiles: 'No profiles available',
+        checkBackLater: 'Try adjusting your filters or check back later',
       },
 
       // Chat Screen

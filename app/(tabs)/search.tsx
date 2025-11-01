@@ -832,12 +832,16 @@ export default function SearchScreen() {
   const ListEmptyComponent = useCallback(
     () => (
       <View style={styles.emptyState}>
-        <Text style={[styles.emptyText, { color: theme.text }]}>
+        <Heart size={60} color={theme.textSecondary} />
+        <Text style={[styles.emptyTitle, { color: theme.text }]}>
           {t('search.noProfiles')}
+        </Text>
+        <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+          {t('search.checkBackLater')}
         </Text>
       </View>
     ),
-    [theme.text, t]
+    [theme, t]
   );
 
   const handleUnmatch = (profileId: string) => {
@@ -1229,7 +1233,11 @@ export default function SearchScreen() {
         extraData={theme}
         numColumns={2}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.flatListContent}
+        contentContainerStyle={
+          sortedDiscoverProfiles.length === 0
+            ? { flex: 1 }
+            : styles.flatListContent
+        }
         columnWrapperStyle={styles.columnWrapper}
         ListEmptyComponent={ListEmptyComponent}
         removeClippedSubviews={true}
@@ -1388,9 +1396,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 20,
     paddingBottom: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
   },
   headerButtons: {
     flexDirection: 'row',
@@ -1681,9 +1686,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 60,
   },
-  emptyText: {
-    fontSize: 18,
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 20,
+    marginBottom: 10,
     textAlign: 'center',
-    fontWeight: '500',
+  },
+  emptyText: {
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 24,
   },
 });
