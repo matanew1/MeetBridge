@@ -39,7 +39,7 @@ import AvatarUpload from './AvatarUpload';
 import InterestTagPicker from './InterestTagPicker';
 import { ZodiacBadge } from './ZodiacBadge';
 import { calculateAge, calculateZodiacSign } from '../../utils/dateUtils';
-import LocationService from '../../services/locationService';
+import { smartLocationManager } from '../../services/location';
 
 interface EditProfileModalProps {
   visible: boolean;
@@ -214,7 +214,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       if (!coordinates) {
         console.log('📍 Getting current location for profile completion...');
         try {
-          const location = await LocationService.getCurrentLocation(true);
+          const location = await smartLocationManager.getCurrentLocation(true);
           if (location) {
             coordinates = {
               latitude: location.latitude,

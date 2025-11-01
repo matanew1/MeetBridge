@@ -17,7 +17,7 @@ import {
   increment,
 } from 'firebase/firestore';
 import { db, auth } from './config';
-import LocationService from '../locationService';
+import { geohashService } from '../location';
 
 export interface Comment {
   id: string;
@@ -341,11 +341,17 @@ class MissedConnectionsService {
       // Apply location filter (near you)
       if (filters?.nearLocation) {
         connections = connections.filter((conn) => {
-          const distance = LocationService.calculateDistancePrecise(
-            filters.nearLocation!.lat,
-            filters.nearLocation!.lng,
-            conn.location.lat,
-            conn.location.lng
+          const distance = geohashService.calculateDistance(
+            {
+              latitude: filters.nearLocation!.lat,
+              longitude: filters.nearLocation!.lng,
+              timestamp: Date.now(),
+            },
+            {
+              latitude: conn.location.lat,
+              longitude: conn.location.lng,
+              timestamp: Date.now(),
+            }
           );
           return distance <= filters.nearLocation!.radiusMeters;
         });

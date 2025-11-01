@@ -44,7 +44,7 @@ import {
   ChatMessage,
 } from '../../store/types';
 import storageService from '../storageService';
-import LocationService from '../locationService';
+import { geohashService, firestoreGeoHelper } from '../location';
 import notificationService from '../notificationService';
 import { calculateZodiacSign } from '../../utils/dateUtils';
 
@@ -163,9 +163,10 @@ export class FirebaseUserProfileService implements IUserProfileService {
       // Handle geohash update if coordinates changed
       if (dataToUpdate.coordinates) {
         const { latitude, longitude } = dataToUpdate.coordinates;
-        dataToUpdate.geohash = LocationService.generateGeohash(
+        dataToUpdate.geohash = geohashService.encode(
           latitude,
-          longitude
+          longitude,
+          9 // Use precision 9 for maximum accuracy
         );
         console.log('📍 Generated geohash:', dataToUpdate.geohash);
       }
@@ -308,9 +309,12 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         throw new Error('Current user not found');
       }
 
-      const currentUserData = currentUserDoc.data();
+      const currentUserData = { ...currentUserDoc.data(), id: currentUserId };
       const userLocation = currentUserData?.coordinates;
 
+      console.log(
+        `🔍 Discovery: ${currentUserData.name} (${currentUserData.gender}) looking for ${filters.gender}`
+      );
       if (!userLocation?.latitude || !userLocation?.longitude) {
         console.warn('User location not set');
         return {
@@ -326,21 +330,33 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         this.getMatchedUserIds(currentUserId),
       ]);
 
-      // Get query bounds
-      const bounds = LocationService.getQueryBoundsMeters(
-        userLocation,
+      // Get query bounds using new geohash service
+      const bounds = geohashService.getGeohashesInBounds(
+        { ...userLocation, timestamp: Date.now() },
         filters.maxDistance
       );
+
+      if (!bounds || !Array.isArray(bounds)) {
+        console.error(
+          'Invalid bounds returned from getGeohashesInBounds:',
+          bounds
+        );
+        return {
+          data: [],
+          success: false,
+          message: 'Failed to calculate location bounds',
+        };
+      }
 
       const profiles: User[] = [];
       const seenIds = new Set<string>([currentUserId]);
 
       // Query users
-      for (const [startHash, endHash] of bounds) {
+      for (const bound of bounds) {
         const q = query(
           collection(db, 'users'),
-          where('geohash', '>=', startHash),
-          where('geohash', '<=', endHash),
+          where('geohash', '>=', bound.lower),
+          where('geohash', '<=', bound.upper),
           limit(100)
         );
 
@@ -358,18 +374,24 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
           }
           seenIds.add(userId);
 
-          const data = docSnapshot.data();
+          const data = { ...docSnapshot.data(), id: userId };
 
           if (!this.validateUserData(data)) return;
           if (!this.matchesGenderFilter(currentUserData, data, filters)) return;
           if (!this.matchesAgeFilter(data, filters)) return;
 
           if (data.coordinates?.latitude && data.coordinates?.longitude) {
-            const distance = LocationService.calculateDistancePrecise(
-              userLocation.latitude,
-              userLocation.longitude,
-              data.coordinates.latitude,
-              data.coordinates.longitude
+            const distance = geohashService.calculateDistance(
+              {
+                latitude: userLocation.latitude,
+                longitude: userLocation.longitude,
+                timestamp: Date.now(),
+              },
+              {
+                latitude: data.coordinates.latitude,
+                longitude: data.coordinates.longitude,
+                timestamp: Date.now(),
+              }
             );
 
             if (distance > filters.maxDistance) return;
@@ -384,10 +406,12 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         });
       }
 
-      const sortedProfiles = LocationService.sortByDistance(
-        profiles,
-        userLocation
-      );
+      // Sort profiles by distance (already calculated)
+      const sortedProfiles = profiles.sort((a, b) => {
+        const distA = a.distance || Infinity;
+        const distB = b.distance || Infinity;
+        return distA - distB;
+      });
 
       return {
         data: sortedProfiles.slice(0, pageSize),
@@ -432,11 +456,33 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
     const currentUserGender = currentUser.gender;
     const targetUserInterestedIn = targetUser.preferences?.interestedIn;
 
+    // Debug logging for bi-directional matching
+    const step1Pass = targetUserGender === filters.gender;
+    const step2Pass = targetUserInterestedIn === currentUserGender;
+    const willMatch = step1Pass && step2Pass;
+
+    if (!step1Pass || !step2Pass) {
+      console.log(
+        `🔍 Gender Filter: ${currentUser.name || currentUser.id} checking ${
+          targetUser.name || targetUser.id
+        }`,
+        {
+          currentGender: currentUserGender,
+          targetGender: targetUserGender,
+          targetInterestedIn: targetUserInterestedIn,
+          filterGender: filters.gender,
+          step1_targetMatchesFilter: step1Pass,
+          step2_mutualInterest: step2Pass,
+          result: willMatch ? '✅ MATCH' : '❌ FILTERED OUT',
+        }
+      );
+    }
+
     // Check if target user matches the gender current user is interested in
-    if (targetUserGender !== filters.gender) return false;
+    if (!step1Pass) return false;
 
     // Check if target user is also interested in current user's gender (mutual interest)
-    return targetUserInterestedIn === currentUserGender;
+    return step2Pass;
   }
 
   private matchesAgeFilter(targetUser: any, filters: SearchFilters): boolean {
@@ -1600,9 +1646,10 @@ export class FirebaseAuthService implements IAuthService {
 
       let geohash: string | undefined;
       if (profileData.coordinates) {
-        geohash = LocationService.generateGeohash(
+        geohash = geohashService.encode(
           profileData.coordinates.latitude,
-          profileData.coordinates.longitude
+          profileData.coordinates.longitude,
+          9 // Use precision 9 for maximum accuracy
         );
       }
 

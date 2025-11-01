@@ -41,10 +41,11 @@ import { MapPin, Users } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import * as Location from 'expo-location';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
-import LocationService from '../../services/locationService';
+import { smartLocationManager } from '../../services/location';
 import missedConnectionsService, {
   MissedConnection,
 } from '../../services/firebase/missedConnectionsService';
@@ -374,6 +375,7 @@ export default function ConnectionsScreen() {
   const { isAuthenticated, user } = useAuth();
 
   const [connections, setConnections] = useState<MissedConnection[]>([]);
+  const [isLocationLoading, setIsLocationLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'all' | 'my' | 'saved'>('all');
   const [unsubscribe, setUnsubscribe] = useState<(() => void) | null>(null);
@@ -396,16 +398,60 @@ export default function ConnectionsScreen() {
     coordinates: { latitude: number; longitude: number };
     address: string | null;
   } | null>(null);
-  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+
+  // Helper function to get location with address
+  const getCurrentLocationWithAddress = async () => {
+    setIsLocationLoading(true);
+    try {
+      const location = await smartLocationManager.getCurrentLocation(true);
+      if (!location) {
+        return null;
+      }
+
+      // Try to get address via reverse geocoding
+      let address: string | null = null;
+      try {
+        const geocode = await Location.reverseGeocodeAsync({
+          latitude: location.latitude,
+          longitude: location.longitude,
+        });
+
+        if (geocode && geocode.length > 0) {
+          const result = geocode[0];
+          const parts = [
+            result.street,
+            result.name,
+            result.city,
+            result.region,
+          ].filter(Boolean);
+          address = parts.length > 0 ? parts.join(', ') : null;
+        }
+      } catch (geocodeError) {
+        console.warn('Could not get address:', geocodeError);
+        // Address is optional, continue without it
+      }
+
+      return {
+        coordinates: {
+          latitude: location.latitude,
+          longitude: location.longitude,
+        },
+        address,
+      };
+    } catch (error) {
+      console.error('Error getting location:', error);
+      return null;
+    } finally {
+      setIsLocationLoading(false);
+    }
+  };
 
   // Detect location when modal opens
   useEffect(() => {
-    if (showCreateModal && !currentLocation && !isDetectingLocation) {
+    if (showCreateModal && !currentLocation && !isLocationLoading) {
       const detectLocation = async () => {
-        setIsDetectingLocation(true);
         try {
-          const locationData =
-            await LocationService.getCurrentLocationWithAddress();
+          const locationData = await getCurrentLocationWithAddress();
           if (locationData) {
             setCurrentLocation(locationData);
           } else {
@@ -420,19 +466,16 @@ export default function ConnectionsScreen() {
             'Location Error',
             'Unable to detect your current location. Please try again.'
           );
-        } finally {
-          setIsDetectingLocation(false);
         }
       };
       detectLocation();
     }
-  }, [showCreateModal, currentLocation, isDetectingLocation]);
+  }, [showCreateModal, currentLocation, isLocationLoading]);
 
   // Reset location when modal closes
   useEffect(() => {
     if (!showCreateModal) {
       setCurrentLocation(null);
-      setIsDetectingLocation(false);
     }
   }, [showCreateModal]);
 
@@ -999,7 +1042,7 @@ export default function ConnectionsScreen() {
                       },
                     ]}
                   >
-                    {isDetectingLocation ? (
+                    {isLocationLoading ? (
                       <View style={styles.locationLoading}>
                         <ActivityIndicator size="small" color={theme.primary} />
                         <Text

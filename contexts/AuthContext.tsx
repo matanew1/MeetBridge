@@ -19,7 +19,7 @@ import {
 } from 'firebase/firestore';
 import { services } from '../services';
 import { User } from '../store/types';
-import LocationService from '../services/locationService';
+import { smartLocationManager, geohashService } from '../services/location';
 import notificationService from '../services/notificationService';
 import presenceService from '../services/presenceService';
 import firebaseApp from '../services/firebase/config';
@@ -118,13 +118,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       // Start location tracking
-      const hasPermission = await LocationService.hasLocationPermissions();
+      const { status: existingStatus } =
+        await Location.getForegroundPermissionsAsync();
 
-      if (!hasPermission) {
+      if (existingStatus !== 'granted') {
         console.log('📍 Requesting location permissions for tracking...');
-        const permissionResult =
-          await LocationService.requestLocationPermissions();
-        if (!permissionResult.granted) {
+        const { status: newStatus } =
+          await Location.requestForegroundPermissionsAsync();
+        if (newStatus !== 'granted') {
           console.warn('📍 Location permission denied, tracking disabled');
           return;
         }
@@ -132,30 +133,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       console.log('📍 Starting continuous location tracking...');
 
-      const success = await LocationService.startLocationWatcher(
-        async (location) => {
+      const success = await smartLocationManager.startTracking(
+        async (update) => {
           try {
+            // Validate update data
+            if (!update?.current?.latitude || !update?.current?.longitude) {
+              console.warn('⚠️ Invalid location update received:', update);
+              return;
+            }
+
             // Update Firebase with new location
-            const geohash = LocationService.generateGeohash(
-              location.latitude,
-              location.longitude
-            );
+            const geohash = update.geohash;
 
             const userRef = doc(db, 'users', firebaseUser.uid);
             await updateDoc(userRef, {
               coordinates: {
-                latitude: location.latitude,
-                longitude: location.longitude,
+                latitude: update.current.latitude,
+                longitude: update.current.longitude,
               },
               geohash,
               lastLocationUpdate: serverTimestamp(),
             });
 
             console.log('✅ Location updated in Firebase (ULTRA-PRECISE):', {
-              lat: location.latitude.toFixed(9), // 9 decimals for ±1m precision
-              lon: location.longitude.toFixed(9),
-              accuracy: location.accuracy
-                ? `±${Math.round(location.accuracy)}m`
+              lat: update.current?.latitude?.toFixed(9) || 'N/A', // 9 decimals for ±1m precision
+              lon: update.current?.longitude?.toFixed(9) || 'N/A',
+              accuracy: update.current?.accuracy
+                ? `±${Math.round(update.current.accuracy)}m`
                 : 'unknown',
               geohash,
             });
@@ -165,8 +169,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               setUser((prev) => ({
                 ...prev!,
                 coordinates: {
-                  latitude: location.latitude,
-                  longitude: location.longitude,
+                  latitude: update.current.latitude,
+                  longitude: update.current.longitude,
                 },
                 geohash,
               }));
@@ -195,7 +199,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Cleanup on unmount or when user logs out
     return () => {
       console.log('🛑 Stopping location tracking...');
-      LocationService.stopLocationWatcher();
+      smartLocationManager.stopTracking();
       console.log('🔕 Cleaning up notification listeners...');
       notificationService.cleanup();
       console.log('👁️ Cleaning up presence service...');
@@ -501,7 +505,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return { success: false, message: 'No user authenticated' };
       }
 
-      const locationData = await LocationService.updateUserLocation();
+      const locationData =
+        await smartLocationManager.getCurrentLocationWithAddress();
       if (!locationData) {
         return { success: false, message: 'Could not get current location' };
       }
@@ -509,9 +514,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const { coordinates, address } = locationData;
 
       // Generate geohash for efficient location-based queries
-      const geohash = LocationService.generateGeohash(
+      const geohash = geohashService.encode(
         coordinates.latitude,
-        coordinates.longitude
+        coordinates.longitude,
+        9 // Use precision 9 for maximum accuracy
       );
 
       const userRef = doc(db, 'users', firebaseUser.uid);
@@ -550,8 +556,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const requestLocationPermission = async () => {
     try {
-      const permission = await LocationService.requestLocationPermissions();
-      return permission.granted;
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      return status === 'granted';
     } catch (error) {
       console.error('Location permission error:', error);
       return false;

@@ -544,7 +544,7 @@ export default function ChatScreen() {
           style={[
             styles.content,
             {
-              backgroundColor: theme.surface,
+              backgroundColor: theme.background,
               transform: [{ translateY: contentSlideAnim }],
               opacity: contentFadeAnim,
             },

@@ -67,12 +67,32 @@ class PresenceService {
    * Set user status to online
    */
   private async setUserOnline(): Promise<void> {
-    if (!this.presenceRef || !this.currentUserId) {
-      console.warn('⚠️ Cannot set user online - service not initialized');
+    // Validate service initialization
+    if (!this.database || !this.currentUserId) {
+      console.warn(
+        '⚠️ Cannot set user online - service not initialized or user ID missing'
+      );
+      return;
+    }
+
+    // Additional validation to ensure currentUserId is a valid string
+    if (
+      typeof this.currentUserId !== 'string' ||
+      this.currentUserId.trim() === ''
+    ) {
+      console.error(
+        '❌ Invalid currentUserId in setUserOnline:',
+        this.currentUserId
+      );
       return;
     }
 
     try {
+      const userId = this.currentUserId; // Store in local variable to avoid race conditions
+
+      // Create a fresh reference to avoid stale references
+      const presenceRef = ref(this.database, `presence/${userId}`);
+
       const presenceData = {
         status: 'online',
         lastSeen: serverTimestamp(),
@@ -80,14 +100,16 @@ class PresenceService {
       };
 
       // Update Realtime Database
-      await set(this.presenceRef, presenceData);
+      await set(presenceRef, presenceData);
 
-      // Update Firestore
-      const userDocRef = doc(db, 'users', this.currentUserId);
-      await updateDoc(userDocRef, {
-        isOnline: true,
-        lastSeen: new Date(),
-      });
+      // Update Firestore with additional null check
+      if (db && userId) {
+        const userDocRef = doc(db, 'users', userId);
+        await updateDoc(userDocRef, {
+          isOnline: true,
+          lastSeen: new Date(),
+        });
+      }
 
       console.log('✅ User set to online');
     } catch (error) {
@@ -99,12 +121,29 @@ class PresenceService {
    * Set user status to offline
    */
   async setUserOffline(): Promise<void> {
-    if (!this.presenceRef || !this.currentUserId) {
-      console.warn('⚠️ Cannot set user offline - service not initialized');
+    // Validate service initialization
+    if (!this.database || !this.currentUserId) {
+      console.warn(
+        '⚠️ Cannot set user offline - service not initialized or user ID missing'
+      );
+      return;
+    }
+
+    // Additional validation to ensure currentUserId is a valid string
+    if (
+      typeof this.currentUserId !== 'string' ||
+      this.currentUserId.trim() === ''
+    ) {
+      console.error('❌ Invalid currentUserId:', this.currentUserId);
       return;
     }
 
     try {
+      const userId = this.currentUserId; // Store in local variable to avoid race conditions
+
+      // Create a fresh reference to avoid stale references
+      const presenceRef = ref(this.database, `presence/${userId}`);
+
       const presenceData = {
         status: 'offline',
         lastSeen: serverTimestamp(),
@@ -112,14 +151,16 @@ class PresenceService {
       };
 
       // Update Realtime Database
-      await set(this.presenceRef, presenceData);
+      await set(presenceRef, presenceData);
 
-      // Update Firestore
-      const userDocRef = doc(db, 'users', this.currentUserId);
-      await updateDoc(userDocRef, {
-        isOnline: false,
-        lastSeen: new Date(),
-      });
+      // Update Firestore with additional null check
+      if (db && userId) {
+        const userDocRef = doc(db, 'users', userId);
+        await updateDoc(userDocRef, {
+          isOnline: false,
+          lastSeen: new Date(),
+        });
+      }
 
       console.log('✅ User set to offline');
     } catch (error) {
@@ -188,16 +229,31 @@ class PresenceService {
     }
 
     this.heartbeatInterval = setInterval(async () => {
-      if (!this.currentUserId || !this.presenceRef) return;
+      if (!this.database || !this.currentUserId) return;
+
+      // Validate currentUserId is a valid string
+      if (
+        typeof this.currentUserId !== 'string' ||
+        this.currentUserId.trim() === ''
+      ) {
+        console.error(
+          '❌ Invalid currentUserId in heartbeat:',
+          this.currentUserId
+        );
+        return;
+      }
 
       try {
+        const userId = this.currentUserId; // Store in local variable
+        const presenceRef = ref(this.database, `presence/${userId}`);
+
         // Check if user is still connected to Realtime Database
-        const snapshot = await get(this.presenceRef);
+        const snapshot = await get(presenceRef);
         const presenceData = snapshot.val();
 
-        if (presenceData?.status === 'online') {
+        if (presenceData?.status === 'online' && db && userId) {
           // Update Firestore to keep it in sync
-          const userDocRef = doc(db, 'users', this.currentUserId);
+          const userDocRef = doc(db, 'users', userId);
           await updateDoc(userDocRef, {
             isOnline: true,
             lastSeen: new Date(),

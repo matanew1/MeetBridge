@@ -91,5 +91,25 @@ export const userProfileService = services.userProfile;
 // Export presence service
 export { presenceService };
 
+// Export location services (new smart location system)
+export {
+  smartLocationManager,
+  geohashService,
+  privacyService,
+  firestoreGeoHelper,
+  GEOHASH_PRECISION_LEVELS,
+} from './location';
+
+// Export location types
+export type {
+  LocationCoordinates,
+  LocationUpdate,
+  LocationServiceConfig,
+  ProximitySearchOptions,
+  ProximityResult,
+  GeohashBounds,
+  AdjacentGeohashes,
+} from './location';
+
 // Export Firebase config
 export { db, auth, storage, realtimeDb } from './firebase/config';
