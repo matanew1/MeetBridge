@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,8 +8,16 @@ import {
   Image,
   Dimensions,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Heart, MessageCircle, X } from 'lucide-react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  withSequence,
+  withSpring,
+  Easing,
+} from 'react-native-reanimated';
+import { Heart, MessageCircle, X, Sparkles } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
@@ -45,6 +53,76 @@ const MatchModal: React.FC<MatchModalProps> = ({
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
 
+  // Animation values
+  const rotation = useSharedValue(0);
+  const scale = useSharedValue(1);
+  const sparkleOpacity = useSharedValue(0);
+  const heartScale = useSharedValue(1);
+
+  useEffect(() => {
+    if (visible) {
+      // Reset animations
+      rotation.value = 0;
+      scale.value = 1;
+      sparkleOpacity.value = 0;
+      heartScale.value = 1;
+
+      // Start animations
+      rotation.value = withRepeat(
+        withTiming(360, {
+          duration: 3000,
+          easing: Easing.bezier(0.65, 0, 0.35, 1),
+        }),
+        -1, // Infinite
+        false
+      );
+
+      scale.value = withRepeat(
+        withSequence(
+          withSpring(1.15, { damping: 3, stiffness: 120 }),
+          withSpring(1, { damping: 3, stiffness: 120 })
+        ),
+        -1, // Infinite
+        true
+      );
+
+      sparkleOpacity.value = withRepeat(
+        withSequence(
+          withTiming(1, { duration: 800, easing: Easing.ease }),
+          withTiming(0.2, { duration: 800, easing: Easing.ease })
+        ),
+        -1, // Infinite
+        true
+      );
+
+      heartScale.value = withRepeat(
+        withSequence(
+          withSpring(1.3, { damping: 2, stiffness: 180 }),
+          withSpring(1, { damping: 2, stiffness: 180 })
+        ),
+        -1, // Infinite
+        true
+      );
+    }
+  }, [visible]);
+
+  // Animated styles
+  const rotatingStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rotation.value}deg` }],
+  }));
+
+  const centerStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const sparkleStyle = useAnimatedStyle(() => ({
+    opacity: sparkleOpacity.value,
+  }));
+
+  const heartStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: heartScale.value }],
+  }));
+
   if (!matchedUser || !currentUser) return null;
 
   return (
@@ -65,9 +143,51 @@ const MatchModal: React.FC<MatchModalProps> = ({
             <X size={24} color="#FFF" />
           </TouchableOpacity>
 
-          {/* Heart Circle */}
-          <View style={styles.heartCircle}>
-            <Heart size={60} color="#FFF" fill="#FFF" />
+          {/* Animated Heart Circle with Sparkles and Ring */}
+          <View style={styles.animationContainer}>
+            {/* Floating sparkles background */}
+            <Animated.View
+              style={[styles.sparkle, styles.sparkle1, sparkleStyle]}
+            >
+              <Sparkles size={24} color="#C77DFF" opacity={0.6} />
+            </Animated.View>
+            <Animated.View
+              style={[styles.sparkle, styles.sparkle2, sparkleStyle]}
+            >
+              <Sparkles size={20} color="#FF6B9D" opacity={0.6} />
+            </Animated.View>
+            <Animated.View
+              style={[styles.sparkle, styles.sparkle3, sparkleStyle]}
+            >
+              <Sparkles size={22} color="#C77DFF" opacity={0.6} />
+            </Animated.View>
+            <Animated.View
+              style={[styles.sparkle, styles.sparkle4, sparkleStyle]}
+            >
+              <Sparkles size={18} color="#FF6B9D" opacity={0.6} />
+            </Animated.View>
+
+            {/* Rotating outer ring */}
+            <Animated.View style={[styles.outerRing, rotatingStyle]}>
+              <View
+                style={[
+                  styles.ringGradient,
+                  {
+                    borderColor: '#C77DFF',
+                    backgroundColor: 'rgba(199, 125, 255, 0.1)',
+                  },
+                ]}
+              />
+            </Animated.View>
+
+            {/* Center pulsing heart */}
+            <Animated.View style={[styles.centerIcon, centerStyle]}>
+              <View style={styles.heartCircle}>
+                <Animated.View style={heartStyle}>
+                  <Heart size={60} color="#FFF" fill="#FFF" />
+                </Animated.View>
+              </View>
+            </Animated.View>
           </View>
 
           {/* Match text */}
@@ -140,14 +260,38 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
+  animationContainer: {
+    width: width * 0.6,
+    height: width * 0.6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    marginBottom: 40,
+  },
+  outerRing: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ringGradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: width * 0.3,
+    borderWidth: 3,
+  },
+  centerIcon: {
+    position: 'absolute',
+    zIndex: 10,
+  },
   heartCircle: {
     width: 160,
     height: 160,
     borderRadius: 80,
-    backgroundColor: 'linear-gradient(135deg, #C77DFF 0%, #FF6B9D 100%)',
+    backgroundColor: '#C77DFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 40,
     shadowColor: '#C77DFF',
     shadowOffset: {
       width: 0,
@@ -158,6 +302,25 @@ const styles = StyleSheet.create({
     elevation: 20,
     borderWidth: 3,
     borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  sparkle: {
+    position: 'absolute',
+  },
+  sparkle1: {
+    top: 20,
+    left: 40,
+  },
+  sparkle2: {
+    top: 30,
+    right: 30,
+  },
+  sparkle3: {
+    bottom: 40,
+    left: 30,
+  },
+  sparkle4: {
+    bottom: 30,
+    right: 40,
   },
   textContainer: {
     alignItems: 'center',
@@ -231,7 +394,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   sendMessageButton: {
-    backgroundColor: 'linear-gradient(135deg, #C77DFF 0%, #FF6B9D 100%)',
+    backgroundColor: '#C77DFF',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

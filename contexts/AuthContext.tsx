@@ -22,7 +22,6 @@ import { User } from '../store/types';
 import { smartLocationManager, geohashService } from '../services/location';
 import notificationService from '../services/notificationService';
 import presenceService from '../services/presenceService';
-import firebaseApp from '../services/firebase/config';
 import * as Location from 'expo-location';
 
 interface AuthContextType {
@@ -102,7 +101,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Initialize presence service with Realtime Database
       console.log('👁️ Initializing presence service...');
       try {
-        await presenceService.initialize(firebaseUser.uid, firebaseApp);
+        await presenceService.initialize(firebaseUser.uid);
         console.log('✅ Presence service initialized');
       } catch (error) {
         console.error('Error initializing presence service:', error);
@@ -281,7 +280,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           if (isGoingOnline) {
             console.log('👁️ App became active - setting user online');
             // Reinitialize presence service to set user online
-            await presenceService.initialize(firebaseUser.uid, firebaseApp);
+            await presenceService.initialize(firebaseUser.uid);
           } else if (isGoingOffline) {
             console.log('👁️ App going to background - setting user offline');
             await presenceService.setUserOffline();

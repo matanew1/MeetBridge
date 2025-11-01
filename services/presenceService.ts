@@ -1,6 +1,5 @@
 // services/presenceService.ts
 import {
-  getDatabase,
   ref,
   onValue,
   onDisconnect,
@@ -11,7 +10,7 @@ import {
   get,
 } from 'firebase/database';
 import { doc, updateDoc } from 'firebase/firestore';
-import { db } from './firebase/config';
+import { db, realtimeDb } from './firebase/config';
 
 class PresenceService {
   private database: Database | null = null;
@@ -24,7 +23,7 @@ class PresenceService {
   /**
    * Initialize the presence service with Firebase Realtime Database
    */
-  async initialize(userId: string, firebaseApp: any): Promise<void> {
+  async initialize(userId: string): Promise<void> {
     if (this.isInitialized && this.currentUserId === userId) {
       console.log('✅ Presence service already initialized for user:', userId);
       return;
@@ -33,8 +32,8 @@ class PresenceService {
     try {
       console.log('🔄 Initializing presence service for user:', userId);
 
-      // Initialize Realtime Database
-      this.database = getDatabase(firebaseApp);
+      // Use the already initialized Realtime Database
+      this.database = realtimeDb;
       this.currentUserId = userId;
       this.presenceRef = ref(this.database, `presence/${userId}`);
 

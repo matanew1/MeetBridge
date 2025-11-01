@@ -43,7 +43,6 @@ import MatchModal from '../components/MatchModal';
 import FilterModal from '../components/FilterModal';
 import DiscoveryAnimation from '../components/DiscoveryAnimation';
 import EnhancedMatchAnimation from '../components/EnhancedMatchAnimation';
-import WinkAnimation from '../components/WinkAnimation';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { lightTheme, darkTheme, Theme } from '../../constants/theme';
@@ -293,7 +292,7 @@ export default function SearchScreen() {
   const [maxDistance, setMaxDistance] = useState(500); // Default to 500m max range (precision 9)
   const [ageRange, setAgeRange] = useState<[number, number]>([18, 99]); // Default age range 18-99
   const [showMatchAnimation, setShowMatchAnimation] = useState(false);
-  const [showWinkAnimation, setShowWinkAnimation] = useState(false);
+  const [showUnmatchAnimation, setShowUnmatchAnimation] = useState(false);
   const [matchData, setMatchData] = useState<{
     user: any;
     matchId: string;
@@ -450,13 +449,17 @@ export default function SearchScreen() {
     }
   }, [sortedDiscoverProfiles]);
 
+  // Track if we've already loaded profiles to avoid redundant calls
+  const profilesLoadedRef = useRef(false);
+
   useEffect(() => {
-    if (currentUser && isAuthenticated) {
+    if (currentUser && isAuthenticated && !profilesLoadedRef.current) {
       updateUserPreferences();
 
       // Load profiles after preferences are updated
       const loadTimer = setTimeout(() => {
         loadDiscoverProfiles(true);
+        profilesLoadedRef.current = true;
 
         // Start animation after profiles load
         const animTimer = setTimeout(() => {
@@ -471,7 +474,7 @@ export default function SearchScreen() {
       // Cleanup load timer
       return () => clearTimeout(loadTimer);
     }
-  }, [currentUser]); // Run when currentUser changes (including coordinates updates)
+  }, [currentUser?.id]); // Run only when currentUser ID changes, not on every coordinate update
 
   // Handle when isSearching changes (from button trigger or auto-trigger)
   useEffect(() => {
@@ -686,9 +689,6 @@ export default function SearchScreen() {
     (profileId: string) => {
       console.log('handleLike called for profile:', profileId);
 
-      // Show wink animation immediately
-      setShowWinkAnimation(true);
-
       // Close profile modal
       setShowProfileDetail(false);
       setSelectedProfile(null);
@@ -790,10 +790,6 @@ export default function SearchScreen() {
     setSelectedProfile(null);
   }, []);
 
-  const handleWinkAnimationComplete = useCallback(() => {
-    setShowWinkAnimation(false);
-  }, []);
-
   // FlatList optimization callbacks (defined after handlers to avoid hoisting issues)
   const keyExtractor = useCallback((item: any) => item.id, []);
 
@@ -855,6 +851,10 @@ export default function SearchScreen() {
   const confirmUnmatch = () => {
     if (unmatchProfileId) {
       console.log('Confirming unmatch for:', unmatchProfileId);
+
+      // Show unmatch animation
+      setShowUnmatchAnimation(true);
+
       unmatchProfile(unmatchProfileId);
       handleCloseProfile();
     }
@@ -891,8 +891,15 @@ export default function SearchScreen() {
     console.log('🔄 Pull-to-refresh triggered');
     setRefreshing(true);
     try {
+      // Clear the discover profiles cache to force fresh data from Firebase
+      const cacheKey = `discoverProfiles_${JSON.stringify(searchFilters)}`;
+      console.log('🗑️ Clearing cache:', cacheKey);
+
+      // Call the cache service to remove old cache
+      // We do this by calling loadDiscoverProfiles with refresh=true
+      // which will clear the cached profiles
       await loadDiscoverProfiles(true);
-      console.log('✅ Profiles refreshed successfully');
+      console.log('✅ Profiles refreshed successfully from Firebase');
     } catch (error) {
       console.error('❌ Error refreshing profiles:', error);
     } finally {
@@ -900,7 +907,7 @@ export default function SearchScreen() {
       setPullDistance(0);
       setIsPulling(false);
     }
-  }, [loadDiscoverProfiles]);
+  }, [loadDiscoverProfiles, searchFilters]);
 
   // Custom pull-to-refresh handlers
   const handleScrollBeginDrag = useCallback(() => {
@@ -1370,13 +1377,6 @@ export default function SearchScreen() {
           theme={theme}
         />
       )}
-
-      {/* Wink Animation */}
-      <WinkAnimation
-        visible={showWinkAnimation}
-        onComplete={handleWinkAnimationComplete}
-        theme={theme}
-      />
     </View>
   );
 }

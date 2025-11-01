@@ -40,6 +40,7 @@ import Animated, {
   withTiming,
   interpolate,
 } from 'react-native-reanimated';
+import { Audio } from 'expo-av';
 import { useUserStore } from '../../store';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
@@ -218,6 +219,8 @@ const ChatScreen = () => {
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const previousMessageCountRef = useRef(0);
 
   // Get real-time presence for the other user using Firestore directly
   const [isOnline, setIsOnline] = useState(false);
@@ -333,6 +336,37 @@ const ChatScreen = () => {
     }, 5000); // 5 second timeout
 
     return () => clearTimeout(timeout);
+  }, []);
+
+  // Load message sound effect
+  useEffect(() => {
+    const loadSound = async () => {
+      try {
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+        });
+
+        const { sound } = await Audio.Sound.createAsync(
+          require('../../assets/audios/message.mp3')
+        );
+        soundRef.current = sound;
+        console.log('🔊 Message sound loaded successfully');
+      } catch (error) {
+        console.error('❌ Error loading message sound:', error);
+      }
+    };
+
+    loadSound();
+
+    return () => {
+      // Cleanup sound on unmount
+      if (soundRef.current) {
+        soundRef.current.unloadAsync().catch((error) => {
+          console.error('❌ Error unloading sound:', error);
+        });
+      }
+    };
   }, []);
 
   // Add cleanup effect for better memory management
@@ -454,7 +488,7 @@ const ChatScreen = () => {
 
     const unsubscribe = onSnapshot(
       messagesQuery,
-      (snapshot: any) => {
+      async (snapshot: any) => {
         const newMessages: Message[] = snapshot.docs.map((doc: any) => {
           const data = doc.data();
           const timestamp =
@@ -475,6 +509,25 @@ const ChatScreen = () => {
           `📨 Received ${newMessages.length} messages from Firestore`
         );
         console.log('📨 Message IDs:', newMessages.map((m) => m.id).join(', '));
+
+        // Check if there's a new message from the other user
+        const hasNewMessageFromOther =
+          newMessages.length > previousMessageCountRef.current &&
+          newMessages.length > 0 &&
+          !newMessages[newMessages.length - 1].isFromCurrentUser;
+
+        // Play sound if new message received from other user
+        if (hasNewMessageFromOther && soundRef.current) {
+          try {
+            await soundRef.current.replayAsync();
+            console.log('🔊 Playing message received sound');
+          } catch (error) {
+            console.error('❌ Error playing sound:', error);
+          }
+        }
+
+        // Update previous message count
+        previousMessageCountRef.current = newMessages.length;
 
         // Update messages from Firestore (single source of truth)
         setMessages(newMessages);

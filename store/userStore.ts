@@ -114,6 +114,11 @@ const defaultSearchFilters: SearchFilters = {
   interests: [],
 };
 
+// Track loading state to prevent duplicate calls
+let isLoadingDiscoverProfiles = false;
+let lastLoadTime = 0;
+const LOAD_DEBOUNCE_MS = 1000; // Minimum 1 second between loads
+
 export const useUserStore = create<UserState>((set, get) => ({
   // Initial state
   currentUser: null,
@@ -141,32 +146,9 @@ export const useUserStore = create<UserState>((set, get) => ({
   setCurrentUser: (user) => set({ currentUser: user }),
 
   loadCurrentUser: async () => {
-    // Check cache first
-    const cachedUser = cacheService.get<User>('currentUser');
-    if (cachedUser) {
-      set({ currentUser: cachedUser });
-      // Sync search filters with cached user preferences
-      const { searchFilters } = get();
-      if (cachedUser.preferences?.interestedIn) {
-        const updatedFilters = {
-          ...searchFilters,
-          gender: cachedUser.preferences.interestedIn,
-          ageRange: cachedUser.preferences?.ageRange || searchFilters.ageRange,
-          maxDistance:
-            cachedUser.preferences?.maxDistance || searchFilters.maxDistance,
-        };
-        console.log(
-          '✅ Auto-syncing search filters with cached user preferences:',
-          {
-            oldGender: searchFilters.gender,
-            newGender: updatedFilters.gender,
-            cachedPreferences: cachedUser.preferences,
-          }
-        );
-        set({ searchFilters: updatedFilters });
-      }
-      return;
-    }
+    // Always fetch fresh user data to ensure preferences are up-to-date
+    // Don't use cache for critical user profile data
+    console.log('🔄 Loading fresh user data from Firebase...');
 
     set({ isLoadingCurrentUser: true, error: null });
     try {
@@ -347,6 +329,20 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   // Discovery Actions
   loadDiscoverProfiles: async (refresh = false) => {
+    // Prevent duplicate calls within debounce window
+    const now = Date.now();
+    if (!refresh && isLoadingDiscoverProfiles) {
+      console.log(
+        '⏭️ loadDiscoverProfiles already in progress, skipping duplicate call'
+      );
+      return;
+    }
+
+    if (!refresh && now - lastLoadTime < LOAD_DEBOUNCE_MS) {
+      console.log('⏭️ loadDiscoverProfiles called too soon, debouncing...');
+      return;
+    }
+
     // get() is for accessing current state
     const { searchFilters, currentUser } = get();
 
@@ -360,6 +356,17 @@ export const useUserStore = create<UserState>((set, get) => ({
       return;
     }
 
+    isLoadingDiscoverProfiles = true;
+    lastLoadTime = now;
+
+    console.log('🔍 loadDiscoverProfiles - Current searchFilters:', {
+      gender: searchFilters.gender,
+      ageRange: searchFilters.ageRange,
+      maxDistance: searchFilters.maxDistance,
+      currentUserGender: currentUser.gender,
+      currentUserPreferences: currentUser.preferences,
+    });
+
     set({
       isLoadingDiscover: true,
       error: null,
@@ -372,6 +379,12 @@ export const useUserStore = create<UserState>((set, get) => ({
       // Use cache for first page only
       const cacheKey =
         page === 1 ? `discoverProfiles_${JSON.stringify(searchFilters)}` : null;
+
+      // Clear cache if refresh is requested
+      if (refresh && cacheKey) {
+        console.log('🗑️ Clearing discover profiles cache on refresh');
+        cacheService.delete(cacheKey);
+      }
 
       if (cacheKey && !refresh) {
         const cached = cacheService.get<UserProfile[]>(cacheKey);
@@ -434,6 +447,7 @@ export const useUserStore = create<UserState>((set, get) => ({
       console.error('Error loading discover profiles:', error);
     } finally {
       set({ isLoadingDiscover: false });
+      isLoadingDiscoverProfiles = false;
     }
   },
 
