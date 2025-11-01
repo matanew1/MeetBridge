@@ -7,7 +7,7 @@ import Animated, {
   withTiming,
   interpolate,
 } from 'react-native-reanimated';
-import { THEME } from '../../../constants/theme';
+import { THEME, lightTheme, darkTheme } from '../../../constants/theme';
 import { useTheme } from '../../../contexts/ThemeContext';
 
 interface SkeletonProps {
@@ -23,7 +23,8 @@ const Skeleton: React.FC<SkeletonProps> = ({
   borderRadius = THEME.borderRadius.sm,
   style,
 }) => {
-  const { theme } = useTheme();
+  const { isDarkMode } = useTheme();
+  const theme = isDarkMode ? darkTheme : lightTheme;
   const animatedValue = useSharedValue(0);
 
   useEffect(() => {
@@ -83,7 +84,8 @@ export const SkeletonText: React.FC<{ lines?: number; width?: string }> = ({
 );
 
 export const SkeletonCard: React.FC = () => {
-  const { theme } = useTheme();
+  const { isDarkMode } = useTheme();
+  const theme = isDarkMode ? darkTheme : lightTheme;
 
   return (
     <View
@@ -117,7 +119,8 @@ export const SkeletonCard: React.FC = () => {
 };
 
 export const SkeletonProfileCard: React.FC = () => {
-  const { theme } = useTheme();
+  const { isDarkMode } = useTheme();
+  const theme = isDarkMode ? darkTheme : lightTheme;
 
   return (
     <View

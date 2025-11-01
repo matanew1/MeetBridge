@@ -2,6 +2,7 @@ import React from 'react';
 import { View, StyleSheet, ViewStyle, TouchableOpacity } from 'react-native';
 import { THEME } from '../../../constants/theme';
 import { useTheme } from '../../../contexts/ThemeContext';
+import { lightTheme, darkTheme } from '../../../constants/theme';
 import {
   scale,
   verticalScale,
@@ -27,7 +28,8 @@ const Card: React.FC<CardProps> = ({
   style,
   padding = 'md',
 }) => {
-  const { theme } = useTheme();
+  const { isDarkMode } = useTheme();
+  const theme = isDarkMode ? darkTheme : lightTheme;
 
   const getCardStyle = (): ViewStyle => {
     const baseStyle: ViewStyle = {

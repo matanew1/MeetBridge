@@ -36,9 +36,6 @@ const LoginScreen = () => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [focusedInput, setFocusedInput] = useState<'email' | 'password' | null>(
-    null
-  );
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
 
@@ -72,12 +69,10 @@ const LoginScreen = () => {
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
         >
           {/* Header Section */}
           <View style={styles.headerSection}>
@@ -86,27 +81,23 @@ const LoginScreen = () => {
               style={styles.logo}
               contentFit="contain"
               tintColor={theme.primary}
-              transition={300}
             />
             <Text style={[styles.welcomeText, { color: theme.textSecondary }]}>
               Welcome back! Sign in to continue your journey
             </Text>
-            <Text style={[styles.signUpText, { color: theme.textSecondary }]}>
-              Don't have an account?{' '}
+            <Text style={styles.footerText}>
+              <Text style={{ color: theme.textSecondary }}>
+                Don't have an account?{' '}
+              </Text>
               <Link href="/auth/register" asChild>
-                <Text style={[styles.linkText, { color: theme.primary }]}>
-                  Sign Up
-                </Text>
+                <Text style={[{ color: theme.textSecondary }, styles.linkText]}>Sign Up</Text>
               </Link>
             </Text>
           </View>
 
           {/* Form Section */}
           <View
-            style={[
-              styles.formSection,
-              { backgroundColor: theme.surface, borderColor: theme.border },
-            ]}
+            style={[styles.formSection, { backgroundColor: theme.surface }]}
           >
             <Text style={[styles.formTitle, { color: theme.text }]}>
               Sign In
@@ -120,37 +111,29 @@ const LoginScreen = () => {
               <View
                 style={[
                   styles.inputContainer,
-                  focusedInput === 'email' && styles.inputContainerFocused,
                   {
                     backgroundColor: theme.background,
-                    borderColor:
-                      focusedInput === 'email' ? theme.primary : theme.border,
+                    borderColor: theme.border,
                   },
                 ]}
               >
-                <Mail
-                  size={moderateScale(20)}
-                  color={
-                    focusedInput === 'email'
-                      ? theme.primary
-                      : theme.textSecondary
-                  }
-                />
+                <Mail size={20} color={theme.textSecondary} />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { color: theme.text }]}
                   placeholder="Enter your email"
                   placeholderTextColor={theme.textSecondary}
                   value={email}
                   onChangeText={setEmail}
-                  onFocus={() => setFocusedInput('email')}
-                  onBlur={() => setFocusedInput(null)}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoComplete="email"
                   textContentType="emailAddress"
                   returnKeyType="next"
                   blurOnSubmit={false}
-                  autoFocus={false}
+                  onSubmitEditing={() => {
+                    // Don't auto-focus password if email is being autofilled
+                    // Let user manually tap password field
+                  }}
                 />
               </View>
             </View>
@@ -163,32 +146,19 @@ const LoginScreen = () => {
               <View
                 style={[
                   styles.inputContainer,
-                  focusedInput === 'password' && styles.inputContainerFocused,
                   {
                     backgroundColor: theme.background,
-                    borderColor:
-                      focusedInput === 'password'
-                        ? theme.primary
-                        : theme.border,
+                    borderColor: theme.border,
                   },
                 ]}
               >
-                <Lock
-                  size={moderateScale(20)}
-                  color={
-                    focusedInput === 'password'
-                      ? theme.primary
-                      : theme.textSecondary
-                  }
-                />
+                <Lock size={20} color={theme.textSecondary} />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { color: theme.text }]}
                   placeholder="Enter your password"
                   placeholderTextColor={theme.textSecondary}
                   value={password}
                   onChangeText={setPassword}
-                  onFocus={() => setFocusedInput('password')}
-                  onBlur={() => setFocusedInput(null)}
                   secureTextEntry={!showPassword}
                   autoComplete="password"
                   textContentType="password"
@@ -198,26 +168,11 @@ const LoginScreen = () => {
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
                   style={styles.eyeButton}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                   {showPassword ? (
-                    <EyeOff
-                      size={moderateScale(20)}
-                      color={
-                        focusedInput === 'password'
-                          ? theme.primary
-                          : theme.textSecondary
-                      }
-                    />
+                    <EyeOff size={20} color={theme.textSecondary} />
                   ) : (
-                    <Eye
-                      size={moderateScale(20)}
-                      color={
-                        focusedInput === 'password'
-                          ? theme.primary
-                          : theme.textSecondary
-                      }
-                    />
+                    <Eye size={20} color={theme.textSecondary} />
                   )}
                 </TouchableOpacity>
               </View>
@@ -226,9 +181,7 @@ const LoginScreen = () => {
             {/* Forgot Password */}
             <TouchableOpacity style={styles.forgotPassword}>
               <Link href="/auth/forgot-password" asChild>
-                <Text
-                  style={[styles.forgotPasswordText, { color: theme.primary }]}
-                >
+                <Text style={{ color: theme.textSecondary }}>
                   Forgot Password?
                 </Text>
               </Link>
@@ -239,16 +192,13 @@ const LoginScreen = () => {
               style={[styles.signInButton, isLoading && styles.disabledButton]}
               onPress={handleLogin}
               disabled={isLoading}
-              activeOpacity={0.8}
             >
               <LinearGradient
                 colors={[theme.primary, theme.primaryVariant]}
                 style={styles.buttonGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
               >
                 {isLoading ? (
-                  <ActivityIndicator color="white" size="small" />
+                  <ActivityIndicator color="white" />
                 ) : (
                   <Text style={styles.signInButtonText}>Sign In</Text>
                 )}
@@ -256,8 +206,8 @@ const LoginScreen = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Footer Spacer */}
-          <View style={styles.footer} />
+          {/* Footer */}
+          <View style={styles.footer}></View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -273,129 +223,135 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    minHeight: deviceInfo.height,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
   },
   headerSection: {
     alignItems: 'center',
-    marginBottom: verticalScale(48),
-    paddingTop: verticalScale(40),
+    marginBottom: 40,
+    paddingTop: 20,
+  },
+  logoContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
   },
   logo: {
-    width: scale(180),
-    height: scale(180),
-    marginBottom: verticalScale(32),
+    width: 150,
+    height: 150,
+  },
+  appTitle: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    marginBottom: 8,
   },
   welcomeText: {
-    fontSize: moderateScale(18),
+    fontSize: 16,
     textAlign: 'center',
-    lineHeight: moderateScale(26),
-    paddingHorizontal: spacing.lg,
-    marginBottom: verticalScale(16),
-  },
-  signUpText: {
-    fontSize: moderateScale(16),
-    textAlign: 'center',
-    lineHeight: moderateScale(24),
+    lineHeight: 24,
+    paddingHorizontal: 20,
   },
   formSection: {
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
-    marginBottom: verticalScale(32),
+    borderRadius: 24,
+    padding: 32,
+    marginBottom: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 12,
-    borderWidth: 1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
   },
   formTitle: {
-    fontSize: moderateScale(28),
-    fontWeight: '700',
+    fontSize: 24,
+    fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: verticalScale(40),
+    marginBottom: 32,
   },
   inputGroup: {
-    marginBottom: verticalScale(28),
+    marginBottom: 24,
   },
   inputLabel: {
-    fontSize: moderateScale(16),
+    fontSize: 16,
     fontWeight: '600',
-    marginBottom: verticalScale(10),
+    marginBottom: 8,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 2,
-    borderRadius: borderRadius.lg,
-    paddingHorizontal: spacing.lg,
-    paddingVertical:
-      Platform.OS === 'ios' ? verticalScale(16) : verticalScale(12),
-    gap: spacing.sm,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  inputContainerFocused: {
-    shadowOpacity: 0.15,
-    elevation: 5,
+    borderWidth: 1.5,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: Platform.OS === 'ios' ? 16 : 12,
+    gap: 12,
   },
   input: {
     flex: 1,
-    fontSize: moderateScale(16),
-    minHeight: verticalScale(24),
+    fontSize: 16,
+    minHeight: 24,
   },
   eyeButton: {
-    padding: spacing.sm,
-    borderRadius: borderRadius.sm,
+    padding: 4,
   },
   forgotPassword: {
     alignSelf: 'flex-end',
-    marginBottom: verticalScale(40),
-    paddingVertical: verticalScale(8),
-    paddingHorizontal: spacing.sm,
+    marginBottom: 32,
   },
   forgotPasswordText: {
-    fontSize: moderateScale(14),
+    fontSize: 14,
     fontWeight: '600',
   },
   signInButton: {
-    borderRadius: borderRadius.lg,
+    borderRadius: 16,
     overflow: 'hidden',
-    marginBottom: verticalScale(32),
+    marginBottom: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 10,
-  },
-  disabledButton: {
-    opacity: 0.6,
-    shadowOpacity: 0.15,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
   },
   buttonGradient: {
-    paddingVertical: verticalScale(20),
+    paddingVertical: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: verticalScale(56),
   },
   signInButtonText: {
     color: 'white',
-    fontSize: moderateScale(18),
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  disabledButton: {
+    opacity: 0.7,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+    gap: 16,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
   footer: {
     alignItems: 'center',
-    paddingVertical: verticalScale(24),
+    paddingVertical: 20,
+  },
+  footerText: {
+    fontSize: 16,
+    textAlign: 'center',
   },
   linkText: {
-    fontWeight: '900',
+    fontWeight: '600',
   },
 });
 

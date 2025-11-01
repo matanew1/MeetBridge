@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { THEME } from '../../../constants/theme';
 import { useTheme } from '../../../contexts/ThemeContext';
+import { lightTheme, darkTheme } from '../../../constants/theme';
 import Button from './Button';
 
 interface EmptyStateProps {
@@ -19,7 +20,8 @@ const EmptyState: React.FC<EmptyStateProps> = ({
   actionLabel,
   onAction,
 }) => {
-  const { theme } = useTheme();
+  const { isDarkMode } = useTheme();
+  const theme = isDarkMode ? darkTheme : lightTheme;
 
   return (
     <View style={styles.container}>

@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { THEME } from '../../../constants/theme';
 import { useTheme } from '../../../contexts/ThemeContext';
+import { lightTheme, darkTheme } from '../../../constants/theme';
 import {
   scale,
   verticalScale,
@@ -42,7 +43,8 @@ const Button: React.FC<ButtonProps> = ({
   style,
   ...props
 }) => {
-  const { theme } = useTheme();
+  const { isDarkMode } = useTheme();
+  const theme = isDarkMode ? darkTheme : lightTheme;
 
   const getButtonStyle = (): ViewStyle => {
     const baseStyle: ViewStyle = {

@@ -8,7 +8,7 @@ import {
   TextInputProps,
   TouchableOpacity,
 } from 'react-native';
-import { THEME } from '../../../constants/theme';
+import { THEME, lightTheme, darkTheme } from '../../../constants/theme';
 import { useTheme } from '../../../contexts/ThemeContext';
 import {
   scale,
@@ -39,7 +39,8 @@ const Input: React.FC<InputProps> = ({
   secureTextEntry,
   ...props
 }) => {
-  const { theme } = useTheme();
+  const { isDarkMode } = useTheme();
+  const theme = isDarkMode ? darkTheme : lightTheme;
   const [isFocused, setIsFocused] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 

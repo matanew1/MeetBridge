@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  Alert,
+  TouchableOpacity,
+} from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -7,14 +14,8 @@ import { lightTheme, darkTheme } from '../../constants/theme';
 import { EditProfileModal } from '../components/EditProfileModal';
 import OnboardingTutorial from '../components/OnboardingTutorial';
 import { User } from '../../store/types';
+import { LinearGradient } from 'expo-linear-gradient';
 import { CheckCircle, Sparkles } from 'lucide-react-native';
-import {
-  scale,
-  verticalScale,
-  moderateScale,
-  spacing,
-  borderRadius,
-} from '../../utils/responsive';
 
 export default function CompleteProfileScreen() {
   const { user, updateProfile } = useAuth();
@@ -74,9 +75,12 @@ export default function CompleteProfileScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
-      <View style={[styles.gradient, { backgroundColor: theme.primary }]}>
+      <LinearGradient
+        colors={[theme.primary, theme.secondary]}
+        style={styles.gradient}
+      >
         <View style={styles.content}>
-          <Sparkles size={scale(80)} color="#fff" style={styles.icon} />
+          <Sparkles size={80} color="#fff" style={styles.icon} />
           <Text style={styles.title}>Complete Your Profile</Text>
           <Text style={styles.description}>
             Let's set up your profile so you can start meeting amazing people!
@@ -84,13 +88,13 @@ export default function CompleteProfileScreen() {
 
           {isProfileCompleted && (
             <View style={styles.successContainer}>
-              <CheckCircle size={scale(40)} color="#4ade80" />
+              <CheckCircle size={40} color="#4ade80" />
               <Text style={styles.successText}>Profile Completed!</Text>
               <Text style={styles.successSubtext}>Get ready to explore...</Text>
             </View>
           )}
         </View>
-      </View>
+      </LinearGradient>
 
       {/* Profile Completion Modal - Cannot be dismissed until complete */}
       <EditProfileModal
@@ -116,46 +120,46 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.lg,
+    padding: 20,
   },
   content: {
     alignItems: 'center',
-    maxWidth: scale(400),
+    maxWidth: 400,
   },
   icon: {
-    marginBottom: verticalScale(30),
+    marginBottom: 30,
   },
   title: {
-    fontSize: moderateScale(32),
-    fontWeight: '700',
+    fontSize: 32,
+    fontWeight: 'bold',
     color: '#fff',
     textAlign: 'center',
-    marginBottom: verticalScale(16),
+    marginBottom: 16,
   },
   description: {
-    fontSize: moderateScale(16),
+    fontSize: 16,
     color: '#fff',
     textAlign: 'center',
-    lineHeight: moderateScale(24),
+    lineHeight: 24,
     opacity: 0.95,
   },
   successContainer: {
-    marginTop: verticalScale(40),
+    marginTop: 40,
     alignItems: 'center',
-    padding: spacing.lg,
+    padding: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: borderRadius.lg,
+    borderRadius: 20,
   },
   successText: {
-    fontSize: moderateScale(24),
-    fontWeight: '700',
+    fontSize: 24,
+    fontWeight: 'bold',
     color: '#fff',
-    marginTop: verticalScale(12),
+    marginTop: 12,
   },
   successSubtext: {
-    fontSize: moderateScale(14),
+    fontSize: 14,
     color: '#fff',
     opacity: 0.9,
-    marginTop: verticalScale(4),
+    marginTop: 4,
   },
 });

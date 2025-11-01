@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { THEME } from '../../../constants/theme';
 import { useTheme } from '../../../contexts/ThemeContext';
+import { lightTheme, darkTheme } from '../../../constants/theme';
 
 export type AvatarSize = 'small' | 'medium' | 'large' | 'xlarge';
 
@@ -28,7 +29,8 @@ const Avatar: React.FC<AvatarProps> = ({
   style,
   showOnline = false,
 }) => {
-  const { theme } = useTheme();
+  const { isDarkMode } = useTheme();
+  const theme = isDarkMode ? darkTheme : lightTheme;
   const [loading, setLoading] = useState(!!source);
   const [error, setError] = useState(false);
 

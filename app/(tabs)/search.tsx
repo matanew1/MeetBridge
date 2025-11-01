@@ -17,9 +17,14 @@ import {
   FlatList,
   ActivityIndicator,
   ListRenderItemInfo,
-  AppState,
 } from 'react-native';
-import { Heart, X, Filter } from 'lucide-react-native';
+import {
+  Heart,
+  X,
+  SlidersVertical,
+  RefreshCw,
+  ChevronDown,
+} from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import Animated, {
@@ -41,7 +46,7 @@ import EnhancedMatchAnimation from '../components/EnhancedMatchAnimation';
 import WinkAnimation from '../components/WinkAnimation';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { lightTheme, darkTheme } from '../../constants/theme';
+import { lightTheme, darkTheme, Theme } from '../../constants/theme';
 import { FirebaseDiscoveryService } from '../../services/firebase/firebaseServices';
 import { services } from '../../services';
 import notificationService from '../../services/notificationService';
@@ -56,7 +61,7 @@ import {
   deviceInfo,
 } from '../../utils/responsive';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 interface ProfileCardProps {
   user: {
@@ -71,7 +76,7 @@ interface ProfileCardProps {
   isLiked: boolean;
   isDisliked: boolean;
   isAnimatingOut: boolean;
-  theme: any;
+  theme: Theme;
 }
 
 const ProfileCard = memo(
@@ -163,8 +168,14 @@ const ProfileCard = memo(
               backgroundColor: theme.cardBackground,
               shadowColor: theme.shadow,
             },
-            isLiked && [styles.likedCard, { borderColor: theme.primary }],
-            isDisliked && [styles.dislikedCard, { borderColor: theme.error }],
+            isLiked && [
+              styles.likedCard,
+              { borderColor: theme.primary, shadowColor: theme.primary },
+            ],
+            isDisliked && [
+              styles.dislikedCard,
+              { borderColor: theme.error, shadowColor: theme.error },
+            ],
           ]}
           onPress={() => onPress(user)}
           disabled={isLiked || isDisliked || isAnimatingOut}
@@ -203,28 +214,6 @@ const ProfileCard = memo(
                 )}
               </>
             )}
-
-            {/* White dots indicator */}
-            {/* {userImages.length > 1 && (
-              <View style={styles.cardDotsContainer}>
-                {userImages.map((_, index) => (
-                  <View
-                    key={index}
-                    style={[
-                      styles.cardDot,
-                      {
-                        backgroundColor:
-                          index === currentImageIndex
-                            ? '#FFF'
-                            : 'rgba(255, 255, 255, 0.5)',
-                        width: index === currentImageIndex ? 7 : 5,
-                        height: index === currentImageIndex ? 7 : 5,
-                      },
-                    ]}
-                  />
-                ))}
-              </View>
-            )} */}
           </View>
           <View style={styles.cardInfo}>
             <Text style={[styles.cardText, { color: theme.text }]}>
@@ -326,8 +315,6 @@ export default function SearchScreen() {
 
   const {
     searchFilters,
-    matchProfiles,
-    centerProfile,
     isSearching,
     discoverProfiles,
     isLoadingDiscover,
@@ -344,9 +331,6 @@ export default function SearchScreen() {
     unmatchProfile,
     getMatchedProfiles,
     triggerSearchAnimation,
-    error,
-    isLoadingLike,
-    isLoadingUnmatch,
     loadConversations,
     createConversation,
     currentUser,
@@ -768,7 +752,7 @@ export default function SearchScreen() {
           });
       }, 200); // Reduced from 300ms to 200ms for faster animation
     },
-    [discoverProfiles, likeProfile, currentUser, dislikeProfile]
+    [discoverProfiles, likeProfile, currentUser]
   );
 
   const handleDislike = useCallback(
@@ -1177,26 +1161,63 @@ export default function SearchScreen() {
             ]}
             onPress={handleFilterPress}
           >
-            <Filter size={20} color={theme.primary} />
+            <SlidersVertical size={20} color={theme.primary} />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Custom Pull-to-Refresh Indicator */}
+      {/* Professional Floating Pull-to-Refresh Indicator */}
       {pullDistance > 0 && (
         <Animated.View
           style={[
-            styles.refreshIndicator,
+            styles.refreshIndicatorContainer,
             {
-              opacity: Math.min(pullDistance / 80, 1),
-              transform: [{ translateY: Math.min(pullDistance / 2, 40) }],
+              opacity: Math.min(pullDistance / 60, 1),
+              transform: [
+                { translateY: Math.min(pullDistance / 1.5, 60) },
+                { scale: Math.min(0.8 + pullDistance / 200, 1.1) },
+              ],
             },
           ]}
         >
-          <ActivityIndicator size="small" color={theme.primary} />
-          <Text style={[styles.refreshText, { color: theme.textSecondary }]}>
-            {pullDistance > 80 ? 'Release to refresh' : 'Pull to refresh'}
-          </Text>
+          <View
+            style={[
+              styles.refreshIndicator,
+              { backgroundColor: theme.surface, shadowColor: theme.shadow },
+            ]}
+          >
+            <Animated.View
+              style={[
+                styles.refreshIconContainer,
+                {
+                  transform: [
+                    {
+                      rotate:
+                        pullDistance > 80
+                          ? '180deg'
+                          : `${pullDistance * 2.25}deg`,
+                    },
+                  ],
+                },
+              ]}
+            >
+              {pullDistance > 80 ? (
+                <RefreshCw size={24} color={theme.primary} />
+              ) : (
+                <ChevronDown size={24} color={theme.primary} />
+              )}
+            </Animated.View>
+            <Text style={[styles.refreshText, { color: theme.text }]}>
+              {pullDistance > 80 ? 'Release to refresh' : 'Pull to refresh'}
+            </Text>
+            {pullDistance > 80 && (
+              <ActivityIndicator
+                size="small"
+                color={theme.primary}
+                style={styles.refreshSpinner}
+              />
+            )}
+          </View>
         </Animated.View>
       )}
 
@@ -1364,17 +1385,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 15,
-    paddingBottom: 20,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
   },
   headerButtons: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: -0.5,
   },
   refreshButton: {
     width: 44,
@@ -1386,12 +1412,16 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   filterButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 48,
+    height: 48,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: 1.5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   loadingText: {
     fontSize: 16,
@@ -1414,34 +1444,42 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   card: {
-    borderRadius: 24,
+    borderRadius: 28,
     overflow: 'hidden',
-    elevation: 5,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
+    elevation: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   likedCard: {
-    borderWidth: 2,
+    borderWidth: 3,
+    shadowOpacity: 0.3,
+    elevation: 12,
   },
   dislikedCard: {
-    opacity: 0.5,
+    opacity: 0.7,
     borderWidth: 2,
+    transform: [{ scale: 0.95 }],
   },
   imageContainer: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     overflow: 'hidden',
-    marginBottom: 8,
-    borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.8)',
+    marginBottom: 12,
+    borderWidth: 4,
+    borderColor: 'rgba(255,255,255,0.9)',
     position: 'relative',
-    marginRight: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   cardImage: {
     width: '100%',
@@ -1463,46 +1501,27 @@ const styles = StyleSheet.create({
     width: '30%',
     zIndex: 10,
   },
-  cardDotsContainer: {
-    position: 'absolute',
-    bottom: 4,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 3,
-    paddingHorizontal: 6,
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
-    borderRadius: 10,
-    alignSelf: 'center',
-  },
-  cardDot: {
-    borderRadius: 3,
-    elevation: 1,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.3,
-    shadowRadius: 1,
-  },
   distanceContainer: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
+    top: 12,
+    right: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
     zIndex: 10,
-    minWidth: 50,
+    minWidth: 55,
     alignItems: 'center',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   distanceText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
+    letterSpacing: -0.2,
   },
   cardInfo: {
     alignItems: 'center',
@@ -1512,130 +1531,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '600',
   },
-  cardHeight: {
-    fontSize: 13,
-    textAlign: 'center',
-    marginTop: 2,
-  },
   // Animation styles
-  searchInterface: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-    paddingVertical: 40,
-  },
-  searchTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 40,
-    textAlign: 'center',
-  },
-  circularStructure: {
-    width: 340,
-    height: 340,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  outerCircle: {
-    width: 320,
-    height: 320,
-    borderRadius: 160,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-  },
-  middleCircle: {
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  innerCircle: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  centerProfileContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    overflow: 'hidden',
-    borderWidth: 3,
-    borderColor: '#4FC3F7',
-    borderStyle: 'dashed',
-    backgroundColor: '#4FC3F7',
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  centerProfile: {
-    width: '100%',
-    height: '100%',
-  },
-  placeholderProfile: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  heartContainer: {
-    position: 'absolute',
-    bottom: -8,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 4,
-    zIndex: 10,
-  },
-  surroundingProfile: {
-    position: 'absolute',
-    overflow: 'hidden',
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  profileImage: {
-    width: '100%',
-    height: '100%',
-  },
-  searchingIndicator: {
-    position: 'absolute',
-    bottom: -120,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 15,
-  },
-  searchingText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
   modalOverlay: {
     position: 'absolute',
     top: 0,
@@ -1741,19 +1637,53 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
   },
-  refreshIndicator: {
+  refreshIndicatorContainer: {
     position: 'absolute',
-    top: 100,
+    top: 120,
     left: 0,
     right: 0,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
-    paddingVertical: 10,
+    paddingVertical: 20,
+  },
+  refreshIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  refreshIconContainer: {
+    marginRight: 12,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   refreshText: {
     fontSize: 14,
+    fontWeight: '600',
+    marginRight: 8,
+  },
+  refreshSpinner: {
+    marginLeft: 8,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyText: {
+    fontSize: 18,
+    textAlign: 'center',
     fontWeight: '500',
-    marginTop: 5,
   },
 });

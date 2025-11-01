@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Heart, MessageCircle, X, Sparkles } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
+import { Theme } from '../../constants/theme';
 import {
   scale,
   verticalScale,
@@ -32,7 +33,7 @@ interface EnhancedMatchAnimationProps {
   };
   onClose: () => void;
   onSendMessage: () => void;
-  theme: any;
+  theme: Theme;
 }
 
 export default function EnhancedMatchAnimation({
@@ -134,15 +135,17 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   heartCircle: {
-    width: moderateScale(90),
-    height: moderateScale(90),
-    borderRadius: moderateScale(45),
+    width: moderateScale(100),
+    height: moderateScale(100),
+    borderRadius: moderateScale(50),
     justifyContent: 'center',
     alignItems: 'center',
-    shadowOffset: { width: 0, height: verticalScale(12) },
-    shadowOpacity: 0.6,
-    shadowRadius: moderateScale(24),
-    elevation: 20,
+    shadowOffset: { width: 0, height: verticalScale(16) },
+    shadowOpacity: 0.7,
+    shadowRadius: moderateScale(28),
+    elevation: 24,
+    borderWidth: moderateScale(3),
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   matchTitle: {
     fontSize: moderateScale(42),
@@ -163,16 +166,18 @@ const styles = StyleSheet.create({
     marginBottom: verticalScale(40),
   },
   profileCard: {
-    width: moderateScale(130),
-    height: verticalScale(170),
-    borderRadius: borderRadius.lg,
+    width: moderateScale(140),
+    height: verticalScale(180),
+    borderRadius: borderRadius.xl,
     overflow: 'hidden',
     backgroundColor: '#E0E0E0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: verticalScale(6) },
-    shadowOpacity: 0.4,
-    shadowRadius: moderateScale(12),
-    elevation: 10,
+    shadowOffset: { width: 0, height: verticalScale(8) },
+    shadowOpacity: 0.5,
+    shadowRadius: moderateScale(16),
+    elevation: 12,
+    borderWidth: moderateScale(2),
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   profileImage: {
     width: '100%',
@@ -180,20 +185,20 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
   heartBadge: {
-    width: moderateScale(50),
-    height: moderateScale(50),
-    borderRadius: moderateScale(25),
+    width: moderateScale(55),
+    height: moderateScale(55),
+    borderRadius: moderateScale(27.5),
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: scale(-10),
+    marginHorizontal: scale(-12),
     zIndex: 1,
     borderWidth: moderateScale(4),
     borderColor: '#FFF',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: verticalScale(2) },
-    shadowOpacity: 0.3,
-    shadowRadius: moderateScale(4),
-    elevation: 8,
+    shadowOffset: { width: 0, height: verticalScale(3) },
+    shadowOpacity: 0.4,
+    shadowRadius: moderateScale(6),
+    elevation: 10,
   },
   actions: {
     width: '100%',
@@ -203,17 +208,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: verticalScale(16),
-    paddingHorizontal: scale(24),
-    borderRadius: borderRadius.md,
+    paddingVertical: verticalScale(18),
+    paddingHorizontal: scale(28),
+    borderRadius: borderRadius.xl,
     gap: spacing.sm,
   },
   messageButton: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: verticalScale(4) },
-    shadowOpacity: 0.2,
-    shadowRadius: moderateScale(8),
-    elevation: 4,
+    shadowOffset: { width: 0, height: verticalScale(6) },
+    shadowOpacity: 0.3,
+    shadowRadius: moderateScale(10),
+    elevation: 6,
   },
   closeButton: {
     borderWidth: moderateScale(2),
@@ -222,7 +227,8 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#FFF',
     fontSize: moderateScale(18),
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
   closeButtonText: {
     fontSize: moderateScale(16),

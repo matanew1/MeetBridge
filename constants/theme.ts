@@ -15,9 +15,9 @@ export const lightTheme = {
   surfaceVariant: '#fcf1fc',
 
   // Primary colors
-  primary: '#8E44AD',
-  primaryVariant: '#EDE7F6',
-  secondary: '#4CAF50',
+  primary: '#7C3AED',
+  primaryVariant: '#F3F0FF',
+  secondary: '#06B6D4',
 
   // Text colors
   text: '#000000',
@@ -115,9 +115,9 @@ export const darkTheme = {
   surfaceVariant: '#2D2D2D',
 
   // Primary colors
-  primary: '#BB86FC',
-  primaryVariant: '#3F3F3F',
-  secondary: '#03DAC6',
+  primary: '#A855F7',
+  primaryVariant: '#2D1B69',
+  secondary: '#0891B2',
 
   // Text colors
   text: '#FFFFFF',
