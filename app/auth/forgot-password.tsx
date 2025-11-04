@@ -14,10 +14,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, router } from 'expo-router';
-import { ArrowLeft, Mail, CheckCircle, Heart } from 'lucide-react-native';
+import { ArrowLeft, Mail, CheckCircle } from 'lucide-react-native';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+
+// Platform check helper
+const isWeb = Platform.OS === 'web';
 import { lightTheme, darkTheme } from '../../constants/theme';
 
 const { width, height } = Dimensions.get('window');
@@ -63,12 +67,14 @@ const ForgotPasswordScreen = () => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.background }]}
+    >
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
         >
@@ -85,9 +91,14 @@ const ForgotPasswordScreen = () => {
               colors={[theme.primary, theme.primaryVariant]}
               style={styles.logoContainer}
             >
-              <Heart size={32} color="white" fill="white" />
+              <Image
+                source={require('../../assets/images/logo.png')}
+                style={{ width: 50, height: 50 }}
+                contentFit="contain"
+                tintColor="white"
+              />
             </LinearGradient>
-            
+
             <Text style={[styles.title, { color: theme.text }]}>
               Forgot Password?
             </Text>
@@ -99,17 +110,24 @@ const ForgotPasswordScreen = () => {
           </View>
 
           {/* Form Section */}
-          <View style={[styles.formSection, { backgroundColor: theme.surface }]}>
+          <View
+            style={[styles.formSection, { backgroundColor: theme.surface }]}
+          >
             {!emailSent ? (
               <>
                 <View style={styles.inputGroup}>
                   <Text style={[styles.inputLabel, { color: theme.text }]}>
                     Email Address
                   </Text>
-                  <View style={[styles.inputContainer, { 
-                    backgroundColor: theme.background,
-                    borderColor: theme.border 
-                  }]}>
+                  <View
+                    style={[
+                      styles.inputContainer,
+                      {
+                        backgroundColor: theme.background,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                  >
                     <Mail size={20} color={theme.textSecondary} />
                     <TextInput
                       style={[styles.input, { color: theme.text }]}
@@ -125,7 +143,10 @@ const ForgotPasswordScreen = () => {
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.resetButton, isLoading && styles.disabledButton]}
+                  style={[
+                    styles.resetButton,
+                    isLoading && styles.disabledButton,
+                  ]}
                   onPress={handleForgotPassword}
                   disabled={isLoading}
                 >
@@ -145,14 +166,22 @@ const ForgotPasswordScreen = () => {
               </>
             ) : (
               <View style={styles.successContainer}>
-                <View style={[styles.successIcon, { backgroundColor: theme.success + '20' }]}>
+                <View
+                  style={[
+                    styles.successIcon,
+                    { backgroundColor: theme.success + '20' },
+                  ]}
+                >
                   <CheckCircle size={60} color={theme.success} />
                 </View>
                 <Text style={[styles.successTitle, { color: theme.text }]}>
                   Email Sent!
                 </Text>
-                <Text style={[styles.successText, { color: theme.textSecondary }]}>
-                  Check your inbox and follow the instructions to reset your password.
+                <Text
+                  style={[styles.successText, { color: theme.textSecondary }]}
+                >
+                  Check your inbox and follow the instructions to reset your
+                  password.
                 </Text>
                 <TouchableOpacity
                   style={styles.resetButton}
@@ -175,11 +204,19 @@ const ForgotPasswordScreen = () => {
           <View style={styles.footer}>
             <Text style={[styles.footerText, { color: theme.textSecondary }]}>
               Remember your password?{' '}
-              <Link href="/auth/login" asChild>
-                <Text style={[styles.linkText, { color: theme.primary }]}>
-                  Back to Sign In
-                </Text>
-              </Link>
+              {isWeb ? (
+                <TouchableOpacity onPress={() => router.push('/auth/login')}>
+                  <Text style={[styles.linkText, { color: theme.primary }]}>
+                    Back to Sign In
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <Link href="/auth/login" asChild>
+                  <Text style={[styles.linkText, { color: theme.primary }]}>
+                    Back to Sign In
+                  </Text>
+                </Link>
+              )}
             </Text>
           </View>
         </ScrollView>

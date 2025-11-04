@@ -315,6 +315,10 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
       console.log(
         `🔍 Discovery: ${currentUserData.name} (${currentUserData.gender}) looking for ${filters.gender}`
       );
+      console.log('📍 Current user location:', userLocation);
+      console.log('👤 Current user preferences:', currentUserData.preferences);
+      console.log('✅ Is profile complete?', currentUserData.isProfileComplete);
+
       if (!userLocation?.latitude || !userLocation?.longitude) {
         console.warn('User location not set');
         return {
@@ -329,6 +333,10 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         this.getInteractedUserIds(currentUserId),
         this.getMatchedUserIds(currentUserId),
       ]);
+
+      console.log(
+        `🚫 Excluded users - Interacted: ${interactedIds.size}, Matched: ${matchedIds.size}`
+      );
 
       // Get query bounds using new geohash service
       const bounds = geohashService.getGeohashesInBounds(
@@ -350,6 +358,14 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
 
       const profiles: User[] = [];
       const seenIds = new Set<string>([currentUserId]);
+      let totalCandidates = 0;
+      let filteredOutStats = {
+        validation: 0,
+        gender: 0,
+        age: 0,
+        distance: 0,
+        excluded: 0,
+      };
 
       // Query users
       for (const bound of bounds) {
@@ -361,6 +377,7 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         );
 
         const snapshot = await getDocs(q);
+        totalCandidates += snapshot.size;
 
         snapshot.forEach((docSnapshot) => {
           const userId = docSnapshot.id;
@@ -370,15 +387,25 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
             interactedIds.has(userId) ||
             matchedIds.has(userId)
           ) {
+            filteredOutStats.excluded++;
             return;
           }
           seenIds.add(userId);
 
           const data = { ...docSnapshot.data(), id: userId };
 
-          if (!this.validateUserData(data)) return;
-          if (!this.matchesGenderFilter(currentUserData, data, filters)) return;
-          if (!this.matchesAgeFilter(data, filters)) return;
+          if (!this.validateUserData(data)) {
+            filteredOutStats.validation++;
+            return;
+          }
+          if (!this.matchesGenderFilter(currentUserData, data, filters)) {
+            filteredOutStats.gender++;
+            return;
+          }
+          if (!this.matchesAgeFilter(data, filters)) {
+            filteredOutStats.age++;
+            return;
+          }
 
           if (data.coordinates?.latitude && data.coordinates?.longitude) {
             const distance = geohashService.calculateDistance(
@@ -394,7 +421,10 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
               }
             );
 
-            if (distance > filters.maxDistance) return;
+            if (distance > filters.maxDistance) {
+              filteredOutStats.distance++;
+              return;
+            }
 
             profiles.push({
               id: userId,
@@ -405,6 +435,12 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
           }
         });
       }
+
+      console.log(`📊 Discovery Stats:
+        - Total candidates found: ${totalCandidates}
+        - Filtered out: ${JSON.stringify(filteredOutStats, null, 2)}
+        - Final profiles: ${profiles.length}
+      `);
 
       // Sort profiles by distance (already calculated)
       const sortedProfiles = profiles.sort((a, b) => {
@@ -461,22 +497,21 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
     const step2Pass = targetUserInterestedIn === currentUserGender;
     const willMatch = step1Pass && step2Pass;
 
-    if (!step1Pass || !step2Pass) {
-      console.log(
-        `🔍 Gender Filter: ${currentUser.name || currentUser.id} checking ${
-          targetUser.name || targetUser.id
-        }`,
-        {
-          currentGender: currentUserGender,
-          targetGender: targetUserGender,
-          targetInterestedIn: targetUserInterestedIn,
-          filterGender: filters.gender,
-          step1_targetMatchesFilter: step1Pass,
-          step2_mutualInterest: step2Pass,
-          result: willMatch ? '✅ MATCH' : '❌ FILTERED OUT',
-        }
-      );
-    }
+    // Always log gender filter checks
+    console.log(
+      `🔍 Gender Filter: ${currentUser.name || currentUser.id} checking ${
+        targetUser.name || targetUser.id
+      }`,
+      {
+        currentGender: currentUserGender,
+        targetGender: targetUserGender,
+        targetInterestedIn: targetUserInterestedIn,
+        filterGender: filters.gender,
+        step1_targetMatchesFilter: step1Pass,
+        step2_mutualInterest: step2Pass,
+        result: willMatch ? '✅ MATCH' : '❌ FILTERED OUT',
+      }
+    );
 
     // Check if target user matches the gender current user is interested in
     if (!step1Pass) return false;

@@ -22,7 +22,7 @@ const resources = {
         loading: 'Loading...',
         distance: 'm',
         noProfiles: 'No profiles available',
-        checkBackLater: 'Try adjusting your filters or check back later',
+        checkBackLater: 'Try adjusting your filters',
       },
 
       // Chat Screen

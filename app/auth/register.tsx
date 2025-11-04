@@ -18,6 +18,9 @@ import { Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+
+// Platform check helper
+const isWeb = Platform.OS === 'web';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import { Image } from 'expo-image';
 
@@ -278,11 +281,19 @@ const RegisterScreen = () => {
           <View style={styles.footer}>
             <Text style={[styles.footerText, { color: theme.textSecondary }]}>
               Already have an account?{' '}
-              <Link href="/auth/login" asChild>
-                <Text style={[styles.linkText, { color: theme.primary }]}>
-                  Sign In
-                </Text>
-              </Link>
+              {isWeb ? (
+                <TouchableOpacity onPress={() => router.push('/auth/login')}>
+                  <Text style={[styles.linkText, { color: theme.primary }]}>
+                    Sign In
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <Link href="/auth/login" asChild>
+                  <Text style={[styles.linkText, { color: theme.primary }]}>
+                    Sign In
+                  </Text>
+                </Link>
+              )}
             </Text>
           </View>
         </ScrollView>

@@ -31,6 +31,9 @@ import {
 
 const { width, height } = Dimensions.get('window');
 
+// Platform check helper
+const isWeb = Platform.OS === 'web';
+
 const LoginScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -89,9 +92,23 @@ const LoginScreen = () => {
               <Text style={{ color: theme.textSecondary }}>
                 Don't have an account?{' '}
               </Text>
-              <Link href="/auth/register" asChild>
-                <Text style={[{ color: theme.textSecondary }, styles.linkText]}>Sign Up</Text>
-              </Link>
+              {isWeb ? (
+                <TouchableOpacity onPress={() => router.push('/auth/register')}>
+                  <Text
+                    style={[{ color: theme.textSecondary }, styles.linkText]}
+                  >
+                    Sign Up
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <Link href="/auth/register" asChild>
+                  <Text
+                    style={[{ color: theme.textSecondary }, styles.linkText]}
+                  >
+                    Sign Up
+                  </Text>
+                </Link>
+              )}
             </Text>
           </View>
 
@@ -179,12 +196,25 @@ const LoginScreen = () => {
             </View>
 
             {/* Forgot Password */}
-            <TouchableOpacity style={styles.forgotPassword}>
-              <Link href="/auth/forgot-password" asChild>
-                <Text style={{ color: theme.textSecondary }}>
-                  Forgot Password?
-                </Text>
-              </Link>
+            <TouchableOpacity
+              style={styles.forgotPassword}
+              onPress={() => !isWeb && router.push('/auth/forgot-password')}
+            >
+              {isWeb ? (
+                <TouchableOpacity
+                  onPress={() => router.push('/auth/forgot-password')}
+                >
+                  <Text style={{ color: theme.textSecondary }}>
+                    Forgot Password?
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <Link href="/auth/forgot-password" asChild>
+                  <Text style={{ color: theme.textSecondary }}>
+                    Forgot Password?
+                  </Text>
+                </Link>
+              )}
             </TouchableOpacity>
 
             {/* Sign In Button */}

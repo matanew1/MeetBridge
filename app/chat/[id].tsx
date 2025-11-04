@@ -40,7 +40,7 @@ import Animated, {
   withTiming,
   interpolate,
 } from 'react-native-reanimated';
-import { Audio } from 'expo-av';
+import { Audio } from 'expo-audio';
 import { useUserStore } from '../../store';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
@@ -342,15 +342,18 @@ const ChatScreen = () => {
   useEffect(() => {
     const loadSound = async () => {
       try {
-        await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: false,
-        });
+        // Set audio mode for iOS
+        if (Platform.OS === 'ios') {
+          await Audio.setAudioModeAsync({
+            playsInSilentModeIOS: true,
+            staysActiveInBackground: false,
+          });
+        }
 
-        const { sound } = await Audio.Sound.createAsync(
-          require('../../assets/audios/message.mp3')
-        );
-        soundRef.current = sound;
+        // Load the audio file
+        const audioSource = require('../../assets/audios/message.mp3');
+        soundRef.current = new Audio.Sound();
+        await soundRef.current.loadAsync(audioSource);
         console.log('🔊 Message sound loaded successfully');
       } catch (error) {
         console.error('❌ Error loading message sound:', error);
@@ -519,7 +522,9 @@ const ChatScreen = () => {
         // Play sound if new message received from other user
         if (hasNewMessageFromOther && soundRef.current) {
           try {
-            await soundRef.current.replayAsync();
+            // Reset to beginning and play
+            await soundRef.current.setPositionAsync(0);
+            await soundRef.current.playAsync();
             console.log('🔊 Playing message received sound');
           } catch (error) {
             console.error('❌ Error playing sound:', error);
