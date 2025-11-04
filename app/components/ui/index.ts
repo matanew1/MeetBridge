@@ -11,6 +11,16 @@ export {
   SkeletonCard,
   SkeletonProfileCard,
 } from './Skeleton';
+export {
+  ProfileCardSkeleton,
+  ChatListItemSkeleton,
+  ConnectionCardSkeleton,
+  MessageSkeleton,
+  ProfileDetailSkeleton,
+  DiscoveryScreenSkeleton,
+  ChatScreenSkeleton,
+  ConnectionsGridSkeleton,
+} from './SkeletonLoaders';
 
 // Re-export types
 export type { ButtonVariant, ButtonSize } from './Button';

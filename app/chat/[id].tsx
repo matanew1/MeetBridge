@@ -46,6 +46,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import ProfileDetail from '../components/ProfileDetail';
 import { usePresence } from '../../hooks/usePresence';
+import notificationService from '../../services/notificationService';
 
 const { width } = Dimensions.get('window');
 
@@ -274,6 +275,16 @@ const ChatScreen = () => {
     return matchedUser || discoverUser;
   }, [matchedProfilesData, discoverProfiles, otherUserId]);
 
+  // Set active chat to suppress notifications while in this chat
+  useEffect(() => {
+    if (otherUserId) {
+      notificationService.setActiveChat(otherUserId as string);
+    }
+    return () => {
+      notificationService.clearActiveChat();
+    };
+  }, [otherUserId]);
+
   useEffect(() => {
     if (!currentUser?.id) return;
     const { doc, updateDoc } = require('firebase/firestore');
@@ -342,8 +353,16 @@ const ChatScreen = () => {
   useEffect(() => {
     const loadSound = async () => {
       try {
+        // Check if Audio is available
+        if (!Audio || !Audio.Sound) {
+          console.warn(
+            '⚠️ Audio module not available, skipping sound initialization'
+          );
+          return;
+        }
+
         // Set audio mode for iOS
-        if (Platform.OS === 'ios') {
+        if (Platform.OS === 'ios' && Audio.setAudioModeAsync) {
           await Audio.setAudioModeAsync({
             playsInSilentModeIOS: true,
             staysActiveInBackground: false,

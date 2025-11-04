@@ -14,8 +14,11 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "MeetBridge needs your location to show you nearby matches and update your profile location.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "MeetBridge needs your location in the background to keep your profile location up-to-date and show you the best matches.",
+        "NSLocationAlwaysUsageDescription": "MeetBridge needs your location in the background to keep your profile location up-to-date and show you the best matches.",
         "UIBackgroundModes": [
-          "location"
+          "location",
+          "fetch",
+          "remote-notification"
         ]
       }
     },
@@ -36,7 +39,8 @@
         "android.permission.ACCESS_BACKGROUND_LOCATION",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_LOCATION"
-      ]
+      ],
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
@@ -57,7 +61,10 @@
         "expo-notifications",
         {
           "icon": "./assets/images/icon.png",
-          "color": "#FF69B4"
+          "color": "#FF69B4",
+          "sounds": [
+            "./assets/audios/message.mp3"
+          ]
         }
       ],
       [

@@ -22,6 +22,7 @@ import { User } from '../store/types';
 import { smartLocationManager, geohashService } from '../services/location';
 import notificationService from '../services/notificationService';
 import presenceService from '../services/presenceService';
+import cleanupService from '../services/cleanupService';
 import * as Location from 'expo-location';
 
 interface AuthContextType {
@@ -98,6 +99,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!firebaseUser) return;
 
     const initializeServices = async () => {
+      // Initialize cleanup service
+      console.log('🧹 Starting cleanup service...');
+      cleanupService.startPeriodicCleanup(60); // Run every 60 minutes
+      console.log('✅ Cleanup service started');
+
       // Initialize presence service with Realtime Database
       console.log('👁️ Initializing presence service...');
       try {
@@ -132,6 +138,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       console.log('📍 Starting continuous location tracking...');
 
+      // Start foreground tracking
       const success = await smartLocationManager.startTracking(
         async (update) => {
           try {
@@ -186,6 +193,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       );
 
+      // Start background tracking (works even when app is closed)
+      await smartLocationManager.startBackgroundTracking(firebaseUser.uid);
+      console.log('✅ Background location tracking started');
+
       if (success) {
         console.log('✅ Location tracking started');
       } else {
@@ -203,6 +214,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       notificationService.cleanup();
       console.log('👁️ Cleaning up presence service...');
       presenceService.cleanup();
+      console.log('🧹 Stopping cleanup service...');
+      cleanupService.stopPeriodicCleanup();
     };
   }, [firebaseUser]);
 

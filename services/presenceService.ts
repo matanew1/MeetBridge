@@ -32,6 +32,11 @@ class PresenceService {
     try {
       console.log('🔄 Initializing presence service for user:', userId);
 
+      // Check if Realtime Database is initialized
+      if (!realtimeDb) {
+        throw new Error('Realtime Database not initialized');
+      }
+
       // Use the already initialized Realtime Database
       this.database = realtimeDb;
       this.currentUserId = userId;

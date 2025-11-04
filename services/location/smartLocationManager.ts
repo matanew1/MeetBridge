@@ -11,6 +11,7 @@
  */
 
 import * as Location from 'expo-location';
+import * as TaskManager from 'expo-task-manager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   LocationCoordinates,
@@ -24,6 +25,58 @@ import {
   LocationServiceMetrics,
 } from './types';
 import geohashService from './geohashService';
+
+// Background location task name
+const BACKGROUND_LOCATION_TASK = 'background-location-task';
+
+// Define background location task
+TaskManager.defineTask(
+  BACKGROUND_LOCATION_TASK,
+  async ({ data, error }: any) => {
+    if (error) {
+      console.error('❌ Background location error:', error);
+      return;
+    }
+    if (data) {
+      const { locations } = data;
+      if (locations && locations.length > 0) {
+        const location = locations[0];
+        console.log('📍 Background location update:', {
+          lat: location.coords.latitude.toFixed(9),
+          lon: location.coords.longitude.toFixed(9),
+          accuracy: `±${Math.round(location.coords.accuracy)}m`,
+        });
+
+        // Update location in Firebase
+        try {
+          const userId = await AsyncStorage.getItem('@current_user_id');
+          if (userId) {
+            const { doc, updateDoc } = require('firebase/firestore');
+            const { db } = require('../firebase/config');
+            const geohash = geohashService.encode(
+              location.coords.latitude,
+              location.coords.longitude,
+              9
+            );
+
+            await updateDoc(doc(db, 'users', userId), {
+              coordinates: {
+                latitude: location.coords.latitude,
+                longitude: location.coords.longitude,
+              },
+              geohash,
+              lastLocationUpdate: new Date(),
+            });
+
+            console.log('✅ Background location updated in Firebase');
+          }
+        } catch (err) {
+          console.error('❌ Error updating background location:', err);
+        }
+      }
+    }
+  }
+);
 
 const DEFAULT_CONFIG: LocationServiceConfig = {
   cacheEnabled: true,
@@ -532,6 +585,77 @@ class SmartLocationManager {
   }
 
   /**
+   * Start background location tracking (continues even when app is closed)
+   */
+  async startBackgroundTracking(userId: string): Promise<boolean> {
+    try {
+      // Check if background location is already running
+      const hasStarted = await Location.hasStartedLocationUpdatesAsync(
+        BACKGROUND_LOCATION_TASK
+      );
+
+      if (hasStarted) {
+        console.log('📍 Background location tracking already running');
+        return true;
+      }
+
+      // Store user ID for background task
+      await AsyncStorage.setItem('@current_user_id', userId);
+
+      // Start background location updates
+      await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
+        accuracy: Location.Accuracy.Balanced,
+        timeInterval: 60000, // 1 minute
+        distanceInterval: 100, // 100 meters
+        showsBackgroundLocationIndicator: true,
+        foregroundService: {
+          notificationTitle: 'MeetBridge Active',
+          notificationBody: 'Updating your location to find nearby matches',
+          notificationColor: '#FF69B4',
+        },
+        deferredUpdatesInterval: 120000, // 2 minutes
+        deferredUpdatesDistance: 200, // 200 meters
+      });
+
+      console.log('✅ Background location tracking started');
+      return true;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      if (
+        errorMessage.includes('UIBackgroundModes') ||
+        errorMessage.includes('not been configured')
+      ) {
+        console.warn(
+          '⚠️ Background location not available - need standalone build with proper configuration'
+        );
+        console.warn('📱 Foreground location tracking will continue to work');
+      } else {
+        console.error('❌ Error starting background location tracking:', error);
+      }
+      return false;
+    }
+  }
+
+  /**
+   * Stop background location tracking
+   */
+  async stopBackgroundTracking(): Promise<void> {
+    try {
+      const hasStarted = await Location.hasStartedLocationUpdatesAsync(
+        BACKGROUND_LOCATION_TASK
+      );
+
+      if (hasStarted) {
+        await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+        console.log('✅ Background location tracking stopped');
+      }
+    } catch (error) {
+      console.error('❌ Error stopping background location tracking:', error);
+    }
+  }
+
+  /**
    * Stop location tracking
    */
   async stopTracking(): Promise<void> {
@@ -545,6 +669,9 @@ class SmartLocationManager {
         this.locationWatcher = null;
       }
     }
+
+    // Also stop background tracking
+    await this.stopBackgroundTracking();
   }
 
   /**

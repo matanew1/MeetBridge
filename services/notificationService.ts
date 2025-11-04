@@ -1,18 +1,55 @@
 // services/notificationService.ts
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import { Platform } from 'react-native';
+import { Platform, AppState, AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from './firebase/config';
 
-// Configure notification behavior
+// Configure notification behavior (will be set properly after service initialization)
+let notificationService: any = null;
+
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
+  handleNotification: async (notification) => {
+    // Don't show notifications when app is in foreground (active)
+    const appState = AppState.currentState;
+    if (appState === 'active') {
+      console.log('🔕 Suppressing notification - app is active');
+      return {
+        shouldShowBanner: false,
+        shouldShowList: false,
+        shouldPlaySound: false,
+        shouldSetBadge: true, // Still update badge count
+      };
+    }
+
+    // Check if the notification is for a chat that's currently open
+    const data = notification.request.content.data;
+    const chatId = data?.chatId || data?.matchId || data?.senderId;
+
+    // If we have a notification service and the chat is active, don't show the notification
+    if (
+      notificationService &&
+      chatId &&
+      notificationService.isChatActive(chatId)
+    ) {
+      console.log(`🔕 Suppressing notification for active chat: ${chatId}`);
+      return {
+        shouldShowBanner: false,
+        shouldShowList: false,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      };
+    }
+
+    // Otherwise, show the notification normally (when app is in background)
+    return {
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    };
+  },
 });
 
 export interface NotificationSettings {
@@ -31,6 +68,7 @@ class NotificationService {
   private notificationListener: any;
   private responseListener: any;
   private settings: NotificationSettings = DEFAULT_SETTINGS;
+  private activeChatId: string | null = null; // Track currently open chat
 
   /**
    * Initialize notification service
@@ -110,6 +148,8 @@ class NotificationService {
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#FF231F7C',
+          enableVibrate: true,
+          showBadge: true,
         });
 
         await Notifications.setNotificationChannelAsync('matches', {
@@ -117,7 +157,9 @@ class NotificationService {
           importance: Notifications.AndroidImportance.HIGH,
           vibrationPattern: [0, 500, 250, 500],
           lightColor: '#FF69B4',
-          sound: 'default',
+          sound: 'message.mp3', // Custom sound from assets
+          enableVibrate: true,
+          showBadge: true,
         });
 
         await Notifications.setNotificationChannelAsync('messages', {
@@ -125,7 +167,9 @@ class NotificationService {
           importance: Notifications.AndroidImportance.HIGH,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#4A90E2',
-          sound: 'default',
+          sound: 'message.mp3', // Custom sound from assets
+          enableVibrate: true,
+          showBadge: true,
         });
       }
 
@@ -216,13 +260,21 @@ class NotificationService {
         return;
       }
 
+      // Check if the notification is for an active chat
+      const chatId = data?.chatId || data?.matchId || data?.senderId;
+      if (chatId && this.isChatActive(chatId)) {
+        console.log(`🔕 Skipping notification for active chat: ${chatId}`);
+        return;
+      }
+
       await Notifications.scheduleNotificationAsync({
         content: {
           title,
           body,
           data,
-          sound: true,
+          sound: 'message.mp3', // Custom sound
           priority: Notifications.AndroidNotificationPriority.HIGH,
+          ...(Platform.OS === 'android' && { channelId }), // Set channel for Android
         },
         trigger: null, // Show immediately
       });
@@ -452,6 +504,33 @@ class NotificationService {
   getSettings(): NotificationSettings {
     return this.settings;
   }
+
+  /**
+   * Set the currently active chat
+   * Call this when a user opens a chat screen
+   */
+  setActiveChat(chatId: string) {
+    this.activeChatId = chatId;
+    console.log(`💬 Active chat set: ${chatId}`);
+  }
+
+  /**
+   * Clear the currently active chat
+   * Call this when a user leaves a chat screen
+   */
+  clearActiveChat() {
+    console.log(`💬 Active chat cleared: ${this.activeChatId}`);
+    this.activeChatId = null;
+  }
+
+  /**
+   * Check if a chat is currently active
+   */
+  isChatActive(chatId: string): boolean {
+    return this.activeChatId === chatId;
+  }
 }
 
-export default new NotificationService();
+const serviceInstance = new NotificationService();
+notificationService = serviceInstance; // Set the reference for the notification handler
+export default serviceInstance;
