@@ -666,17 +666,39 @@ export default function SearchScreen() {
       }
     };
 
-    const unsubscribe1 = onSnapshot(matchesQuery1, (snapshot: any) => {
-      snapshot
-        .docChanges()
-        .forEach((change: any) => handleMatchChange(change, true));
-    });
+    const unsubscribe1 = onSnapshot(
+      matchesQuery1,
+      (snapshot: any) => {
+        snapshot
+          .docChanges()
+          .forEach((change: any) => handleMatchChange(change, true));
+      },
+      (error: any) => {
+        // Handle permission-denied errors gracefully (expected during logout)
+        if (error?.code === 'permission-denied') {
+          console.log('⚠️ Match listener permission denied (user logged out)');
+          return;
+        }
+        console.error('❌ Error in match listener 1:', error);
+      }
+    );
 
-    const unsubscribe2 = onSnapshot(matchesQuery2, (snapshot: any) => {
-      snapshot
-        .docChanges()
-        .forEach((change: any) => handleMatchChange(change, false));
-    });
+    const unsubscribe2 = onSnapshot(
+      matchesQuery2,
+      (snapshot: any) => {
+        snapshot
+          .docChanges()
+          .forEach((change: any) => handleMatchChange(change, false));
+      },
+      (error: any) => {
+        // Handle permission-denied errors gracefully (expected during logout)
+        if (error?.code === 'permission-denied') {
+          console.log('⚠️ Match listener permission denied (user logged out)');
+          return;
+        }
+        console.error('❌ Error in match listener 2:', error);
+      }
+    );
 
     return () => {
       console.log('🔕 Cleaning up match listener');

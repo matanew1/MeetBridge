@@ -131,8 +131,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   };
 
   const handleSettings = () => {
-    // TODO: Navigate to settings screen
-    console.log('Settings functionality coming soon!');
+    onClose(); // Close profile modal first
+    router.push('/settings');
   };
 
   const handleImagePress = (

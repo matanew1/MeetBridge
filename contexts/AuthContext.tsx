@@ -379,24 +379,51 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async () => {
     try {
+      console.log('🚪 Starting logout process...');
+
       if (firebaseUser) {
         try {
-          // Set user offline in presence service
+          // Stop location tracking first
+          console.log('🛑 Stopping location tracking...');
+          smartLocationManager.stopTracking();
+
+          // Cleanup notification service
+          console.log('🔕 Cleaning up notifications...');
+          notificationService.cleanup();
+
+          // Cleanup presence service (includes setting user offline)
+          console.log('👁️ Cleaning up presence service...');
           await presenceService.setUserOffline();
           await presenceService.cleanup();
-        } catch (updateError) {
+
+          // Stop cleanup service
+          console.log('🧹 Stopping cleanup service...');
+          cleanupService.stopPeriodicCleanup();
+
+          console.log('✅ All services cleaned up');
+        } catch (cleanupError) {
           console.warn(
-            'Failed to update offline status on logout:',
-            updateError
+            '⚠️ Error during service cleanup on logout:',
+            cleanupError
           );
+          // Continue with logout even if cleanup fails
         }
       }
 
+      // Now perform the actual logout
+      console.log('🔓 Signing out from Firebase...');
       await services.auth.logout();
+
+      // Clear user state
       setUser(null);
       setFirebaseUser(null);
+
+      console.log('✅ Logout completed successfully');
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('❌ Logout error:', error);
+      // Force clear state even if logout fails
+      setUser(null);
+      setFirebaseUser(null);
     }
   };
 

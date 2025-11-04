@@ -8,9 +8,19 @@ import {
   ImageStyle,
   ActivityIndicator,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { THEME } from '../../../constants/theme';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../../constants/theme';
+import { scale, verticalScale } from '../../../utils/responsive';
 
 export type AvatarSize = 'small' | 'medium' | 'large' | 'xlarge';
 
@@ -20,6 +30,8 @@ interface AvatarProps {
   size?: AvatarSize;
   style?: ViewStyle;
   showOnline?: boolean;
+  statusRing?: boolean;
+  statusRingColor?: string;
 }
 
 const Avatar: React.FC<AvatarProps> = ({
@@ -28,17 +40,42 @@ const Avatar: React.FC<AvatarProps> = ({
   size = 'medium',
   style,
   showOnline = false,
+  statusRing = false,
+  statusRingColor,
 }) => {
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
   const [loading, setLoading] = useState(!!source);
   const [error, setError] = useState(false);
 
+  // Animation for online pulse
+  const pulseScale = useSharedValue(1);
+
+  React.useEffect(() => {
+    if (showOnline) {
+      pulseScale.value = withRepeat(
+        withSequence(
+          withTiming(1.2, {
+            duration: 1000,
+            easing: Easing.inOut(Easing.ease),
+          }),
+          withTiming(1, { duration: 1000, easing: Easing.inOut(Easing.ease) })
+        ),
+        -1,
+        false
+      );
+    }
+  }, [showOnline]);
+
+  const pulseAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseScale.value }],
+  }));
+
   const sizeMap: Record<AvatarSize, number> = {
-    small: 40,
-    medium: 56,
-    large: 80,
-    xlarge: 120,
+    small: scale(40),
+    medium: scale(56),
+    large: scale(80),
+    xlarge: scale(120),
   };
 
   const fontSize: Record<AvatarSize, number> = {
@@ -49,10 +86,10 @@ const Avatar: React.FC<AvatarProps> = ({
   };
 
   const onlineBadgeSize: Record<AvatarSize, number> = {
-    small: 10,
-    medium: 14,
-    large: 18,
-    xlarge: 24,
+    small: scale(10),
+    medium: scale(14),
+    large: scale(18),
+    xlarge: scale(24),
   };
 
   const avatarSize = sizeMap[size];
@@ -75,6 +112,14 @@ const Avatar: React.FC<AvatarProps> = ({
     overflow: 'hidden',
   };
 
+  const statusRingContainerStyle: ViewStyle = {
+    width: avatarSize + scale(8),
+    height: avatarSize + scale(8),
+    borderRadius: (avatarSize + scale(8)) / 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  };
+
   const imageStyle: ImageStyle = {
     width: avatarSize,
     height: avatarSize,
@@ -89,12 +134,13 @@ const Avatar: React.FC<AvatarProps> = ({
     height: onlineBadgeSize[size],
     borderRadius: onlineBadgeSize[size] / 2,
     backgroundColor: theme.success,
-    borderWidth: 2,
+    borderWidth: scale(2),
     borderColor: theme.background,
+    zIndex: 10,
   };
 
-  return (
-    <View style={[containerStyle, style]}>
+  const renderAvatar = () => (
+    <View style={[containerStyle, !statusRing && style]}>
       {source && !error ? (
         <>
           <Image
@@ -134,9 +180,34 @@ const Avatar: React.FC<AvatarProps> = ({
         </Text>
       )}
 
-      {showOnline && <View style={onlineBadgeStyle} />}
+      {showOnline && (
+        <Animated.View style={[onlineBadgeStyle, pulseAnimatedStyle]} />
+      )}
     </View>
   );
+
+  if (statusRing) {
+    return (
+      <View style={[statusRingContainerStyle, style]}>
+        <LinearGradient
+          colors={
+            statusRingColor
+              ? [statusRingColor, statusRingColor]
+              : (theme.primaryGradient as any)
+          }
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[
+            StyleSheet.absoluteFill,
+            { borderRadius: (avatarSize + scale(8)) / 2 },
+          ]}
+        />
+        {renderAvatar()}
+      </View>
+    );
+  }
+
+  return renderAvatar();
 };
 
 export default Avatar;

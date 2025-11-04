@@ -307,35 +307,49 @@ const ChatScreen = () => {
     const { doc, onSnapshot } = require('firebase/firestore');
     const { db } = require('../../services/firebase/config');
     const userDocRef = doc(db, 'users', otherUserId);
-    const unsubscribe = onSnapshot(userDocRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const userData = snapshot.data();
-        setIsOnline(userData.isOnline || false);
-        // Format lastSeen as text
-        let lastSeen =
-          userData.lastSeen?.toDate?.() ||
-          (userData.lastSeen?.seconds
-            ? new Date(userData.lastSeen.seconds * 1000)
-            : null);
-        if (lastSeen) {
-          const now = new Date();
-          const diff = Math.floor((now.getTime() - lastSeen.getTime()) / 1000);
-          if (userData.isOnline) {
-            setLastSeenText('Online');
-          } else if (diff < 60) {
-            setLastSeenText('Last seen just now');
-          } else if (diff < 3600) {
-            setLastSeenText(`Last seen ${Math.floor(diff / 60)} min ago`);
-          } else if (diff < 86400) {
-            setLastSeenText(`Last seen ${Math.floor(diff / 3600)} hr ago`);
+    const unsubscribe = onSnapshot(
+      userDocRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const userData = snapshot.data();
+          setIsOnline(userData.isOnline || false);
+          // Format lastSeen as text
+          let lastSeen =
+            userData.lastSeen?.toDate?.() ||
+            (userData.lastSeen?.seconds
+              ? new Date(userData.lastSeen.seconds * 1000)
+              : null);
+          if (lastSeen) {
+            const now = new Date();
+            const diff = Math.floor(
+              (now.getTime() - lastSeen.getTime()) / 1000
+            );
+            if (userData.isOnline) {
+              setLastSeenText('Online');
+            } else if (diff < 60) {
+              setLastSeenText('Last seen just now');
+            } else if (diff < 3600) {
+              setLastSeenText(`Last seen ${Math.floor(diff / 60)} min ago`);
+            } else if (diff < 86400) {
+              setLastSeenText(`Last seen ${Math.floor(diff / 3600)} hr ago`);
+            } else {
+              setLastSeenText(`Last seen ${Math.floor(diff / 86400)} days ago`);
+            }
           } else {
-            setLastSeenText(`Last seen ${Math.floor(diff / 86400)} days ago`);
+            setLastSeenText('Offline');
           }
-        } else {
-          setLastSeenText('Offline');
         }
+      },
+      (error: any) => {
+        if (error?.code === 'permission-denied') {
+          console.log(
+            '⚠️ User status listener permission denied (user logged out)'
+          );
+          return;
+        }
+        console.error('❌ Error in user status listener:', error);
       }
-    });
+    );
     return () => unsubscribe();
   }, [otherUserId]);
 
@@ -561,7 +575,13 @@ const ChatScreen = () => {
           flatListRef.current?.scrollToEnd({ animated: false });
         }, 50);
       },
-      (error) => {
+      (error: any) => {
+        if (error?.code === 'permission-denied') {
+          console.log(
+            '⚠️ Message listener permission denied (user logged out)'
+          );
+          return;
+        }
         console.error('❌ Error in message listener:', error);
       }
     );
@@ -583,85 +603,97 @@ const ChatScreen = () => {
 
     const matchDocRef = doc(db, 'matches', conversation.matchId);
 
-    const unsubscribe = onSnapshot(matchDocRef, (snapshot: any) => {
-      if (!snapshot.exists()) {
-        console.log('🚫 Match document deleted - unmatch detected!');
+    const unsubscribe = onSnapshot(
+      matchDocRef,
+      (snapshot: any) => {
+        if (!snapshot.exists()) {
+          console.log('🚫 Match document deleted - unmatch detected!');
 
-        // Update store to remove unmatched user
-        if (otherUserId) {
-          console.log(`🚫 Removing ${otherUserId} from store`);
-          useUserStore.setState((state) => ({
-            matchedProfiles: (state.matchedProfiles || []).filter(
-              (id) => id !== otherUserId
-            ),
-            matchedProfilesData: (state.matchedProfilesData || []).filter(
-              (profile) => profile.id !== otherUserId
-            ),
-            likedProfiles: (state.likedProfiles || []).filter(
-              (id) => id !== otherUserId
-            ),
-            likedProfilesData: (state.likedProfilesData || []).filter(
-              (profile) => profile.id !== otherUserId
-            ),
-            conversations: (state.conversations || []).filter(
-              (conv) => !conv.participants?.includes(otherUserId)
-            ),
-          }));
+          // Update store to remove unmatched user
+          if (otherUserId) {
+            console.log(`🚫 Removing ${otherUserId} from store`);
+            useUserStore.setState((state) => ({
+              matchedProfiles: (state.matchedProfiles || []).filter(
+                (id) => id !== otherUserId
+              ),
+              matchedProfilesData: (state.matchedProfilesData || []).filter(
+                (profile) => profile.id !== otherUserId
+              ),
+              likedProfiles: (state.likedProfiles || []).filter(
+                (id) => id !== otherUserId
+              ),
+              likedProfilesData: (state.likedProfilesData || []).filter(
+                (profile) => profile.id !== otherUserId
+              ),
+              conversations: (state.conversations || []).filter(
+                (conv) => !conv.participants?.includes(otherUserId)
+              ),
+            }));
+          }
+
+          Alert.alert(
+            t('chat.unmatchTitle'),
+            t('chat.unmatchDetected'),
+            [
+              {
+                text: t('actions.close'),
+                onPress: () => router.back(),
+              },
+            ],
+            { cancelable: false }
+          );
+          return;
         }
 
-        Alert.alert(
-          t('chat.unmatchTitle'),
-          t('chat.unmatchDetected'),
-          [
-            {
-              text: t('actions.close'),
-              onPress: () => router.back(),
-            },
-          ],
-          { cancelable: false }
-        );
-        return;
-      }
+        const data = snapshot.data();
+        if (data?.unmatched) {
+          console.log('🚫 Match unmatched - redirecting');
 
-      const data = snapshot.data();
-      if (data?.unmatched) {
-        console.log('🚫 Match unmatched - redirecting');
+          // Update store to remove unmatched user
+          if (otherUserId) {
+            console.log(`🚫 Removing ${otherUserId} from store`);
+            useUserStore.setState((state) => ({
+              matchedProfiles: state.matchedProfiles.filter(
+                (id) => id !== otherUserId
+              ),
+              matchedProfilesData: state.matchedProfilesData.filter(
+                (profile) => profile.id !== otherUserId
+              ),
+              likedProfiles: state.likedProfiles.filter(
+                (id) => id !== otherUserId
+              ),
+              likedProfilesData: state.likedProfilesData.filter(
+                (profile) => profile.id !== otherUserId
+              ),
+              conversations: state.conversations.filter(
+                (conv) => !conv.participants.includes(otherUserId)
+              ),
+            }));
+          }
 
-        // Update store to remove unmatched user
-        if (otherUserId) {
-          console.log(`🚫 Removing ${otherUserId} from store`);
-          useUserStore.setState((state) => ({
-            matchedProfiles: state.matchedProfiles.filter(
-              (id) => id !== otherUserId
-            ),
-            matchedProfilesData: state.matchedProfilesData.filter(
-              (profile) => profile.id !== otherUserId
-            ),
-            likedProfiles: state.likedProfiles.filter(
-              (id) => id !== otherUserId
-            ),
-            likedProfilesData: state.likedProfilesData.filter(
-              (profile) => profile.id !== otherUserId
-            ),
-            conversations: state.conversations.filter(
-              (conv) => !conv.participants.includes(otherUserId)
-            ),
-          }));
+          Alert.alert(
+            t('chat.unmatchTitle'),
+            t('chat.unmatchDetected'),
+            [
+              {
+                text: t('actions.close'),
+                onPress: () => router.back(),
+              },
+            ],
+            { cancelable: false }
+          );
         }
-
-        Alert.alert(
-          t('chat.unmatchTitle'),
-          t('chat.unmatchDetected'),
-          [
-            {
-              text: t('actions.close'),
-              onPress: () => router.back(),
-            },
-          ],
-          { cancelable: false }
-        );
+      },
+      (error: any) => {
+        if (error?.code === 'permission-denied') {
+          console.log(
+            '⚠️ Unmatch listener permission denied (user logged out)'
+          );
+          return;
+        }
+        console.error('❌ Error in unmatch listener:', error);
       }
-    });
+    );
 
     return () => {
       console.log('🔕 Cleaning up unmatch listener');
@@ -710,7 +742,13 @@ const ChatScreen = () => {
           });
         }
       },
-      (error) => {
+      (error: any) => {
+        if (error?.code === 'permission-denied') {
+          console.log(
+            '⚠️ Presence listener permission denied (user logged out)'
+          );
+          return;
+        }
         console.error('❌ Error in presence listener:', error);
       }
     );

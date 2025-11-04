@@ -292,45 +292,60 @@ export default function ChatScreen() {
           orderBy('updatedAt', 'desc')
         );
 
-        unsubscribe = onSnapshot(conversationsQuery, async (snapshot) => {
-          console.log(
-            '🔔 Real-time conversation update:',
-            snapshot.size,
-            'conversations'
-          );
+        unsubscribe = onSnapshot(
+          conversationsQuery,
+          async (snapshot) => {
+            console.log(
+              '🔔 Real-time conversation update:',
+              snapshot.size,
+              'conversations'
+            );
 
-          try {
-            // Process the conversations directly from snapshot to avoid cache
-            const conversationsData = snapshot.docs.map((doc) => {
-              const data = doc.data();
-              return {
-                id: doc.id,
-                participants: data.participants || [],
-                createdAt:
-                  data.createdAt?.toDate?.() ||
-                  new Date(data.createdAt || Date.now()),
-                updatedAt:
-                  data.updatedAt?.toDate?.() ||
-                  new Date(data.updatedAt || Date.now()),
-                lastMessage: data.lastMessage
-                  ? {
-                      text: data.lastMessage.text || '',
-                      senderId: data.lastMessage.senderId || '',
-                      timestamp:
-                        data.lastMessage.createdAt?.toDate?.() ||
-                        new Date(data.lastMessage.createdAt || Date.now()),
-                    }
-                  : undefined,
-                unreadCount: data.unreadCount?.[currentUser.id] || 0,
-              };
-            });
+            try {
+              // Process the conversations directly from snapshot to avoid cache
+              const conversationsData = snapshot.docs.map((doc) => {
+                const data = doc.data();
+                return {
+                  id: doc.id,
+                  participants: data.participants || [],
+                  createdAt:
+                    data.createdAt?.toDate?.() ||
+                    new Date(data.createdAt || Date.now()),
+                  updatedAt:
+                    data.updatedAt?.toDate?.() ||
+                    new Date(data.updatedAt || Date.now()),
+                  lastMessage: data.lastMessage
+                    ? {
+                        text: data.lastMessage.text || '',
+                        senderId: data.lastMessage.senderId || '',
+                        timestamp:
+                          data.lastMessage.createdAt?.toDate?.() ||
+                          new Date(data.lastMessage.createdAt || Date.now()),
+                      }
+                    : undefined,
+                  unreadCount: data.unreadCount?.[currentUser.id] || 0,
+                };
+              });
 
-            // Update store directly with real-time data
-            useUserStore.setState({ conversations: conversationsData });
-          } catch (error) {
-            console.error('❌ Error processing conversation snapshot:', error);
+              // Update store directly with real-time data
+              useUserStore.setState({ conversations: conversationsData });
+            } catch (error) {
+              console.error(
+                '❌ Error processing conversation snapshot:',
+                error
+              );
+            }
+          },
+          (error: any) => {
+            if (error?.code === 'permission-denied') {
+              console.log(
+                '⚠️ Conversation listener permission denied (user logged out)'
+              );
+              return;
+            }
+            console.error('❌ Error in conversation listener:', error);
           }
-        });
+        );
       };
 
       setupRealtimeListener();

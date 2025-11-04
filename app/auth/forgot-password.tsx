@@ -87,17 +87,12 @@ const ForgotPasswordScreen = () => {
               <ArrowLeft size={24} color={theme.text} />
             </TouchableOpacity>
 
-            <LinearGradient
-              colors={[theme.primary, theme.primaryVariant]}
-              style={styles.logoContainer}
-            >
-              <Image
-                source={require('../../assets/images/logo.png')}
-                style={{ width: 50, height: 50 }}
-                contentFit="contain"
-                tintColor="white"
-              />
-            </LinearGradient>
+            <Image
+              source={require('../../assets/images/logo.png')}
+              style={styles.logo}
+              contentFit="contain"
+              tintColor={theme.primary}
+            />
 
             <Text style={[styles.title, { color: theme.text }]}>
               Forgot Password?
@@ -257,19 +252,10 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 4,
   },
-  logoContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
+  logo: {
+    width: 150,
+    height: 150,
     marginBottom: 24,
-    marginTop: 40,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
   },
   title: {
     fontSize: 28,

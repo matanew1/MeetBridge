@@ -34,24 +34,51 @@ class PresenceService {
 
       // Check if Realtime Database is initialized
       if (!realtimeDb) {
-        throw new Error('Realtime Database not initialized');
+        console.warn(
+          '⚠️ Realtime Database not initialized, skipping presence service'
+        );
+        return;
       }
 
       // Use the already initialized Realtime Database
       this.database = realtimeDb;
       this.currentUserId = userId;
+
+      // Validate database before creating reference
+      if (!this.database) {
+        console.warn(
+          '⚠️ Database is null after assignment, skipping presence setup'
+        );
+        return;
+      }
+
       this.presenceRef = ref(this.database, `presence/${userId}`);
+
+      // Validate presenceRef before proceeding
+      if (!this.presenceRef) {
+        console.warn(
+          '⚠️ Failed to create presence reference, skipping presence setup'
+        );
+        return;
+      }
 
       // Set user as online
       await this.setUserOnline();
 
       // Setup disconnect handler - automatically set user offline when connection is lost
-      const disconnectRef = onDisconnect(this.presenceRef);
-      await disconnectRef.set({
-        status: 'offline',
-        lastSeen: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+      try {
+        const disconnectRef = onDisconnect(this.presenceRef);
+        if (disconnectRef) {
+          await disconnectRef.set({
+            status: 'offline',
+            lastSeen: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+        }
+      } catch (disconnectError) {
+        console.warn('⚠️ Failed to setup disconnect handler:', disconnectError);
+        // Continue initialization even if disconnect handler fails
+      }
 
       // Listen to our own presence in RTDB and sync to Firestore
       this.syncPresenceToFirestore(userId);
@@ -63,7 +90,8 @@ class PresenceService {
       console.log('✅ Presence service initialized successfully');
     } catch (error) {
       console.error('❌ Error initializing presence service:', error);
-      throw error;
+      // Don't throw - allow app to continue even if presence fails
+      console.warn('⚠️ Continuing without presence service');
     }
   }
 
@@ -104,15 +132,32 @@ class PresenceService {
       };
 
       // Update Realtime Database
-      await set(presenceRef, presenceData);
+      try {
+        await set(presenceRef, presenceData);
+      } catch (rtdbError) {
+        console.warn('⚠️ Error updating RTDB online status:', rtdbError);
+      }
 
-      // Update Firestore with additional null check
+      // Update Firestore with additional null check and error handling
       if (db && userId) {
-        const userDocRef = doc(db, 'users', userId);
-        await updateDoc(userDocRef, {
-          isOnline: true,
-          lastSeen: new Date(),
-        });
+        try {
+          const userDocRef = doc(db, 'users', userId);
+          await updateDoc(userDocRef, {
+            isOnline: true,
+            lastSeen: new Date(),
+          });
+        } catch (firestoreError: any) {
+          if (firestoreError?.code === 'permission-denied') {
+            console.warn(
+              '⚠️ Permission denied updating Firestore online status'
+            );
+          } else {
+            console.warn(
+              '⚠️ Error updating Firestore online status:',
+              firestoreError
+            );
+          }
+        }
       }
 
       console.log('✅ User set to online');
@@ -154,16 +199,34 @@ class PresenceService {
         updatedAt: serverTimestamp(),
       };
 
-      // Update Realtime Database
-      await set(presenceRef, presenceData);
+      // Update Realtime Database first
+      try {
+        await set(presenceRef, presenceData);
+      } catch (rtdbError) {
+        console.warn('⚠️ Error updating RTDB offline status:', rtdbError);
+      }
 
-      // Update Firestore with additional null check
+      // Update Firestore with additional null check and error handling
       if (db && userId) {
-        const userDocRef = doc(db, 'users', userId);
-        await updateDoc(userDocRef, {
-          isOnline: false,
-          lastSeen: new Date(),
-        });
+        try {
+          const userDocRef = doc(db, 'users', userId);
+          await updateDoc(userDocRef, {
+            isOnline: false,
+            lastSeen: new Date(),
+          });
+        } catch (firestoreError: any) {
+          // Ignore permission denied errors during logout
+          if (firestoreError?.code === 'permission-denied') {
+            console.warn(
+              '⚠️ Permission denied updating Firestore offline status (expected during logout)'
+            );
+          } else {
+            console.warn(
+              '⚠️ Error updating Firestore offline status:',
+              firestoreError
+            );
+          }
+        }
       }
 
       console.log('✅ User set to offline');
@@ -195,24 +258,47 @@ class PresenceService {
 
           if (data && data.status === 'online') {
             // User is online in RTDB, update Firestore
-            await updateDoc(userDocRef, {
-              isOnline: true,
-              lastSeen: new Date(),
-            });
-            console.log('✅ Synced online status to Firestore');
+            try {
+              await updateDoc(userDocRef, {
+                isOnline: true,
+                lastSeen: new Date(),
+              });
+              console.log('✅ Synced online status to Firestore');
+            } catch (updateError: any) {
+              if (updateError?.code === 'permission-denied') {
+                console.warn(
+                  '⚠️ Permission denied syncing online status (user may be logged out)'
+                );
+              } else {
+                throw updateError;
+              }
+            }
           } else if (data && data.status === 'offline') {
             // User is offline in RTDB, update Firestore
             const lastSeenDate = data.lastSeen
               ? new Date(data.lastSeen)
               : new Date();
-            await updateDoc(userDocRef, {
-              isOnline: false,
-              lastSeen: lastSeenDate,
-            });
-            console.log('✅ Synced offline status to Firestore');
+            try {
+              await updateDoc(userDocRef, {
+                isOnline: false,
+                lastSeen: lastSeenDate,
+              });
+              console.log('✅ Synced offline status to Firestore');
+            } catch (updateError: any) {
+              if (updateError?.code === 'permission-denied') {
+                console.warn(
+                  '⚠️ Permission denied syncing offline status (user may be logged out)'
+                );
+              } else {
+                throw updateError;
+              }
+            }
           }
-        } catch (error) {
-          console.error('❌ Error syncing presence to Firestore:', error);
+        } catch (error: any) {
+          // Only log non-permission errors
+          if (error?.code !== 'permission-denied') {
+            console.error('❌ Error syncing presence to Firestore:', error);
+          }
         }
       },
       (error) => {
@@ -454,29 +540,58 @@ class PresenceService {
   async cleanup(): Promise<void> {
     console.log('🧹 Cleaning up presence service');
 
-    // Stop heartbeat
-    if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval);
-      this.heartbeatInterval = null;
+    try {
+      // Stop heartbeat first to prevent any new updates
+      if (this.heartbeatInterval) {
+        clearInterval(this.heartbeatInterval);
+        this.heartbeatInterval = null;
+      }
+
+      // Set user offline before unsubscribing listeners
+      // This ensures the offline status is written while we still have permissions
+      try {
+        await this.setUserOffline();
+      } catch (offlineError) {
+        console.warn(
+          '⚠️ Error setting user offline during cleanup:',
+          offlineError
+        );
+      }
+
+      // Unsubscribe from all listeners (including sync listener)
+      // Do this after setting offline to prevent permission errors
+      this.unsubscribeCallbacks.forEach((unsubscribe) => {
+        try {
+          unsubscribe();
+        } catch (unsubError) {
+          console.warn('⚠️ Error unsubscribing listener:', unsubError);
+        }
+      });
+      this.unsubscribeCallbacks.clear();
+
+      // Give a brief moment for any pending writes to complete
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      // Reset state
+      this.database = null;
+      this.presenceRef = null;
+      this.currentUserId = null;
+      this.isInitialized = false;
+
+      console.log('✅ Presence service cleaned up');
+    } catch (error) {
+      console.error('❌ Error during presence service cleanup:', error);
+      // Force reset even if cleanup fails
+      this.database = null;
+      this.presenceRef = null;
+      this.currentUserId = null;
+      this.isInitialized = false;
+      this.unsubscribeCallbacks.clear();
+      if (this.heartbeatInterval) {
+        clearInterval(this.heartbeatInterval);
+        this.heartbeatInterval = null;
+      }
     }
-
-    // Unsubscribe from all listeners (including sync listener)
-    this.unsubscribeCallbacks.forEach((unsubscribe) => unsubscribe());
-    this.unsubscribeCallbacks.clear();
-
-    // Set user offline (this will trigger sync to Firestore via the listener)
-    await this.setUserOffline();
-
-    // Give a moment for the offline sync to complete
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    // Reset state
-    this.database = null;
-    this.presenceRef = null;
-    this.currentUserId = null;
-    this.isInitialized = false;
-
-    console.log('✅ Presence service cleaned up');
   }
 }
 

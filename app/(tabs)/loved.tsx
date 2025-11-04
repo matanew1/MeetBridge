@@ -440,12 +440,32 @@ export default function LovedScreen() {
       });
     };
 
-    const unsubscribe1 = onSnapshot(matchesQuery1, (snapshot) =>
-      handleUnmatchDetection(snapshot, true)
+    const unsubscribe1 = onSnapshot(
+      matchesQuery1,
+      (snapshot) => handleUnmatchDetection(snapshot, true),
+      (error: any) => {
+        if (error?.code === 'permission-denied') {
+          console.log(
+            '⚠️ Unmatch listener permission denied (user logged out)'
+          );
+          return;
+        }
+        console.error('❌ Error in unmatch listener 1:', error);
+      }
     );
 
-    const unsubscribe2 = onSnapshot(matchesQuery2, (snapshot) =>
-      handleUnmatchDetection(snapshot, false)
+    const unsubscribe2 = onSnapshot(
+      matchesQuery2,
+      (snapshot) => handleUnmatchDetection(snapshot, false),
+      (error: any) => {
+        if (error?.code === 'permission-denied') {
+          console.log(
+            '⚠️ Unmatch listener permission denied (user logged out)'
+          );
+          return;
+        }
+        console.error('❌ Error in unmatch listener 2:', error);
+      }
     );
 
     return () => {

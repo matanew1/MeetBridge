@@ -1,8 +1,21 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import { THEME } from '../../../constants/theme';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../../constants/theme';
+import {
+  spacing,
+  borderRadius,
+  moderateScale,
+} from '../../../utils/responsive';
 import Button from './Button';
 
 interface EmptyStateProps {
@@ -11,6 +24,7 @@ interface EmptyStateProps {
   message?: string;
   actionLabel?: string;
   onAction?: () => void;
+  illustration?: React.ReactNode;
 }
 
 const EmptyState: React.FC<EmptyStateProps> = ({
@@ -19,28 +33,60 @@ const EmptyState: React.FC<EmptyStateProps> = ({
   message,
   actionLabel,
   onAction,
+  illustration,
 }) => {
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
 
+  // Floating animation
+  const translateY = useSharedValue(0);
+
+  React.useEffect(() => {
+    translateY.value = withRepeat(
+      withSequence(
+        withTiming(-10, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0, { duration: 2000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      false
+    );
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+
   return (
     <View style={styles.container}>
-      {icon && <View style={styles.iconContainer}>{icon}</View>}
+      {(icon || illustration) && (
+        <Animated.View style={[styles.iconContainer, animatedStyle]}>
+          {illustration || icon}
+        </Animated.View>
+      )}
 
-      <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
+      <Text
+        style={[styles.title, { color: theme.text, ...theme.typography.h2 }]}
+      >
+        {title}
+      </Text>
 
       {message && (
-        <Text style={[styles.message, { color: theme.textSecondary }]}>
+        <Text
+          style={[
+            styles.message,
+            { color: theme.textSecondary, ...theme.typography.body },
+          ]}
+        >
           {message}
         </Text>
       )}
 
       {actionLabel && onAction && (
         <Button
-          variant="primary"
-          size="medium"
+          variant="gradient"
+          size="large"
           onPress={onAction}
-          style={{ marginTop: THEME.spacing.lg }}
+          style={{ marginTop: spacing['2xl'] }}
         >
           {actionLabel}
         </Button>
@@ -54,23 +100,19 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: THEME.spacing.xl,
+    paddingHorizontal: spacing['2xl'],
   },
   iconContainer: {
-    marginBottom: THEME.spacing.lg,
-    opacity: 0.6,
+    marginBottom: spacing.xl,
+    opacity: 0.8,
   },
   title: {
-    fontSize: THEME.fonts.large,
-    fontWeight: '600',
     textAlign: 'center',
-    marginBottom: THEME.spacing.sm,
+    marginBottom: spacing.md,
   },
   message: {
-    fontSize: THEME.fonts.regular,
     textAlign: 'center',
-    lineHeight: 22,
-    maxWidth: 300,
+    maxWidth: 320,
   },
 });
 

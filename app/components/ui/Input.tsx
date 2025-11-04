@@ -8,6 +8,12 @@ import {
   TextInputProps,
   TouchableOpacity,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSpring,
+} from 'react-native-reanimated';
 import { THEME, lightTheme, darkTheme } from '../../../constants/theme';
 import { useTheme } from '../../../contexts/ThemeContext';
 import {
@@ -47,22 +53,54 @@ const Input: React.FC<InputProps> = ({
   const isPassword = secureTextEntry;
   const showPasswordToggle = isPassword && rightIcon === undefined;
 
+  // Animations
+  const borderWidth = useSharedValue(1);
+  const labelScale = useSharedValue(1);
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    borderWidth.value = withTiming(2, { duration: 150 });
+    if (label) {
+      labelScale.value = withSpring(0.85, { damping: 15 });
+    }
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    borderWidth.value = withTiming(1, { duration: 150 });
+    if (label && !props.value) {
+      labelScale.value = withSpring(1, { damping: 15 });
+    }
+  };
+
+  const animatedBorderStyle = useAnimatedStyle(() => ({
+    borderWidth: borderWidth.value,
+  }));
+
   return (
     <View style={[styles.container, containerStyle]}>
       {label && (
         <Text
           style={[
             styles.label,
-            { color: error ? theme.error : theme.textSecondary },
+            {
+              color: error
+                ? theme.error
+                : isFocused
+                ? theme.primary
+                : theme.textSecondary,
+              fontWeight: isFocused ? '600' : '500',
+            },
           ]}
         >
           {label}
         </Text>
       )}
 
-      <View
+      <Animated.View
         style={[
           styles.inputContainer,
+          animatedBorderStyle,
           {
             backgroundColor: theme.surface,
             borderColor: error
@@ -70,7 +108,6 @@ const Input: React.FC<InputProps> = ({
               : isFocused
               ? theme.primary
               : theme.border,
-            borderWidth: isFocused ? 2 : 1,
           },
         ]}
       >
@@ -85,9 +122,9 @@ const Input: React.FC<InputProps> = ({
             },
             style,
           ]}
-          placeholderTextColor={theme.textSecondary}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
+          placeholderTextColor={theme.textTertiary}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
           secureTextEntry={isPassword && !isPasswordVisible}
           {...props}
         />
@@ -106,13 +143,16 @@ const Input: React.FC<InputProps> = ({
         {rightIcon && !showPasswordToggle && (
           <View style={styles.iconRight}>{rightIcon}</View>
         )}
-      </View>
+      </Animated.View>
 
       {(error || helperText) && (
         <Text
           style={[
             styles.helperText,
-            { color: error ? theme.error : theme.textSecondary },
+            {
+              color: error ? theme.error : theme.textSecondary,
+              ...theme.typography.caption,
+            },
           ]}
         >
           {error || helperText}
@@ -124,29 +164,30 @@ const Input: React.FC<InputProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: THEME.spacing.md,
+    marginBottom: spacing.lg,
   },
   label: {
-    fontSize: THEME.fonts.small,
+    fontSize: fontScale(14),
     fontWeight: '500',
-    marginBottom: THEME.spacing.xs,
+    marginBottom: spacing.xs,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: THEME.borderRadius.md,
-    minHeight: 48,
-    paddingHorizontal: THEME.spacing.md,
+    borderRadius: borderRadius.lg,
+    minHeight: verticalScale(50),
+    paddingHorizontal: spacing.lg,
   },
   input: {
-    fontSize: THEME.fonts.regular,
-    paddingVertical: THEME.spacing.sm,
+    fontSize: fontScale(16),
+    paddingVertical: spacing.sm,
+    lineHeight: fontScale(24),
   },
   iconLeft: {
-    marginRight: THEME.spacing.sm,
+    marginRight: spacing.sm,
   },
   iconRight: {
-    marginLeft: THEME.spacing.sm,
+    marginLeft: spacing.sm,
   },
   helperText: {
     fontSize: THEME.fonts.small,
