@@ -2,7 +2,8 @@
 import { Dimensions, PixelRatio, Platform } from 'react-native';
 
 // Get screen dimensions
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+export const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } =
+  Dimensions.get('window');
 
 // Base dimensions (iPhone 11/X)
 const BASE_WIDTH = 375;

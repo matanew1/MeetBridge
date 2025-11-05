@@ -10,9 +10,18 @@ import {
   Binoculars,
 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  Platform,
+  Animated,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
@@ -25,6 +34,8 @@ import {
   spacing,
   borderRadius,
   deviceInfo,
+  isTablet,
+  SCREEN_WIDTH,
 } from '../../utils/responsive';
 
 export default function TabLayout() {
@@ -34,6 +45,8 @@ export default function TabLayout() {
   const router = useRouter();
   const theme = isDarkMode ? darkTheme : lightTheme;
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const insets = useSafeAreaInsets();
 
   // Redirect to profile completion if needed
   useEffect(() => {
@@ -43,6 +56,18 @@ export default function TabLayout() {
   }, [user]);
 
   const handleProfilePress = () => {
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 0.95,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
     setShowProfileModal(true);
   };
 
@@ -50,44 +75,177 @@ export default function TabLayout() {
     setShowProfileModal(false);
   };
 
+  // Calculate responsive dimensions
+  const tabBarHeight = isTablet
+    ? verticalScale(70)
+    : deviceInfo.isSmallDevice
+    ? verticalScale(65)
+    : verticalScale(80);
+
+  const iconSize = isTablet
+    ? scale(26)
+    : deviceInfo.isSmallDevice
+    ? scale(22)
+    : scale(24);
+
+  const headerHeight = Platform.select({
+    ios: isTablet ? verticalScale(100) : verticalScale(90),
+    android: verticalScale(70),
+    default: verticalScale(70),
+  });
+
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
       <View
-        style={[styles.header, { backgroundColor: theme.headerBackground }]}
+        style={[
+          styles.header,
+          {
+            backgroundColor: theme.headerBackground,
+            paddingTop: insets.top + spacing.sm,
+            ...Platform.select({
+              ios: {
+                shadowColor: theme.shadow,
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: isDarkMode ? 0.3 : 0.08,
+                shadowRadius: 8,
+              },
+              android: {
+                elevation: 4,
+              },
+            }),
+          },
+        ]}
       >
-        <View style={styles.headerLeft}>
-          <Text style={[styles.logoText, { color: theme.primary }]}>
-            MeetBridge
-          </Text>
-        </View>
-        <View style={styles.headerRight}>
-          <TouchableOpacity
-            style={[
-              styles.darkModeButton,
-              { backgroundColor: theme.primaryVariant },
-            ]}
-            onPress={toggleDarkMode}
-          >
-            {isDarkMode ? (
-              <Sun size={20} color={theme.primary} />
-            ) : (
-              <Moon size={20} color={theme.primary} />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.profileButton}
-            onPress={handleProfilePress}
-          >
-            <Image
-              source={
-                user?.image
-                  ? { uri: user.image }
-                  : require('../../assets/images/placeholder.png')
-              }
-              style={styles.headerProfile}
-            />
-          </TouchableOpacity>
+        <View style={styles.headerContent}>
+          <View style={styles.headerLeft}>
+            <View style={styles.logoContainer}>
+              <Text
+                style={[
+                  styles.logoText,
+                  {
+                    color: theme.primary,
+                    fontSize: isTablet ? moderateScale(26) : moderateScale(22),
+                  },
+                ]}
+              >
+                MeetBridge
+              </Text>
+            </View>
+          </View>
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              style={[
+                styles.darkModeButton,
+                {
+                  backgroundColor: theme.primaryVariant,
+                  width: isTablet
+                    ? scale(50)
+                    : deviceInfo.isSmallDevice
+                    ? scale(40)
+                    : scale(44),
+                  height: isTablet
+                    ? scale(50)
+                    : deviceInfo.isSmallDevice
+                    ? scale(40)
+                    : scale(44),
+                  borderRadius: isTablet
+                    ? scale(25)
+                    : deviceInfo.isSmallDevice
+                    ? scale(20)
+                    : scale(22),
+                },
+              ]}
+              onPress={toggleDarkMode}
+              activeOpacity={0.7}
+            >
+              {isDarkMode ? (
+                <Sun
+                  size={
+                    isTablet
+                      ? scale(24)
+                      : deviceInfo.isSmallDevice
+                      ? scale(18)
+                      : scale(20)
+                  }
+                  color={theme.primary}
+                />
+              ) : (
+                <Moon
+                  size={
+                    isTablet
+                      ? scale(24)
+                      : deviceInfo.isSmallDevice
+                      ? scale(18)
+                      : scale(20)
+                  }
+                  color={theme.primary}
+                />
+              )}
+            </TouchableOpacity>
+            <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+              <TouchableOpacity
+                style={[
+                  styles.profileButton,
+                  {
+                    width: isTablet
+                      ? scale(50)
+                      : deviceInfo.isSmallDevice
+                      ? scale(40)
+                      : scale(44),
+                    height: isTablet
+                      ? scale(50)
+                      : deviceInfo.isSmallDevice
+                      ? scale(40)
+                      : scale(44),
+                    borderRadius: isTablet
+                      ? scale(25)
+                      : deviceInfo.isSmallDevice
+                      ? scale(20)
+                      : scale(22),
+                    borderWidth: 2,
+                    borderColor: theme.primary,
+                    ...Platform.select({
+                      ios: {
+                        shadowColor: theme.primary,
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.2,
+                        shadowRadius: 4,
+                      },
+                      android: {
+                        elevation: 3,
+                      },
+                    }),
+                  },
+                ]}
+                onPress={handleProfilePress}
+                activeOpacity={0.8}
+              >
+                <Image
+                  source={
+                    user?.image
+                      ? { uri: user.image }
+                      : require('../../assets/images/placeholder.png')
+                  }
+                  style={[
+                    styles.headerProfile,
+                    {
+                      width: isTablet
+                        ? scale(50)
+                        : deviceInfo.isSmallDevice
+                        ? scale(40)
+                        : scale(44),
+                      height: isTablet
+                        ? scale(50)
+                        : deviceInfo.isSmallDevice
+                        ? scale(40)
+                        : scale(44),
+                    },
+                  ]}
+                />
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
         </View>
       </View>
       <Tabs
@@ -96,30 +254,71 @@ export default function TabLayout() {
           tabBarStyle: {
             backgroundColor: theme.tabBarBackground,
             borderTopWidth: 0,
-            elevation: 8,
-            shadowColor: theme.shadow,
-            shadowOffset: { width: 0, height: -2 },
-            shadowOpacity: isDarkMode ? 0.3 : 0.1,
-            shadowRadius: 8,
-            paddingTop: spacing.sm,
-            paddingBottom: deviceInfo.isSmallDevice ? spacing.xs : 0,
-            marginBottom: 0,
-            height: deviceInfo.isSmallDevice
-              ? verticalScale(70)
-              : verticalScale(90),
+            borderWidth: isDarkMode ? 0 : 1,
+            borderColor: isDarkMode ? 'transparent' : theme.borderLight,
+            ...Platform.select({
+              ios: {
+                shadowColor: theme.shadow,
+                shadowOffset: { width: 0, height: -4 },
+                shadowOpacity: isDarkMode ? 0.5 : 0.15,
+                shadowRadius: 16,
+              },
+              android: {
+                elevation: 16,
+              },
+            }),
+            paddingTop: isTablet ? spacing.md : spacing.sm,
+            paddingBottom:
+              Math.max(insets.bottom, spacing.xs) +
+              (isTablet ? spacing.md : spacing.sm),
+            paddingHorizontal: isTablet
+              ? spacing.xl
+              : deviceInfo.isSmallDevice
+              ? spacing.sm
+              : spacing.md,
+            marginBottom: Platform.select({
+              ios: spacing.sm,
+              android: spacing.xs,
+              default: spacing.xs,
+            }),
+            marginHorizontal: isTablet
+              ? spacing.xl
+              : deviceInfo.isSmallDevice
+              ? spacing.sm
+              : spacing.md,
+            height: tabBarHeight,
             position: 'absolute',
             bottom: 0,
             left: 0,
             right: 0,
+            borderRadius: borderRadius.xxl,
+            overflow: 'hidden',
           },
           tabBarActiveTintColor: theme.tabBarActive,
           tabBarInactiveTintColor: theme.tabBarInactive,
           tabBarLabelStyle: {
-            fontSize: deviceInfo.isSmallDevice
-              ? moderateScale(10)
-              : moderateScale(11),
-            fontWeight: '500',
-            marginTop: 1,
+            fontSize: isTablet
+              ? moderateScale(13)
+              : deviceInfo.isSmallDevice
+              ? moderateScale(9)
+              : moderateScale(10),
+            fontWeight: '600',
+            marginTop: deviceInfo.isSmallDevice
+              ? spacing.xs / 3
+              : spacing.xs / 2,
+            letterSpacing: 0.15,
+            textAlign: 'center',
+          },
+          tabBarIconStyle: {
+            marginTop: deviceInfo.isSmallDevice ? 0 : spacing.xs / 2,
+          },
+          tabBarItemStyle: {
+            paddingVertical: deviceInfo.isSmallDevice
+              ? spacing.xs / 2
+              : spacing.xs,
+            borderRadius: borderRadius.lg,
+            marginHorizontal: deviceInfo.isSmallDevice ? 0 : spacing.xs / 4,
+            flex: 1,
           },
         }}
       >
@@ -127,8 +326,24 @@ export default function TabLayout() {
           name="loved"
           options={{
             title: t('tabs.discover'),
-            tabBarIcon: ({ size, color }) => (
-              <HeartHandshake size={size} color={color} />
+            tabBarIcon: ({ focused, color }) => (
+              <View
+                style={[
+                  styles.iconContainer,
+                  focused && [
+                    styles.activeIconContainer,
+                    {
+                      backgroundColor: theme.primaryVariant,
+                    },
+                  ],
+                ]}
+              >
+                <HeartHandshake
+                  size={iconSize}
+                  color={color}
+                  strokeWidth={focused ? 2.5 : 2}
+                />
+              </View>
             ),
           }}
         />
@@ -136,8 +351,24 @@ export default function TabLayout() {
           name="search"
           options={{
             title: t('tabs.search'),
-            tabBarIcon: ({ size, color }) => (
-              <Search size={size} color={color} />
+            tabBarIcon: ({ focused, color }) => (
+              <View
+                style={[
+                  styles.iconContainer,
+                  focused && [
+                    styles.activeIconContainer,
+                    {
+                      backgroundColor: theme.primaryVariant,
+                    },
+                  ],
+                ]}
+              >
+                <Search
+                  size={iconSize}
+                  color={color}
+                  strokeWidth={focused ? 2.5 : 2}
+                />
+              </View>
             ),
           }}
         />
@@ -145,17 +376,49 @@ export default function TabLayout() {
           name="chat"
           options={{
             title: t('tabs.chat'),
-            tabBarIcon: ({ size, color }) => (
-              <MessageCircleMore size={size} color={color} />
+            tabBarIcon: ({ focused, color }) => (
+              <View
+                style={[
+                  styles.iconContainer,
+                  focused && [
+                    styles.activeIconContainer,
+                    {
+                      backgroundColor: theme.primaryVariant,
+                    },
+                  ],
+                ]}
+              >
+                <MessageCircleMore
+                  size={iconSize}
+                  color={color}
+                  strokeWidth={focused ? 2.5 : 2}
+                />
+              </View>
             ),
           }}
         />
         <Tabs.Screen
           name="connections"
           options={{
-            title: 'Connections',
-            tabBarIcon: ({ size, color }) => (
-              <Binoculars size={size} color={color} />
+            title: 'Board',
+            tabBarIcon: ({ focused, color }) => (
+              <View
+                style={[
+                  styles.iconContainer,
+                  focused && [
+                    styles.activeIconContainer,
+                    {
+                      backgroundColor: theme.primaryVariant,
+                    },
+                  ],
+                ]}
+              >
+                <Binoculars
+                  size={iconSize}
+                  color={color}
+                  strokeWidth={focused ? 2.5 : 2}
+                />
+              </View>
             ),
           }}
         />
@@ -178,54 +441,90 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    paddingHorizontal: isTablet
+      ? spacing.xl
+      : deviceInfo.isSmallDevice
+      ? spacing.md
+      : spacing.lg,
+    paddingBottom: isTablet ? spacing.md : spacing.sm,
+  },
+  headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 10,
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    flex: 1,
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  logoImage: {
-    width: 30,
-    height: 30,
+    gap: deviceInfo.isSmallDevice ? spacing.xs : spacing.sm,
   },
   logoText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    fontFamily: 'Satoshi',
+    fontWeight: '800',
+    fontFamily: Platform.select({
+      ios: 'Satoshi',
+      android: 'sans-serif-medium',
+      default: 'Satoshi',
+    }),
+    letterSpacing: -0.5,
   },
   profileButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
     overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerProfile: {
-    width: 40,
-    height: 40,
+    resizeMode: 'cover',
   },
   darkModeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  notificationButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  iconContainer: {
     justifyContent: 'center',
     alignItems: 'center',
+    minWidth: isTablet
+      ? scale(48)
+      : deviceInfo.isSmallDevice
+      ? scale(36)
+      : scale(40),
+    minHeight: isTablet
+      ? scale(48)
+      : deviceInfo.isSmallDevice
+      ? scale(36)
+      : scale(40),
+    borderRadius: borderRadius.xl,
+  },
+  activeIconContainer: {
+    paddingHorizontal: isTablet
+      ? spacing.md
+      : deviceInfo.isSmallDevice
+      ? spacing.sm
+      : spacing.md,
+    paddingVertical: isTablet
+      ? spacing.sm
+      : deviceInfo.isSmallDevice
+      ? spacing.xs
+      : spacing.sm,
+    borderRadius: borderRadius.xl,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#7C3AED',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
 });

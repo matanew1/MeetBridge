@@ -204,27 +204,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     };
   };
 
-  const getLastSeenDisplay = (lastSeen?: Date | string, isOnline?: boolean) => {
-    if (isOnline) return 'Active now';
-    if (!lastSeen) return 'Last seen recently';
-
-    const lastSeenDate = new Date(lastSeen);
-    const now = new Date();
-    const diffInMinutes = Math.floor(
-      (now.getTime() - lastSeenDate.getTime()) / (1000 * 60)
-    );
-
-    if (diffInMinutes < 60) {
-      return `Active ${diffInMinutes} minutes ago`;
-    } else if (diffInMinutes < 1440) {
-      const hours = Math.floor(diffInMinutes / 60);
-      return `Active ${hours} hour${hours > 1 ? 's' : ''} ago`;
-    } else {
-      const days = Math.floor(diffInMinutes / 1440);
-      return `Active ${days} day${days > 1 ? 's' : ''} ago`;
-    }
-  };
-
   const getGenderDisplay = (gender?: string) => {
     if (!gender) return 'Not specified';
     return gender.charAt(0).toUpperCase() + gender.slice(1);
@@ -399,11 +378,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     },
                   ]}
                 />
-                <Text
-                  style={[styles.statusText, { color: theme.textSecondary }]}
-                >
-                  {getLastSeenDisplay(user.lastSeen, user.isOnline)}
-                </Text>
               </View>
             </View>
 
