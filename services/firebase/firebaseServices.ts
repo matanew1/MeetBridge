@@ -27,6 +27,8 @@ import {
   updatePassword,
   deleteUser,
   User as FirebaseUser,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
 } from 'firebase/auth';
 import { db, auth } from './config';
 import {

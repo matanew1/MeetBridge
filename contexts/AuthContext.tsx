@@ -387,12 +387,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (email: string, password: string) => {
     try {
       const response = await services.auth.login(email, password);
-      if (!response.success) {
-        errorHandler.error(
-          'Login Failed',
-          response.message || 'Unable to login'
-        );
-      }
+      // Don't show error toast here - let the UI component handle it
       return {
         success: response.success,
         message:
@@ -400,7 +395,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           (response.success ? 'Login successful' : 'Login failed'),
       };
     } catch (error) {
-      return errorHandler.handle(error, { title: 'Login Error' });
+      // Return error without showing toast - let the UI component handle it
+      const result = errorHandler.handle(error, {
+        title: 'Login Error',
+        showToast: false, // UI component will show the toast
+      });
+      return {
+        success: false,
+        message: result.message || 'An unexpected error occurred',
+      };
     }
   };
 
@@ -409,12 +412,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   ) => {
     try {
       const response = await services.auth.register(userData);
-      if (!response.success) {
-        errorHandler.error(
-          'Registration Failed',
-          response.message || 'Unable to register'
-        );
-      }
+      // Don't show error toast here - let the UI component handle it
       return {
         success: response.success,
         message:
@@ -424,7 +422,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             : 'Registration failed'),
       };
     } catch (error) {
-      return errorHandler.handle(error, { title: 'Registration Error' });
+      // Return error without showing toast - let the UI component handle it
+      const result = errorHandler.handle(error, {
+        title: 'Registration Error',
+        showToast: false, // UI component will show the toast
+      });
+      return {
+        success: false,
+        message: result.message || 'An unexpected error occurred',
+      };
     }
   };
 
