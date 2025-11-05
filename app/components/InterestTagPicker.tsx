@@ -7,7 +7,6 @@ import {
   StyleSheet,
   ScrollView,
   Modal,
-  Alert,
 } from 'react-native';
 import { X, Plus } from 'lucide-react-native';
 import {
@@ -17,6 +16,7 @@ import {
 } from '../../constants/interests';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
+import toastService from '../../services/toastService';
 
 interface InterestTagPickerProps {
   selectedInterests: string[];
@@ -41,7 +41,7 @@ export default function InterestTagPicker({
     } else {
       // Add interest if under limit
       if (selectedInterests.length >= maxInterests) {
-        Alert.alert(
+        toastService.error(
           'Maximum Reached',
           `You can select up to ${maxInterests} interests.`
         );
@@ -54,17 +54,17 @@ export default function InterestTagPicker({
   const addCustomInterest = () => {
     const trimmed = customInterest.trim();
     if (!trimmed) {
-      Alert.alert('Invalid Input', 'Please enter an interest.');
+      toastService.error('Invalid Input', 'Please enter an interest.');
       return;
     }
 
     if (selectedInterests.includes(trimmed)) {
-      Alert.alert('Duplicate', 'This interest is already added.');
+      toastService.error('Duplicate', 'This interest is already added.');
       return;
     }
 
     if (selectedInterests.length >= maxInterests) {
-      Alert.alert(
+      toastService.error(
         'Maximum Reached',
         `You can select up to ${maxInterests} interests.`
       );
@@ -80,7 +80,7 @@ export default function InterestTagPicker({
     ).length;
 
     if (customCount >= MAX_CUSTOM_INTERESTS) {
-      Alert.alert(
+      toastService.error(
         'Custom Limit Reached',
         `You can add up to ${MAX_CUSTOM_INTERESTS} custom interests.`
       );

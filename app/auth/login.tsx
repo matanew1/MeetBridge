@@ -28,6 +28,7 @@ import {
   borderRadius,
   deviceInfo,
 } from '../../utils/responsive';
+import toastService from '../../services/toastService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -46,7 +47,7 @@ const LoginScreen = () => {
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+      toastService.error('Login Error', 'Please fill in all fields');
       return;
     }
 
@@ -56,10 +57,10 @@ const LoginScreen = () => {
       if (result.success) {
         router.replace('/search');
       } else {
-        Alert.alert('Login Failed', result.message);
+        toastService.error('Login Failed', result.message);
       }
     } catch (error) {
-      Alert.alert('Error', 'An unexpected error occurred');
+      toastService.error('Error', 'An unexpected error occurred');
     } finally {
       setIsLoading(false);
     }

@@ -37,6 +37,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import missedConnectionsService, {
   MissedConnection,
 } from '../../../services/firebase/missedConnectionsService';
+import toastService from '../../../services/toastService';
 
 interface Comment {
   id: string;
@@ -231,7 +232,7 @@ export default function CommentsScreen() {
 
   const handleSendComment = async () => {
     if (!isAuthenticated) {
-      Alert.alert('Sign In Required', 'Please sign in to comment.');
+      toastService.error('Sign In Required', 'Please sign in to comment.');
       return;
     }
 
@@ -266,7 +267,7 @@ export default function CommentsScreen() {
         scrollViewRef.current?.scrollToEnd({ animated: true });
       }, 100);
     } else {
-      Alert.alert('Error', result.message);
+      toastService.error('Error', result.message);
     }
 
     setIsSending(false);
@@ -274,10 +275,7 @@ export default function CommentsScreen() {
 
   const handleClaimConnection = async () => {
     if (!isAuthenticated) {
-      Alert.alert(
-        'Sign In Required',
-        'Please sign in to claim this connection.'
-      );
+      toastService.error('Sign In Required', 'Please sign in to claim this connection.');
       return;
     }
 
@@ -313,7 +311,7 @@ export default function CommentsScreen() {
      */
 
     // Show verification info and confirmation
-    Alert.alert(
+    toastService.info(
       "That's You? 🎯",
       "By claiming this connection, you're saying you were at this location at the specified time.\n\n" +
         '💡 Verification:\n' +
@@ -337,7 +335,7 @@ export default function CommentsScreen() {
             );
 
             if (result.success) {
-              Alert.alert(
+              toastService.info(
                 'Claim Submitted! ✨',
                 "The post creator will be notified. If they confirm, you'll both be matched!"
               );
@@ -349,7 +347,7 @@ export default function CommentsScreen() {
                 setConnection(connectionResult.data);
               }
             } else {
-              Alert.alert('Error', result.message);
+              toastService.error('Error', result.message);
             }
 
             setIsClaiming(false);

@@ -1593,12 +1593,15 @@ export class FirebaseAuthService implements IAuthService {
         message: 'Login successful',
       };
     } catch (error) {
-      console.error('Error during login:', error);
       let errorMessage = 'Login failed';
 
       if (error instanceof Error) {
         const code = (error as any).code;
         switch (code) {
+          case 'auth/invalid-credential':
+            errorMessage =
+              'Invalid email or password. Please check your credentials and try again';
+            break;
           case 'auth/user-not-found':
             errorMessage = 'No account found with this email';
             break;
@@ -1927,6 +1930,203 @@ export class FirebaseAuthService implements IAuthService {
         data: false,
         success: false,
         message: 'Authentication error. Please log in again.',
+      };
+    }
+  }
+
+  async deleteAccount(password: string): Promise<ApiResponse<boolean>> {
+    try {
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser || !firebaseUser.email) {
+        throw new Error('No authenticated user found');
+      }
+
+      const userId = firebaseUser.uid;
+      console.log('🗑️ Starting account deletion for user:', userId);
+
+      // Step 1: Reauthenticate user
+      const credential = EmailAuthProvider.credential(
+        firebaseUser.email,
+        password
+      );
+      await reauthenticateWithCredential(firebaseUser, credential);
+      console.log('✅ User reauthenticated successfully');
+
+      // Step 2: Delete user's profile image from storage
+      try {
+        const userDoc = await getDoc(doc(db, 'users', userId));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          if (userData.image) {
+            await storageService.deleteImage(userData.image);
+            console.log('✅ Profile image deleted');
+          }
+        }
+      } catch (error) {
+        console.error('⚠️ Error deleting profile image:', error);
+        // Continue with deletion even if image deletion fails
+      }
+
+      // Step 3: Delete user's conversations and messages
+      try {
+        const conversationsQuery = query(
+          collection(db, 'conversations'),
+          where('participants', 'array-contains', userId)
+        );
+        const conversationsSnapshot = await getDocs(conversationsQuery);
+
+        const batch = writeBatch(db);
+        let batchCount = 0;
+
+        for (const conversationDoc of conversationsSnapshot.docs) {
+          // Delete all messages in this conversation
+          const messagesQuery = query(
+            collection(db, 'conversations', conversationDoc.id, 'messages')
+          );
+          const messagesSnapshot = await getDocs(messagesQuery);
+
+          messagesSnapshot.docs.forEach((messageDoc) => {
+            batch.delete(messageDoc.ref);
+            batchCount++;
+          });
+
+          // Delete the conversation
+          batch.delete(conversationDoc.ref);
+          batchCount++;
+
+          // Commit batch if it reaches 500 operations (Firestore limit)
+          if (batchCount >= 450) {
+            await batch.commit();
+            batchCount = 0;
+          }
+        }
+
+        if (batchCount > 0) {
+          await batch.commit();
+        }
+        console.log('✅ Conversations and messages deleted');
+      } catch (error) {
+        console.error('⚠️ Error deleting conversations:', error);
+        // Continue with deletion
+      }
+
+      // Step 4: Delete user's matches
+      try {
+        const matchesQuery = query(
+          collection(db, 'matches'),
+          where('users', 'array-contains', userId)
+        );
+        const matchesSnapshot = await getDocs(matchesQuery);
+
+        const batch = writeBatch(db);
+        matchesSnapshot.docs.forEach((matchDoc) => {
+          batch.delete(matchDoc.ref);
+        });
+
+        if (matchesSnapshot.size > 0) {
+          await batch.commit();
+          console.log('✅ Matches deleted');
+        }
+      } catch (error) {
+        console.error('⚠️ Error deleting matches:', error);
+        // Continue with deletion
+      }
+
+      // Step 5: Delete user's likes (given and received)
+      try {
+        const likesGivenQuery = query(
+          collection(db, 'likes'),
+          where('userId', '==', userId)
+        );
+        const likesReceivedQuery = query(
+          collection(db, 'likes'),
+          where('likedUserId', '==', userId)
+        );
+
+        const [likesGivenSnapshot, likesReceivedSnapshot] = await Promise.all([
+          getDocs(likesGivenQuery),
+          getDocs(likesReceivedQuery),
+        ]);
+
+        const batch = writeBatch(db);
+        likesGivenSnapshot.docs.forEach((likeDoc) => {
+          batch.delete(likeDoc.ref);
+        });
+        likesReceivedSnapshot.docs.forEach((likeDoc) => {
+          batch.delete(likeDoc.ref);
+        });
+
+        if (likesGivenSnapshot.size > 0 || likesReceivedSnapshot.size > 0) {
+          await batch.commit();
+          console.log('✅ Likes deleted');
+        }
+      } catch (error) {
+        console.error('⚠️ Error deleting likes:', error);
+        // Continue with deletion
+      }
+
+      // Step 6: Delete user's missed connections
+      try {
+        const connectionsQuery = query(
+          collection(db, 'missedConnections'),
+          where('userId', '==', userId)
+        );
+        const connectionsSnapshot = await getDocs(connectionsQuery);
+
+        const batch = writeBatch(db);
+        connectionsSnapshot.docs.forEach((connectionDoc) => {
+          batch.delete(connectionDoc.ref);
+        });
+
+        if (connectionsSnapshot.size > 0) {
+          await batch.commit();
+          console.log('✅ Missed connections deleted');
+        }
+      } catch (error) {
+        console.error('⚠️ Error deleting missed connections:', error);
+        // Continue with deletion
+      }
+
+      // Step 7: Delete user profile from Firestore
+      await deleteDoc(doc(db, 'users', userId));
+      console.log('✅ User profile deleted from Firestore');
+
+      // Step 8: Delete Firebase Authentication account
+      await deleteUser(firebaseUser);
+      console.log('✅ Firebase Authentication account deleted');
+
+      return {
+        data: true,
+        success: true,
+        message: 'Your account has been permanently deleted',
+      };
+    } catch (error) {
+      console.error('❌ Error deleting account:', error);
+
+      let errorMessage = 'Failed to delete account';
+
+      if (error instanceof Error) {
+        const code = (error as any).code;
+        switch (code) {
+          case 'auth/wrong-password':
+            errorMessage = 'Incorrect password. Please try again';
+            break;
+          case 'auth/requires-recent-login':
+            errorMessage =
+              'Please log out and log back in before deleting your account';
+            break;
+          case 'auth/user-not-found':
+            errorMessage = 'User account not found';
+            break;
+          default:
+            errorMessage = error.message;
+        }
+      }
+
+      return {
+        data: false,
+        success: false,
+        message: errorMessage,
       };
     }
   }

@@ -6,11 +6,11 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
-  Alert,
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import toastService from '../../services/toastService';
 import {
   ChevronRight,
   ChevronLeft,
@@ -34,6 +34,10 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import { Card, Button } from '../components/ui';
+import EditProfileModal from '../components/EditProfileModal';
+import ChangePasswordModal from '../components/ChangePasswordModal';
+import DeleteAccountModal from '../components/DeleteAccountModal';
+import { useUserStore } from '../../store/userStore';
 import {
   scale,
   verticalScale,
@@ -41,6 +45,8 @@ import {
   spacing,
   borderRadius,
 } from '../../utils/responsive';
+import toastSerivce from '../../services/toastService';
+import { User as UserType } from '../../types/models/user';
 
 interface SettingItemProps {
   icon: React.ReactNode;
@@ -148,7 +154,8 @@ const SettingItem: React.FC<SettingItemProps> = ({
 
 const Settings: React.FC = () => {
   const { isDarkMode, toggleDarkMode } = useTheme();
-  const { user, logout } = useAuth();
+  const { user, logout, updateProfile, refreshUserProfile, deleteAccount } =
+    useAuth();
   const router = useRouter();
   const theme = isDarkMode ? darkTheme : lightTheme;
 
@@ -158,9 +165,12 @@ const Settings: React.FC = () => {
   const [matchNotifications, setMatchNotifications] = useState(true);
   const [locationEnabled, setLocationEnabled] = useState(true);
   const [showOnlineStatus, setShowOnlineStatus] = useState(true);
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
 
   const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
+    toastService.info('Logout', 'Are you sure you want to logout?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Logout',
@@ -174,24 +184,80 @@ const Settings: React.FC = () => {
   };
 
   const handleDeleteAccount = () => {
-    Alert.alert(
-      'Delete Account',
-      'This action cannot be undone. All your data will be permanently deleted.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            // TODO: Implement account deletion
-            Alert.alert(
-              'Feature Coming Soon',
-              'Account deletion will be available in a future update.'
+    setShowDeleteAccount(true);
+  };
+
+  const handleConfirmDelete = async (password: string) => {
+    try {
+      const result = await deleteAccount(password);
+
+      if (result.success) {
+        setShowDeleteAccount(false);
+        toastService.success(
+          'Account Deleted',
+          'Your account has been permanently deleted'
+        );
+        // Navigate to login after a short delay
+        setTimeout(() => {
+          router.replace('/auth/login');
+        }, 1500);
+      }
+    } catch (error) {
+      console.error('Error deleting account:', error);
+    }
+  };
+
+  const handleEditProfile = () => {
+    setShowEditProfile(true);
+  };
+
+  const handleSaveProfile = async (updatedData: Partial<User>) => {
+    try {
+      // If updateProfile exists in AuthContext, use it
+      if (updateProfile) {
+        await updateProfile(updatedData);
+        // Refresh the user profile from Firebase to ensure we have the latest data
+        if (refreshUserProfile) {
+          await refreshUserProfile();
+        }
+
+        // Sync search filters with user preferences
+        if (updatedData.preferences) {
+          const { updateSearchFilters } = useUserStore.getState();
+          const filterUpdates: any = {};
+
+          if (updatedData.preferences.interestedIn !== undefined) {
+            filterUpdates.gender = updatedData.preferences.interestedIn;
+          }
+          if (updatedData.preferences.ageRange !== undefined) {
+            filterUpdates.ageRange = updatedData.preferences.ageRange;
+          }
+          if (updatedData.preferences.maxDistance !== undefined) {
+            filterUpdates.maxDistance = updatedData.preferences.maxDistance;
+          }
+
+          if (Object.keys(filterUpdates).length > 0) {
+            updateSearchFilters(filterUpdates);
+            console.log(
+              '✅ Search filters synced with preferences:',
+              filterUpdates
             );
-          },
-        },
-      ]
-    );
+          }
+        }
+
+        console.log('✅ Profile updated and refreshed from Firebase');
+        toastService.success(
+          'Profile Updated',
+          'Your profile has been updated successfully'
+        );
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toastService.error(
+        'Update Failed',
+        'Failed to update your profile. Please try again.'
+      );
+    }
   };
 
   return (
@@ -235,39 +301,13 @@ const Settings: React.FC = () => {
             icon={<User />}
             title="Edit Profile"
             subtitle="Update your profile information"
-            onPress={() => {
-              // Close settings and open profile modal
-              router.back();
-            }}
-          />
-          <SettingItem
-            icon={<Mail />}
-            title="Email"
-            subtitle={user?.email || 'Not set'}
-            onPress={() =>
-              Alert.alert(
-                'Change Email',
-                'Email change functionality coming soon'
-              )
-            }
-          />
-          <SettingItem
-            icon={<Smartphone />}
-            title="Phone Number"
-            subtitle="Add or update phone number"
-            onPress={() =>
-              Alert.alert('Phone Number', 'Phone verification coming soon')
-            }
+            onPress={handleEditProfile}
           />
           <SettingItem
             icon={<Lock />}
             title="Change Password"
-            onPress={() =>
-              Alert.alert(
-                'Change Password',
-                'Password change functionality coming soon'
-              )
-            }
+            subtitle="Update your account password"
+            onPress={() => setShowChangePassword(true)}
           />
         </SettingSection>
 
@@ -278,21 +318,10 @@ const Settings: React.FC = () => {
             title="Privacy Settings"
             subtitle="Control who can see your profile"
             onPress={() =>
-              Alert.alert('Privacy', 'Advanced privacy settings coming soon')
-            }
-          />
-          <SettingItem
-            icon={<MapPin />}
-            title="Location Services"
-            subtitle={locationEnabled ? 'Enabled' : 'Disabled'}
-            showChevron={false}
-            rightElement={
-              <Switch
-                value={locationEnabled}
-                onValueChange={setLocationEnabled}
-                trackColor={{ false: theme.border, true: theme.primary }}
-                thumbColor={theme.surface}
-              />
+              toastService.info(
+                'Privacy',
+                'Advanced privacy settings coming soon'
+              )
             }
           />
           <SettingItem
@@ -380,7 +409,10 @@ const Settings: React.FC = () => {
             title="Language"
             subtitle="English (US)"
             onPress={() =>
-              Alert.alert('Language', 'Multi-language support coming soon')
+              toastService.info(
+                'Language',
+                'Multi-language support coming soon'
+              )
             }
           />
         </SettingSection>
@@ -388,30 +420,15 @@ const Settings: React.FC = () => {
         {/* Support */}
         <SettingSection title="SUPPORT">
           <SettingItem
-            icon={<HelpCircle />}
-            title="Help Center"
-            onPress={() => Alert.alert('Help', 'Opening help center...')}
-          />
-          <SettingItem
             icon={<Info />}
             title="About"
             subtitle="Version 1.0.0"
             onPress={() =>
-              Alert.alert(
+              toastService.info(
                 'MeetBridge',
                 'Version 1.0.0\n\nConnect meaningfully with people nearby.'
               )
             }
-          />
-          <SettingItem
-            icon={<Globe />}
-            title="Terms of Service"
-            onPress={() => Alert.alert('Terms', 'Opening terms of service...')}
-          />
-          <SettingItem
-            icon={<Shield />}
-            title="Privacy Policy"
-            onPress={() => Alert.alert('Privacy', 'Opening privacy policy...')}
           />
         </SettingSection>
 
@@ -454,6 +471,26 @@ const Settings: React.FC = () => {
           </Text>
         </View>
       </ScrollView>
+
+      {/* Edit Profile Modal */}
+      <EditProfileModal
+        visible={showEditProfile}
+        onClose={() => setShowEditProfile(false)}
+        onSave={handleSaveProfile}
+      />
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        visible={showChangePassword}
+        onClose={() => setShowChangePassword(false)}
+      />
+
+      {/* Delete Account Modal */}
+      <DeleteAccountModal
+        visible={showDeleteAccount}
+        onClose={() => setShowDeleteAccount(false)}
+        onConfirm={handleConfirmDelete}
+      />
     </SafeAreaView>
   );
 };

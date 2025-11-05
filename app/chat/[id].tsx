@@ -19,8 +19,7 @@ import {
   Platform,
   Dimensions,
   Modal,
-  Alert,
-  Keyboard,
+  // Alert, // Removed Alert import
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
@@ -47,6 +46,7 @@ import { lightTheme, darkTheme } from '../../constants/theme';
 import ProfileDetail from '../components/ProfileDetail';
 import { usePresence } from '../../hooks/usePresence';
 import notificationService from '../../services/notificationService';
+import toastService from '../../services/toastService'; // Added toastService import
 
 const { width } = Dimensions.get('window');
 
@@ -631,17 +631,8 @@ const ChatScreen = () => {
             }));
           }
 
-          Alert.alert(
-            t('chat.unmatchTitle'),
-            t('chat.unmatchDetected'),
-            [
-              {
-                text: t('actions.close'),
-                onPress: () => router.back(),
-              },
-            ],
-            { cancelable: false }
-          );
+          toastService.show(t('chat.unmatchTitle'), t('chat.unmatchDetected')); // Replaced Alert.alert with toastService.show
+          
           return;
         }
 
@@ -671,17 +662,7 @@ const ChatScreen = () => {
             }));
           }
 
-          Alert.alert(
-            t('chat.unmatchTitle'),
-            t('chat.unmatchDetected'),
-            [
-              {
-                text: t('actions.close'),
-                onPress: () => router.back(),
-              },
-            ],
-            { cancelable: false }
-          );
+          toastService.show(t('chat.unmatchTitle'), t('chat.unmatchDetected')); // Replaced Alert.alert with toastService.show
         }
       },
       (error: any) => {

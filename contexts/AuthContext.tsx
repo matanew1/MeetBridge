@@ -8,8 +8,15 @@ import React, {
   ReactNode,
 } from 'react';
 import { Platform, AppState, AppStateStatus } from 'react-native';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import {
+  onAuthStateChanged,
+  User as FirebaseUser,
+  updatePassword,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+} from 'firebase/auth';
 import { auth, db } from '../services/firebase/config';
+import errorHandler from '../utils/errorHandler';
 import {
   doc,
   getDoc,
@@ -45,6 +52,13 @@ interface AuthContextType {
     token: string,
     newPassword: string
   ) => Promise<{ success: boolean; message: string }>;
+  changePassword: (
+    currentPassword: string,
+    newPassword: string
+  ) => Promise<{ success: boolean; message: string }>;
+  deleteAccount: (
+    password: string
+  ) => Promise<{ success: boolean; message: string }>;
   refreshUserProfile: () => Promise<void>;
   updateProfile: (
     userData: Partial<User>
@@ -79,7 +93,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!firebaseUser) return;
 
     try {
-      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+      const userDocRef = doc(db, 'users', firebaseUser.uid);
+      const userDoc = await getDoc(userDocRef);
       if (userDoc.exists()) {
         const userData = userDoc.data();
         const fullUser: User = {
@@ -88,6 +103,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           lastSeen: convertTimestamp(userData.lastSeen),
         } as User;
         setUser(fullUser);
+
+        // Update online status when refreshing profile
+        try {
+          await updateDoc(userDocRef, {
+            isOnline: true,
+            lastSeen: serverTimestamp(),
+          });
+        } catch (error) {
+          console.warn('⚠️ Failed to update online status:', error);
+        }
       }
     } catch (error) {
       console.error('Error refreshing user profile:', error);
@@ -248,8 +273,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
             setUser(fullUser);
 
-            // Note: User online status will be set by presenceService initialization
-            // which happens in the separate useEffect
+            // Immediately set user online in Firestore
+            try {
+              await updateDoc(userDocRef, {
+                isOnline: true,
+                lastSeen: serverTimestamp(),
+              });
+              console.log('✅ User status set to online');
+            } catch (error) {
+              console.warn('⚠️ Failed to set user online:', error);
+            }
           } else {
             // User exists in Firebase Auth but not in Firestore
             // This should ONLY happen in rare cases - DO NOT auto-create defaults for existing users
@@ -292,6 +325,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
           if (isGoingOnline) {
             console.log('👁️ App became active - setting user online');
+
+            // Immediately update Firestore
+            try {
+              await updateDoc(doc(db, 'users', firebaseUser.uid), {
+                isOnline: true,
+                lastSeen: serverTimestamp(),
+              });
+            } catch (error) {
+              console.warn(
+                '⚠️ Failed to update Firestore online status:',
+                error
+              );
+            }
+
             // Reinitialize presence service to set user online
             await presenceService.initialize(firebaseUser.uid);
           } else if (isGoingOffline) {
@@ -340,6 +387,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (email: string, password: string) => {
     try {
       const response = await services.auth.login(email, password);
+      if (!response.success) {
+        errorHandler.error(
+          'Login Failed',
+          response.message || 'Unable to login'
+        );
+      }
       return {
         success: response.success,
         message:
@@ -347,11 +400,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           (response.success ? 'Login successful' : 'Login failed'),
       };
     } catch (error) {
-      console.error('Login error:', error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Login failed',
-      };
+      return errorHandler.handle(error, { title: 'Login Error' });
     }
   };
 
@@ -360,6 +409,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   ) => {
     try {
       const response = await services.auth.register(userData);
+      if (!response.success) {
+        errorHandler.error(
+          'Registration Failed',
+          response.message || 'Unable to register'
+        );
+      }
       return {
         success: response.success,
         message:
@@ -369,11 +424,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             : 'Registration failed'),
       };
     } catch (error) {
-      console.error('Registration error:', error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Registration failed',
-      };
+      return errorHandler.handle(error, { title: 'Registration Error' });
     }
   };
 
@@ -421,6 +472,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('✅ Logout completed successfully');
     } catch (error) {
       console.error('❌ Logout error:', error);
+      errorHandler.handle(error, { title: 'Logout Error' });
       // Force clear state even if logout fails
       setUser(null);
       setFirebaseUser(null);
@@ -430,6 +482,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const forgotPassword = async (email: string) => {
     try {
       const response = await services.auth.forgotPassword(email);
+      if (!response.success) {
+        errorHandler.error(
+          'Password Reset Failed',
+          response.message || 'Failed to send reset email'
+        );
+      }
       return {
         success: response.success,
         message:
@@ -439,18 +497,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             : 'Failed to send reset email'),
       };
     } catch (error) {
-      console.error('Forgot password error:', error);
-      return {
-        success: false,
-        message:
-          error instanceof Error ? error.message : 'Failed to send reset email',
-      };
+      return errorHandler.handle(error, { title: 'Forgot Password Error' });
     }
   };
 
   const resetPassword = async (token: string, newPassword: string) => {
     try {
       const response = await services.auth.resetPassword(token, newPassword);
+      if (!response.success) {
+        errorHandler.error(
+          'Password Reset Failed',
+          response.message || 'Failed to reset password'
+        );
+      }
       return {
         success: response.success,
         message:
@@ -460,18 +519,151 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             : 'Failed to reset password'),
       };
     } catch (error) {
-      console.error('Reset password error:', error);
+      return errorHandler.handle(error, { title: 'Password Reset Error' });
+    }
+  };
+
+  const changePassword = async (
+    currentPassword: string,
+    newPassword: string
+  ) => {
+    try {
+      if (!firebaseUser || !firebaseUser.email) {
+        return {
+          success: false,
+          message: 'No user logged in',
+        };
+      }
+
+      // Validate inputs
+      if (!currentPassword || currentPassword.trim().length === 0) {
+        return {
+          success: false,
+          message: 'Please enter your current password',
+        };
+      }
+
+      if (!newPassword || newPassword.trim().length === 0) {
+        return {
+          success: false,
+          message: 'Please enter a new password',
+        };
+      }
+
+      // Validate password strength
+      if (newPassword.length < 6) {
+        return {
+          success: false,
+          message: 'New password must be at least 6 characters long',
+        };
+      }
+
+      // Check if passwords are the same
+      if (currentPassword === newPassword) {
+        return {
+          success: false,
+          message: 'New password must be different from current password',
+        };
+      }
+
+      console.log('🔐 Attempting to reauthenticate user...');
+
+      // Reauthenticate user with current password
+      const credential = EmailAuthProvider.credential(
+        firebaseUser.email,
+        currentPassword
+      );
+
+      await reauthenticateWithCredential(firebaseUser, credential);
+      console.log('✅ Reauthentication successful');
+
+      // Update to new password
+      console.log('🔄 Updating password...');
+      await updatePassword(firebaseUser, newPassword);
+      console.log('✅ Password updated successfully');
+
+      return {
+        success: true,
+        message: 'Password changed successfully',
+      };
+    } catch (error: any) {
+      console.error('❌ Change password error:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+
+      let errorMessage = 'Failed to change password';
+      if (error.code) {
+        switch (error.code) {
+          case 'auth/wrong-password':
+          case 'auth/invalid-credential':
+          case 'auth/invalid-login-credentials':
+            errorMessage = 'Current password is incorrect. Please try again.';
+            break;
+          case 'auth/weak-password':
+            errorMessage =
+              'New password is too weak. Please use a stronger password.';
+            break;
+          case 'auth/requires-recent-login':
+            errorMessage =
+              'For security reasons, please log out and log back in before changing your password.';
+            break;
+          case 'auth/too-many-requests':
+            errorMessage = 'Too many attempts. Please try again later.';
+            break;
+          case 'auth/user-not-found':
+            errorMessage = 'User not found. Please log in again.';
+            break;
+          case 'auth/network-request-failed':
+            errorMessage =
+              'Network error. Please check your connection and try again.';
+            break;
+          default:
+            errorMessage = error.message || 'An unexpected error occurred';
+        }
+      }
+
       return {
         success: false,
-        message:
-          error instanceof Error ? error.message : 'Failed to reset password',
+        message: errorMessage,
       };
+    }
+  };
+
+  const deleteAccount = async (password: string) => {
+    try {
+      if (!password || password.trim().length === 0) {
+        return {
+          success: false,
+          message: 'Please enter your password to confirm account deletion',
+        };
+      }
+
+      console.log('🗑️ Starting account deletion process...');
+
+      const response = await services.auth.deleteAccount(password);
+
+      if (response.success) {
+        console.log('✅ Account deleted successfully');
+        // Clear local user state
+        setUser(null);
+        setFirebaseUser(null);
+        return errorHandler.handle(response);
+      } else {
+        return errorHandler.handle(response);
+      }
+    } catch (error: any) {
+      console.error('❌ Delete account error:', error);
+      return errorHandler.error(
+        'Deletion Failed',
+        error.message || 'Failed to delete account. Please try again.'
+      );
     }
   };
 
   const cleanupOrphanedAuth = async () => {
     try {
       if (!firebaseUser) {
+        errorHandler.error('Cleanup Failed', 'No user currently authenticated');
         return {
           success: false,
           message: 'No user currently authenticated',
@@ -483,6 +675,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (response.success) {
         setUser(null);
         setFirebaseUser(null);
+      } else {
+        errorHandler.error(
+          'Cleanup Failed',
+          response.message || 'Cleanup failed'
+        );
       }
 
       return {
@@ -492,17 +689,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           (response.success ? 'Cleanup successful' : 'Cleanup failed'),
       };
     } catch (error) {
-      console.error('Manual cleanup error:', error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Cleanup failed',
-      };
+      return errorHandler.handle(error, { title: 'Cleanup Error' });
     }
   };
 
   const updateProfile = async (userData: Partial<User>) => {
     try {
       if (!firebaseUser) {
+        errorHandler.error('Update Failed', 'No user currently authenticated');
         return {
           success: false,
           message: 'No user currently authenticated',
@@ -524,17 +718,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         };
       }
 
+      errorHandler.error(
+        'Update Failed',
+        response.message || 'Failed to update profile'
+      );
       return {
         success: false,
         message: response.message || 'Failed to update profile',
       };
     } catch (error) {
-      console.error('Update profile error:', error);
-      return {
-        success: false,
-        message:
-          error instanceof Error ? error.message : 'Failed to update profile',
-      };
+      return errorHandler.handle(error, { title: 'Update Profile Error' });
     }
   };
 
@@ -588,8 +781,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         location: address,
       };
     } catch (error) {
-      console.error('Update location error:', error);
-      return { success: false, message: 'Failed to update location' };
+      return errorHandler.handle(error, { title: 'Location Update Error' });
     }
   };
 
@@ -613,6 +805,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
     forgotPassword,
     resetPassword,
+    changePassword,
+    deleteAccount,
     refreshUserProfile,
     updateProfile,
     updateLocationLive,

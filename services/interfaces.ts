@@ -111,6 +111,7 @@ export interface IAuthService {
     token: string,
     newPassword: string
   ): Promise<ApiResponse<boolean>>;
+  deleteAccount(password: string): Promise<ApiResponse<boolean>>;
   cleanupOrphanedAuth(
     firebaseUser: FirebaseUser
   ): Promise<ApiResponse<boolean>>;

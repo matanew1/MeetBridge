@@ -5,6 +5,7 @@ import { I18nManager } from 'react-native';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { AuthProvider } from '../contexts/AuthContext';
+import GlobalToast from './components/GlobalToast';
 import '../i18n'; // Initialize i18n
 
 export default function RootLayout() {
@@ -23,6 +24,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         </Stack>
         <StatusBar style="dark" />
+        <GlobalToast />
       </AuthProvider>
     </ThemeProvider>
   );

@@ -8,7 +8,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
   ActivityIndicator,
   Dimensions,
 } from 'react-native';
@@ -18,6 +17,7 @@ import { Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import toastService from '../../services/toastService';
 
 // Platform check helper
 const isWeb = Platform.OS === 'web';
@@ -42,19 +42,19 @@ const RegisterScreen = () => {
 
   const validateForm = () => {
     if (!formData.email.trim()) {
-      Alert.alert('Error', 'Please enter your email');
+      toastService.error('Error', 'Please enter your email');
       return false;
     }
     if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
+      toastService.error('Error', 'Please enter a valid email address');
       return false;
     }
     if (formData.password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters long');
+      toastService.error('Error', 'Password must be at least 6 characters long');
       return false;
     }
     if (formData.password !== formData.confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      toastService.error('Error', 'Passwords do not match');
       return false;
     }
     return true;
@@ -89,21 +89,16 @@ const RegisterScreen = () => {
 
       const result = await register(userData);
       if (result.success) {
-        Alert.alert(
+        toastService.success(
           'Success',
-          "Account created successfully! Let's set up your profile.",
-          [
-            {
-              text: 'Continue',
-              onPress: () => router.replace('/auth/complete-profile'),
-            },
-          ]
+          "Account created successfully! Let's set up your profile."
         );
+        router.replace('/auth/complete-profile');
       } else {
-        Alert.alert('Registration Failed', result.message);
+        toastService.error('Registration Failed', result.message);
       }
     } catch (error) {
-      Alert.alert('Error', 'An unexpected error occurred');
+      toastService.error('Error', 'An unexpected error occurred');
     } finally {
       setIsLoading(false);
     }

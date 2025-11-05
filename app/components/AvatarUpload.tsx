@@ -5,13 +5,13 @@ import {
   TouchableOpacity,
   Image,
   StyleSheet,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { Camera, Upload, User } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
+import { toastService } from '../../services/toastService';
 
 interface AvatarUploadProps {
   currentImage?: string;
@@ -33,10 +33,9 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({
   const requestPermissions = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert(
+      toastService.warning(
         'Permission Required',
-        'Please grant camera roll permissions to upload photos.',
-        [{ text: 'OK' }]
+        'Please grant camera roll permissions to upload photos.'
       );
       return false;
     }
@@ -64,7 +63,7 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image. Please try again.');
+      toastService.error('Error', 'Failed to pick image. Please try again.');
     } finally {
       setIsUploading(false);
     }
@@ -73,10 +72,9 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert(
+      toastService.warning(
         'Permission Required',
-        'Please grant camera permissions to take photos.',
-        [{ text: 'OK' }]
+        'Please grant camera permissions to take photos.'
       );
       return;
     }
@@ -97,22 +95,16 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({
       }
     } catch (error) {
       console.error('Error taking photo:', error);
-      Alert.alert('Error', 'Failed to take photo. Please try again.');
+      toastService.error('Error', 'Failed to take photo. Please try again.');
     } finally {
       setIsUploading(false);
     }
   };
 
   const showImageOptions = () => {
-    Alert.alert(
-      'Select Photo',
-      'Choose how you want to add your photo',
-      [
-        { text: 'Camera', onPress: takePhoto },
-        { text: 'Photo Library', onPress: pickImage },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
+    // Since toast doesn't support action buttons, we'll directly call pickImage
+    // Users can use the camera icon to access camera functionality
+    pickImage();
   };
 
   return (

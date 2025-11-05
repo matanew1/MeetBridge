@@ -16,6 +16,7 @@ import OnboardingTutorial from '../components/OnboardingTutorial';
 import { User } from '../../store/types';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CheckCircle, Sparkles } from 'lucide-react-native';
+import toastService from '../../services/toastService';
 
 export default function CompleteProfileScreen() {
   const { user, updateProfile } = useAuth();
@@ -41,11 +42,11 @@ export default function CompleteProfileScreen() {
         // Show tutorial after profile completion
         setShowTutorial(true);
       } else {
-        Alert.alert('Error', result.message || 'Failed to save profile');
+        toastService.error('Error', result.message || 'Failed to save profile');
       }
     } catch (error) {
       console.error('Error saving profile:', error);
-      Alert.alert('Error', 'An unexpected error occurred');
+      toastService.error('Error', 'An unexpected error occurred');
     }
   };
 
@@ -64,10 +65,9 @@ export default function CompleteProfileScreen() {
   };
 
   const handleCloseModal = () => {
-    Alert.alert(
+    toastService.warning(
       'Profile Required',
-      'Please complete your profile to continue using MeetBridge. This helps other users get to know you better!',
-      [{ text: 'OK' }]
+      'Please complete your profile to continue using MeetBridge. This helps other users get to know you better!'
     );
   };
 

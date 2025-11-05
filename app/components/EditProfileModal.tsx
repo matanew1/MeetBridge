@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import toastService from '../../services/toastService';
 import {
   X,
   Save,
@@ -103,10 +104,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           // No need to refresh here as it causes infinite loops
         } catch (error) {
           console.error('Error loading user profile:', error);
-          Alert.alert(
-            'Error',
-            'Failed to load profile data. Please try again.'
-          );
+          toastService.error('Error', 'Failed to load profile data. Please try again.');
         } finally {
           setIsLoading(false);
         }
@@ -175,12 +173,12 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     setIsSaving(true);
     try {
       if (!formData.name.trim()) {
-        Alert.alert('Error', 'Name is required');
+        toastService.error('Error', 'Name is required');
         return;
       }
 
       if (!formData.dateOfBirth) {
-        Alert.alert('Error', 'Date of birth is required');
+        toastService.error('Error', 'Date of birth is required');
         return;
       }
 
@@ -192,17 +190,14 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
       // Validate the date is valid
       if (isNaN(dobDate.getTime())) {
-        Alert.alert(
-          'Error',
-          'Invalid date of birth. Please select a valid date.'
-        );
+        toastService.error('Error', 'Invalid date of birth. Please select a valid date.');
         return;
       }
 
       // Check if user is at least 18 years old
       const age = calculateAge(dobDate);
       if (age === null || age < 18) {
-        Alert.alert('Error', 'You must be at least 18 years old');
+        toastService.error('Error', 'You must be at least 18 years old');
         return;
       }
 
@@ -223,17 +218,11 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
             console.log('✅ Got location for profile:', coordinates);
           } else {
             console.warn('⚠️ Could not get location for profile completion');
-            Alert.alert(
-              'Location Warning',
-              'We could not get your location. You can still save your profile, but you may not see nearby users until location is available.'
-            );
+            toastService.warn('Location Warning', 'We could not get your location. You can still save your profile, but you may not see nearby users until location is available.');
           }
         } catch (error) {
           console.error('Error getting location:', error);
-          Alert.alert(
-            'Location Error',
-            'There was an error getting your location. Please check your location permissions.'
-          );
+          toastService.error('Location Error', 'There was an error getting your location. Please check your location permissions.');
         }
       }
 
@@ -257,7 +246,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       onClose();
     } catch (error) {
       console.error('Error saving profile:', error);
-      Alert.alert('Error', 'Failed to save profile. Please try again.');
+      toastService.error('Error', 'Failed to save profile. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -290,7 +279,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const pickAdditionalImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert(
+      toastService.error(
         'Permission Required',
         'Please grant camera roll permissions to upload photos.'
       );
@@ -313,7 +302,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
         }));
       }
     } catch {
-      Alert.alert('Error', 'Failed to pick image');
+      toastService.error('Error', 'Failed to pick image');
     }
   };
 

@@ -19,6 +19,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import toastService from '../../services/toastService';
 
 // Platform check helper
 const isWeb = Platform.OS === 'web';
@@ -37,12 +38,12 @@ const ForgotPasswordScreen = () => {
 
   const handleForgotPassword = async () => {
     if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email address');
+      toastService.error('Error', 'Please enter your email address');
       return;
     }
 
     if (!/\S+@\S+\.\S+/.test(email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
+      toastService.error('Error', 'Please enter a valid email address');
       return;
     }
 
@@ -51,12 +52,12 @@ const ForgotPasswordScreen = () => {
       const result = await forgotPassword(email.trim());
       if (result.success) {
         setEmailSent(true);
-        Alert.alert('Success', result.message, [{ text: 'OK' }]);
+        toastService.success('Success', result.message);
       } else {
-        Alert.alert('Error', result.message);
+        toastService.error('Error', result.message);
       }
     } catch (error) {
-      Alert.alert('Error', 'An unexpected error occurred');
+      toastService.error('Error', 'An unexpected error occurred');
     } finally {
       setIsLoading(false);
     }

@@ -330,10 +330,7 @@ export default function ChatScreen() {
               // Update store directly with real-time data
               useUserStore.setState({ conversations: conversationsData });
             } catch (error) {
-              console.error(
-                '❌ Error processing conversation snapshot:',
-                error
-              );
+              // Error processing conversation snapshot
             }
           },
           (error: any) => {
@@ -343,7 +340,7 @@ export default function ChatScreen() {
               );
               return;
             }
-            console.error('❌ Error in conversation listener:', error);
+            // Error in conversation listener
           }
         );
       };
@@ -444,7 +441,7 @@ export default function ChatScreen() {
         }),
       ]).start();
     } catch (error) {
-      console.error('❌ Error in chat screen useEffect:', error);
+      // Error in chat screen useEffect
       setChats([]);
     }
   }, [

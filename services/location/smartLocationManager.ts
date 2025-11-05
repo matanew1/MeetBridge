@@ -13,6 +13,7 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import {
   LocationCoordinates,
   LocationCache,
@@ -28,6 +29,9 @@ import geohashService from './geohashService';
 
 // Background location task name
 const BACKGROUND_LOCATION_TASK = 'background-location-task';
+
+// Check if we're on web platform (background location not supported)
+const isWeb = Platform.OS === 'web';
 
 // Define background location task
 TaskManager.defineTask(
@@ -589,6 +593,14 @@ class SmartLocationManager {
    */
   async startBackgroundTracking(userId: string): Promise<boolean> {
     try {
+      // Background location is not supported on web
+      if (isWeb) {
+        console.log(
+          '⚠️ Background location tracking not supported on web platform'
+        );
+        return false;
+      }
+
       // Check if background location is already running
       const hasStarted = await Location.hasStartedLocationUpdatesAsync(
         BACKGROUND_LOCATION_TASK
@@ -642,6 +654,11 @@ class SmartLocationManager {
    */
   async stopBackgroundTracking(): Promise<void> {
     try {
+      // Background location is not supported on web
+      if (isWeb) {
+        return;
+      }
+
       const hasStarted = await Location.hasStartedLocationUpdatesAsync(
         BACKGROUND_LOCATION_TASK
       );
