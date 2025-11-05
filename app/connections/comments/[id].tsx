@@ -11,7 +11,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
-  Alert,
   Image,
   ActivityIndicator,
   Keyboard,
@@ -173,20 +172,25 @@ export default function CommentsScreen() {
       useNativeDriver: true,
     }).start();
 
-    // Keyboard listeners
-    const keyboardWillShow = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (e) => {
-        setKeyboardHeight(e.endCoordinates.height);
-      }
-    );
+    // Keyboard listeners - skip on web platform
+    let keyboardWillShow: any;
+    let keyboardWillHide: any;
 
-    const keyboardWillHide = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => {
-        setKeyboardHeight(0);
-      }
-    );
+    if (Platform.OS !== 'web') {
+      keyboardWillShow = Keyboard.addListener(
+        Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+        (e) => {
+          setKeyboardHeight(e.endCoordinates.height);
+        }
+      );
+
+      keyboardWillHide = Keyboard.addListener(
+        Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+        () => {
+          setKeyboardHeight(0);
+        }
+      );
+    }
 
     // Set up real-time listener for comments
     const unsubscribe = missedConnectionsService.subscribeToComments(
@@ -200,8 +204,10 @@ export default function CommentsScreen() {
       if (unsubscribe) {
         unsubscribe();
       }
-      keyboardWillShow.remove();
-      keyboardWillHide.remove();
+      if (Platform.OS !== 'web') {
+        keyboardWillShow?.remove();
+        keyboardWillHide?.remove();
+      }
     };
   }, [id]);
 
@@ -275,7 +281,10 @@ export default function CommentsScreen() {
 
   const handleClaimConnection = async () => {
     if (!isAuthenticated) {
-      toastService.error('Sign In Required', 'Please sign in to claim this connection.');
+      toastService.error(
+        'Sign In Required',
+        'Please sign in to claim this connection.'
+      );
       return;
     }
 

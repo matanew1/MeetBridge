@@ -12,7 +12,8 @@
 
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// [SECURITY FIX] Import secure storage service instead of direct AsyncStorage
+import { secureStorageService } from '../secureStorageService';
 import { Platform } from 'react-native';
 import {
   LocationCoordinates,
@@ -53,7 +54,10 @@ TaskManager.defineTask(
 
         // Update location in Firebase
         try {
-          const userId = await AsyncStorage.getItem('@current_user_id');
+          // [SECURITY FIX] Use secure storage service for user ID
+          const userId = await secureStorageService.getItem<string>(
+            '@current_user_id'
+          );
           if (userId) {
             const { doc, updateDoc } = require('firebase/firestore');
             const { db } = require('../firebase/config');
@@ -63,16 +67,28 @@ TaskManager.defineTask(
               9
             );
 
-            await updateDoc(doc(db, 'users', userId), {
-              coordinates: {
-                latitude: location.coords.latitude,
-                longitude: location.coords.longitude,
-              },
-              geohash,
-              lastLocationUpdate: new Date(),
-            });
+            // [SECURITY] Validate coordinates before updating
+            if (
+              !isNaN(location.coords.latitude) &&
+              !isNaN(location.coords.longitude) &&
+              location.coords.latitude >= -90 &&
+              location.coords.latitude <= 90 &&
+              location.coords.longitude >= -180 &&
+              location.coords.longitude <= 180
+            ) {
+              await updateDoc(doc(db, 'users', userId), {
+                coordinates: {
+                  latitude: location.coords.latitude,
+                  longitude: location.coords.longitude,
+                },
+                geohash,
+                lastLocationUpdate: new Date(),
+              });
 
-            console.log('✅ Background location updated in Firebase');
+              console.log('✅ Background location updated in Firebase');
+            } else {
+              console.error('❌ Invalid coordinates, skipping update');
+            }
           }
         } catch (err) {
           console.error('❌ Error updating background location:', err);
@@ -158,14 +174,18 @@ class SmartLocationManager {
    */
   private async loadPersistedData(): Promise<void> {
     try {
+      // [SECURITY FIX] Use secure storage service (location data is non-sensitive, routes to AsyncStorage)
       const [cachedLocation, history, metrics] = await Promise.all([
-        AsyncStorage.getItem(STORAGE_KEYS.LAST_LOCATION),
-        AsyncStorage.getItem(STORAGE_KEYS.LOCATION_HISTORY),
-        AsyncStorage.getItem(STORAGE_KEYS.METRICS),
+        secureStorageService.getItem<string>(STORAGE_KEYS.LAST_LOCATION),
+        secureStorageService.getItem<string>(STORAGE_KEYS.LOCATION_HISTORY),
+        secureStorageService.getItem<string>(STORAGE_KEYS.METRICS),
       ]);
 
       if (cachedLocation) {
-        this.locationCache = JSON.parse(cachedLocation);
+        this.locationCache =
+          typeof cachedLocation === 'string'
+            ? JSON.parse(cachedLocation)
+            : cachedLocation;
 
         // Check if cache is still valid
         if (this.locationCache && Date.now() < this.locationCache.expiresAt) {
@@ -177,11 +197,13 @@ class SmartLocationManager {
       }
 
       if (history) {
-        this.locationHistory = JSON.parse(history);
+        this.locationHistory =
+          typeof history === 'string' ? JSON.parse(history) : history;
       }
 
       if (metrics) {
-        this.metrics = JSON.parse(metrics);
+        this.metrics =
+          typeof metrics === 'string' ? JSON.parse(metrics) : metrics;
       }
     } catch (error) {
       console.error('Error loading persisted location data:', error);
@@ -193,28 +215,29 @@ class SmartLocationManager {
    */
   private async persistData(): Promise<void> {
     try {
-      const promises: Promise<void>[] = [];
+      // [SECURITY FIX] Use secure storage service
+      const promises: Promise<boolean>[] = [];
 
       if (this.locationCache) {
         promises.push(
-          AsyncStorage.setItem(
+          secureStorageService.setItem(
             STORAGE_KEYS.LAST_LOCATION,
-            JSON.stringify(this.locationCache)
+            this.locationCache
           )
         );
       }
 
       if (this.locationHistory.length > 0) {
         promises.push(
-          AsyncStorage.setItem(
+          secureStorageService.setItem(
             STORAGE_KEYS.LOCATION_HISTORY,
-            JSON.stringify(this.locationHistory)
+            this.locationHistory
           )
         );
       }
 
       promises.push(
-        AsyncStorage.setItem(STORAGE_KEYS.METRICS, JSON.stringify(this.metrics))
+        secureStorageService.setItem(STORAGE_KEYS.METRICS, this.metrics)
       );
 
       await Promise.all(promises);
@@ -611,8 +634,8 @@ class SmartLocationManager {
         return true;
       }
 
-      // Store user ID for background task
-      await AsyncStorage.setItem('@current_user_id', userId);
+      // [SECURITY FIX] Store user ID securely for background task
+      await secureStorageService.setItem('@current_user_id', userId);
 
       // Start background location updates
       await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
@@ -678,7 +701,10 @@ class SmartLocationManager {
   async stopTracking(): Promise<void> {
     if (this.locationWatcher) {
       try {
-        this.locationWatcher.remove();
+        // Check if remove method exists (native platforms)
+        if (typeof this.locationWatcher.remove === 'function') {
+          this.locationWatcher.remove();
+        }
         console.log('✅ Location tracking stopped');
       } catch (error) {
         console.error('Error stopping location tracking:', error);

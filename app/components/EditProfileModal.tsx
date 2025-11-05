@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
-  Alert,
   Image,
   ActivityIndicator,
   Platform,
@@ -104,7 +103,10 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           // No need to refresh here as it causes infinite loops
         } catch (error) {
           console.error('Error loading user profile:', error);
-          toastService.error('Error', 'Failed to load profile data. Please try again.');
+          toastService.error(
+            'Error',
+            'Failed to load profile data. Please try again.'
+          );
         } finally {
           setIsLoading(false);
         }
@@ -190,7 +192,10 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
       // Validate the date is valid
       if (isNaN(dobDate.getTime())) {
-        toastService.error('Error', 'Invalid date of birth. Please select a valid date.');
+        toastService.error(
+          'Error',
+          'Invalid date of birth. Please select a valid date.'
+        );
         return;
       }
 
@@ -218,11 +223,17 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
             console.log('✅ Got location for profile:', coordinates);
           } else {
             console.warn('⚠️ Could not get location for profile completion');
-            toastService.warn('Location Warning', 'We could not get your location. You can still save your profile, but you may not see nearby users until location is available.');
+            toastService.warn(
+              'Location Warning',
+              'We could not get your location. You can still save your profile, but you may not see nearby users until location is available.'
+            );
           }
         } catch (error) {
           console.error('Error getting location:', error);
-          toastService.error('Location Error', 'There was an error getting your location. Please check your location permissions.');
+          toastService.error(
+            'Location Error',
+            'There was an error getting your location. Please check your location permissions.'
+          );
         }
       }
 

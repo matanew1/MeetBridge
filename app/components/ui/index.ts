@@ -27,6 +27,3 @@ export {
 export type { ButtonVariant, ButtonSize } from './Button';
 export type { CardVariant } from './Card';
 export type { AvatarSize } from './Avatar';
-
-const Dummy = () => null;
-export default Dummy;

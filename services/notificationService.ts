@@ -255,6 +255,12 @@ class NotificationService {
     channelId: string = 'default'
   ) {
     try {
+      // Skip on web platform - notifications are not supported
+      if (Platform.OS === 'web') {
+        console.log('📱 Notifications not available on web platform');
+        return;
+      }
+
       if (!this.settings.enabled) {
         console.log('Notifications disabled, skipping local notification');
         return;

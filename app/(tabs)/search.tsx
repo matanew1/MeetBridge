@@ -27,6 +27,7 @@ import {
 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -448,6 +449,17 @@ export default function SearchScreen() {
       });
     }
   }, [sortedDiscoverProfiles]);
+
+  // ⚡ ALWAYS refresh profiles when search tab is focused - NO CACHE
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🔄 Search tab focused - refreshing profiles from Firebase');
+      if (currentUser && isAuthenticated) {
+        // Always fetch fresh data when tab is focused
+        loadDiscoverProfiles(true);
+      }
+    }, [currentUser, isAuthenticated, loadDiscoverProfiles])
+  );
 
   // Track if we've already loaded profiles to avoid redundant calls
   const profilesLoadedRef = useRef(false);

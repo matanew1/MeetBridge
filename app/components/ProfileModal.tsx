@@ -366,21 +366,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               {user.name || 'Unknown User'}
             </Text>
 
-            <View style={styles.statusContainer}>
-              <View style={styles.statusItem}>
-                <View
-                  style={[
-                    styles.statusDot,
-                    {
-                      backgroundColor: user.isOnline
-                        ? '#4CAF50'
-                        : theme.textSecondary,
-                    },
-                  ]}
-                />
-              </View>
-            </View>
-
             <Text style={[styles.userAge, { color: theme.textSecondary }]}>
               {typeof user.age === 'number'
                 ? `${user.age} years old`

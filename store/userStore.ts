@@ -376,28 +376,8 @@ export const useUserStore = create<UserState>((set, get) => ({
     try {
       const page = refresh ? 1 : get().currentPage;
 
-      // Use cache for first page only
-      const cacheKey =
-        page === 1 ? `discoverProfiles_${JSON.stringify(searchFilters)}` : null;
-
-      // Clear cache if refresh is requested
-      if (refresh && cacheKey) {
-        console.log('🗑️ Clearing discover profiles cache on refresh');
-        cacheService.delete(cacheKey);
-      }
-
-      if (cacheKey && !refresh) {
-        const cached = cacheService.get<UserProfile[]>(cacheKey);
-        if (cached) {
-          set({
-            discoverProfiles: cached,
-            hasMoreProfiles: true,
-            currentPage: page,
-            isLoadingDiscover: false,
-          });
-          return;
-        }
-      }
+      // ⚡ ALWAYS FETCH FRESH DATA - NO CACHE for search/discovery
+      console.log('� Fetching fresh profiles from Firebase (no cache)');
 
       const response = await discoveryService.getDiscoverProfiles(
         searchFilters,
@@ -430,15 +410,6 @@ export const useUserStore = create<UserState>((set, get) => ({
             currentPage: page,
           };
         });
-
-        // Cache only first page results
-        if (page === 1 && cacheKey) {
-          cacheService.set(
-            cacheKey,
-            sortedProfiles,
-            CACHE_TTL.DISCOVER_PROFILES
-          );
-        }
       } else {
         set({ error: response.message || 'Failed to load profiles' });
       }
@@ -819,9 +790,6 @@ export const useUserStore = create<UserState>((set, get) => ({
       set((state) => ({
         conversations: [newConversation, ...state.conversations],
       }));
-
-      // Invalidate conversations cache
-      cacheService.invalidateByPrefix('conversations_');
 
       console.log('🔴 Conversation created:', conversationRef.id);
     } catch (error) {

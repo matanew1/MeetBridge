@@ -2,9 +2,12 @@
     "rules": {
         "presence": {
             "$uid": {
-                ".read": true,
-                ".write": "$uid === auth.uid"
+                ".read": "auth != null",
+                ".write": "auth != null && $uid === auth.uid",
+                ".validate": "newData.hasChildren(['isOnline', 'lastSeen']) && newData.child('isOnline').isBoolean() && newData.child('lastSeen').isNumber()"
             }
-        }
+        },
+        ".read": false,
+        ".write": false
     }
 }

@@ -6,7 +6,6 @@ import {
   FlatList,
   Image,
   TouchableOpacity,
-  Alert,
   Animated,
   ListRenderItemInfo,
 } from 'react-native';
@@ -17,7 +16,6 @@ import { useUserStore } from '../../store';
 import ProfileDetail from '../components/ProfileDetail';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
-import '../../i18n';
 
 interface LikedProfileCardProps {
   user: {

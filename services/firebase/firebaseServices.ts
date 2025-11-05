@@ -1,4 +1,5 @@
 // services/firebase/firebaseServices.ts
+// [SECURITY FIX] Added input sanitization throughout
 import {
   collection,
   doc,
@@ -49,6 +50,23 @@ import storageService from '../storageService';
 import { geohashService, firestoreGeoHelper } from '../location';
 import notificationService from '../notificationService';
 import { calculateZodiacSign } from '../../utils/dateUtils';
+// [SECURITY FIX] Import sanitization utilities
+import {
+  sanitizeString,
+  sanitizeEmail,
+  sanitizeUserId,
+  sanitizeNumber,
+  sanitizeCoordinates,
+  sanitizeUrl,
+  sanitizeObjectKeys,
+  sanitizeStringArray,
+  sanitizeAge,
+  sanitizeDisplayName,
+  sanitizeBio,
+  sanitizeDocumentId,
+  sanitizeSearchQuery,
+  checkRateLimit,
+} from '../../utils/inputSanitizer';
 
 // ============================================
 // Utility Functions
@@ -102,7 +120,54 @@ export class FirebaseUserProfileService implements IUserProfileService {
       const user = auth.currentUser;
       if (!user) throw new Error('No user logged in');
 
+      // [SECURITY FIX] Sanitize user input before updating
       const dataToUpdate: Record<string, any> = { ...userData };
+
+      // Sanitize string fields
+      if (dataToUpdate.displayName) {
+        dataToUpdate.displayName = sanitizeDisplayName(
+          dataToUpdate.displayName
+        );
+        if (!dataToUpdate.displayName) {
+          throw new Error('Invalid display name');
+        }
+      }
+
+      if (dataToUpdate.bio) {
+        dataToUpdate.bio = sanitizeBio(dataToUpdate.bio, 500);
+      }
+
+      if (dataToUpdate.age !== undefined) {
+        const sanitizedAge = sanitizeAge(dataToUpdate.age);
+        if (sanitizedAge === null) {
+          throw new Error('Invalid age');
+        }
+        dataToUpdate.age = sanitizedAge;
+      }
+
+      // [SECURITY] Sanitize coordinates
+      if (dataToUpdate.coordinates) {
+        const coords = sanitizeCoordinates(
+          dataToUpdate.coordinates.latitude,
+          dataToUpdate.coordinates.longitude
+        );
+        if (!coords) {
+          throw new Error('Invalid coordinates');
+        }
+        dataToUpdate.coordinates = coords;
+      }
+
+      // [SECURITY] Sanitize interests array
+      if (Array.isArray(dataToUpdate.interests)) {
+        dataToUpdate.interests = sanitizeStringArray(
+          dataToUpdate.interests,
+          50,
+          20
+        );
+      }
+
+      // [SECURITY] Sanitize object keys to prevent prototype pollution
+      dataToUpdate = sanitizeObjectKeys(dataToUpdate) as Record<string, any>;
 
       // Handle image upload if it's a local file
       if (
@@ -299,6 +364,7 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
     page: number = 1
   ): Promise<ApiResponse<User[]>> {
     try {
+      console.log('🔥 FETCHING FRESH DATA FROM FIREBASE - NO CACHE');
       const pageSize = 20;
       const currentUserId = auth.currentUser?.uid;
 
@@ -320,6 +386,7 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
       console.log('📍 Current user location:', userLocation);
       console.log('👤 Current user preferences:', currentUserData.preferences);
       console.log('✅ Is profile complete?', currentUserData.isProfileComplete);
+      console.log('🎯 Search filters:', filters);
 
       if (!userLocation?.latitude || !userLocation?.longitude) {
         console.warn('User location not set');
@@ -1137,53 +1204,24 @@ export class FirebaseMatchingService implements IMatchingService {
         batch.delete(doc(db, 'conversations', conversationId));
       }
 
-      // Update existing like interactions to dislike with 24h expiration
+      // Delete existing interactions instead of converting to dislike
+      // This allows users to see each other again immediately after unmatch
       const existingInteractionsQuery = query(
         collection(db, 'interactions'),
         where('userId', 'in', [userId, targetUserId]),
-        where('targetUserId', 'in', [userId, targetUserId]),
-        where('type', '==', 'like')
+        where('targetUserId', 'in', [userId, targetUserId])
       );
       const existingInteractionsSnapshot = await getDocs(
         existingInteractionsQuery
       );
 
       existingInteractionsSnapshot.docs.forEach((interactionDoc) => {
-        const expiresAt = new Date();
-        expiresAt.setHours(expiresAt.getHours() + 24);
-
-        batch.update(interactionDoc.ref, {
-          type: 'dislike',
-          createdAt: serverTimestamp(),
-          expiresAt,
-        });
-      });
-
-      // Create 24h dislike blocks (in case no existing interactions)
-      const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + 24);
-
-      const interaction1Ref = doc(collection(db, 'interactions'));
-      batch.set(interaction1Ref, {
-        userId,
-        targetUserId,
-        type: 'dislike',
-        createdAt: serverTimestamp(),
-        expiresAt,
-      });
-
-      const interaction2Ref = doc(collection(db, 'interactions'));
-      batch.set(interaction2Ref, {
-        userId: targetUserId,
-        targetUserId: userId,
-        type: 'dislike',
-        createdAt: serverTimestamp(),
-        expiresAt,
+        batch.delete(interactionDoc.ref);
       });
 
       await batch.commit();
 
-      console.log('✅ Unmatch complete');
+      console.log('✅ Unmatch complete - interactions deleted');
 
       return {
         data: true,

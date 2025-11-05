@@ -19,7 +19,7 @@ import {
   Platform,
   Dimensions,
   Modal,
-  // Alert, // Removed Alert import
+  Keyboard,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
@@ -47,6 +47,7 @@ import ProfileDetail from '../components/ProfileDetail';
 import { usePresence } from '../../hooks/usePresence';
 import notificationService from '../../services/notificationService';
 import toastService from '../../services/toastService'; // Added toastService import
+import IcebreakerSuggestions from '../components/IcebreakerSuggestions';
 
 const { width } = Dimensions.get('window');
 
@@ -219,6 +220,7 @@ const ChatScreen = () => {
   const [heartAnimation, setHeartAnimation] = useState(false);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [showIcebreakers, setShowIcebreakers] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
   const previousMessageCountRef = useRef(0);
@@ -365,6 +367,12 @@ const ChatScreen = () => {
 
   // Load message sound effect
   useEffect(() => {
+    // Skip audio on web platform
+    if (Platform.OS === 'web') {
+      console.log('📱 Audio not available on web platform');
+      return;
+    }
+
     const loadSound = async () => {
       try {
         // Check if Audio is available
@@ -419,6 +427,11 @@ const ChatScreen = () => {
 
   // Keyboard listeners for auto-scrolling
   useEffect(() => {
+    // Skip keyboard listeners on web platform
+    if (Platform.OS === 'web') {
+      return;
+    }
+
     const keyboardWillShow = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
       (e) => {
@@ -632,7 +645,7 @@ const ChatScreen = () => {
           }
 
           toastService.show(t('chat.unmatchTitle'), t('chat.unmatchDetected')); // Replaced Alert.alert with toastService.show
-          
+
           return;
         }
 
@@ -739,6 +752,15 @@ const ChatScreen = () => {
       unsubscribe();
     };
   }, [otherUserId]);
+
+  // Show icebreakers for empty conversations
+  useEffect(() => {
+    if (messages.length === 0 && currentUser && otherUser) {
+      setShowIcebreakers(true);
+    } else {
+      setShowIcebreakers(false);
+    }
+  }, [messages.length, currentUser, otherUser]);
 
   // Memoized animation styles
   const headerStyle = useAnimatedStyle(
@@ -1012,6 +1034,19 @@ const ChatScreen = () => {
             minIndexForVisible: 0,
           }}
         />
+
+        {/* Icebreaker Suggestions - show only for empty chats */}
+        {showIcebreakers && currentUser && otherUser && (
+          <IcebreakerSuggestions
+            currentUser={currentUser}
+            matchedUser={otherUser}
+            onSelectIcebreaker={(text) => {
+              setInputText(text);
+              setShowIcebreakers(false);
+            }}
+            visible={showIcebreakers}
+          />
+        )}
 
         {/* Input */}
         <Animated.View
