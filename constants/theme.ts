@@ -48,6 +48,9 @@ export const lightTheme = {
   success: '#10B981',
   successBackground: '#D1FAE5',
   successLight: '#6EE7B7',
+
+  // Theme mode
+  isDark: false,
   warning: '#F59E0B',
   warningBackground: '#FEF3C7',
   warningLight: '#FCD34D',
@@ -245,6 +248,9 @@ export const darkTheme = {
   text: '#E5E5E5',
   textSecondary: '#A1A1A1',
   textTertiary: '#737373',
+
+  // Theme mode
+  isDark: true,
   textOnPrimary: '#000000',
   textOnDark: '#FFFFFF',
 

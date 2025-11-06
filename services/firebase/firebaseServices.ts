@@ -121,7 +121,7 @@ export class FirebaseUserProfileService implements IUserProfileService {
       if (!user) throw new Error('No user logged in');
 
       // [SECURITY FIX] Sanitize user input before updating
-      const dataToUpdate: Record<string, any> = { ...userData };
+      let dataToUpdate: Record<string, any> = { ...userData };
 
       // Sanitize string fields
       if (dataToUpdate.displayName) {

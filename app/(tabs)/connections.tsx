@@ -1265,7 +1265,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 24,
   },
-  title: { fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
+  title: { fontSize: 24, fontWeight: '700', letterSpacing: -0.5 },
   headerIcons: { flexDirection: 'row', gap: 10 },
   iconButton: {
     width: 48,

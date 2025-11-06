@@ -24,6 +24,8 @@ import {
   SlidersVertical,
   RefreshCw,
   ChevronDown,
+  Map,
+  Grid3x3,
 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
@@ -44,6 +46,7 @@ import MatchModal from '../components/MatchModal';
 import FilterModal from '../components/FilterModal';
 import DiscoveryAnimation from '../components/DiscoveryAnimation';
 import EnhancedMatchAnimation from '../components/EnhancedMatchAnimation';
+import MapViewComponent from '../components/MapViewComponent';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { lightTheme, darkTheme, Theme } from '../../constants/theme';
@@ -299,6 +302,7 @@ export default function SearchScreen() {
     matchId: string;
     conversationId?: string;
   } | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid'); // New state for view toggle
 
   // Local state to track cards being animated out
   const [animatingOutCards, setAnimatingOutCards] = useState<Set<string>>(
@@ -1199,6 +1203,21 @@ export default function SearchScreen() {
           {t('search.title')}
         </Text>
         <View style={styles.headerButtons}>
+          {/* View Mode Toggle */}
+          <TouchableOpacity
+            style={[
+              styles.viewToggleButton,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+            ]}
+            onPress={() => setViewMode(viewMode === 'grid' ? 'map' : 'grid')}
+          >
+            {viewMode === 'grid' ? (
+              <Map size={20} color={theme.primary} />
+            ) : (
+              <Grid3x3 size={20} color={theme.primary} />
+            )}
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={[
               styles.filterButton,
@@ -1266,33 +1285,44 @@ export default function SearchScreen() {
         </Animated.View>
       )}
 
-      <FlatList
-        ref={flatListRef}
-        data={sortedDiscoverProfiles}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        extraData={theme}
-        numColumns={2}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={
-          sortedDiscoverProfiles.length === 0
-            ? { flex: 1 }
-            : styles.flatListContent
-        }
-        columnWrapperStyle={styles.columnWrapper}
-        ListEmptyComponent={ListEmptyComponent}
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={4}
-        updateCellsBatchingPeriod={100}
-        initialNumToRender={4}
-        windowSize={3}
-        getItemLayout={getItemLayout}
-        scrollEventThrottle={16}
-        onScrollBeginDrag={handleScrollBeginDrag}
-        onScrollEndDrag={handleScrollEndDrag}
-        onScroll={handleScroll}
-        onMomentumScrollEnd={handleMomentumScrollEnd}
-      />
+      {/* Conditional rendering: Map View or Grid View */}
+      {viewMode === 'map' ? (
+        <MapViewComponent
+          profiles={sortedDiscoverProfiles}
+          currentUser={currentUser}
+          onProfileSelect={handleProfilePress}
+          maxDistance={maxDistance}
+          theme={theme}
+        />
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={sortedDiscoverProfiles}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          extraData={theme}
+          numColumns={2}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={
+            sortedDiscoverProfiles.length === 0
+              ? { flex: 1 }
+              : styles.flatListContent
+          }
+          columnWrapperStyle={styles.columnWrapper}
+          ListEmptyComponent={ListEmptyComponent}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={4}
+          updateCellsBatchingPeriod={100}
+          initialNumToRender={4}
+          windowSize={3}
+          getItemLayout={getItemLayout}
+          scrollEventThrottle={16}
+          onScrollBeginDrag={handleScrollBeginDrag}
+          onScrollEndDrag={handleScrollEndDrag}
+          onScroll={handleScroll}
+          onMomentumScrollEnd={handleMomentumScrollEnd}
+        />
+      )}
 
       {/* Refreshing Overlay */}
       {refreshing && (
@@ -1437,7 +1467,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
     letterSpacing: -0.5,
   },
@@ -1451,6 +1481,18 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   filterButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  viewToggleButton: {
     width: 48,
     height: 48,
     borderRadius: 16,
