@@ -406,6 +406,10 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
       console.log(
         `🚫 Excluded users - Interacted: ${interactedIds.size}, Matched: ${matchedIds.size}`
       );
+      console.log(
+        `🚫 Interacted IDs: ${JSON.stringify(Array.from(interactedIds))}`
+      );
+      console.log(`🚫 Matched IDs: ${JSON.stringify(Array.from(matchedIds))}`);
 
       // Get query bounds using new geohash service
       const bounds = geohashService.getGeohashesInBounds(
@@ -450,18 +454,26 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
 
         snapshot.forEach((docSnapshot) => {
           const userId = docSnapshot.id;
+          const data = { ...docSnapshot.data(), id: userId };
+
+          console.log(
+            `👤 Found candidate: ${data.displayName || userId} (${userId})`
+          );
 
           if (
             seenIds.has(userId) ||
             interactedIds.has(userId) ||
             matchedIds.has(userId)
           ) {
+            console.log(`🚫 Excluding user ${userId}:`, {
+              alreadySeen: seenIds.has(userId),
+              inInteracted: interactedIds.has(userId),
+              inMatched: matchedIds.has(userId),
+            });
             filteredOutStats.excluded++;
             return;
           }
           seenIds.add(userId);
-
-          const data = { ...docSnapshot.data(), id: userId };
 
           if (!this.validateUserData(data)) {
             filteredOutStats.validation++;
@@ -490,7 +502,21 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
               }
             );
 
+            console.log(
+              `📏 Distance check for ${data.displayName || userId}:`,
+              {
+                distance: distance.toFixed(2) + 'km',
+                maxDistance: filters.maxDistance + 'km',
+                willInclude: distance <= filters.maxDistance,
+              }
+            );
+
             if (distance > filters.maxDistance) {
+              console.log(
+                `🚫 Filtered by distance: ${
+                  data.displayName || userId
+                } (${distance.toFixed(2)}km > ${filters.maxDistance}km)`
+              );
               filteredOutStats.distance++;
               return;
             }

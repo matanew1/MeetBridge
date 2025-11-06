@@ -149,18 +149,36 @@ service cloud.firestore {
     // [SECURITY FIX] Matches - strict access control
     match /matches/{matchId} {
       allow read: if isAuthenticated() && (
-        isOwner(resource.data.user1Id) || isOwner(resource.data.user2Id)
+        isOwner(resource.data.user1) || isOwner(resource.data.user2)
       );
       
       allow create: if isAuthenticated() && (
-        isOwner(request.resource.data.user1Id) || isOwner(request.resource.data.user2Id)
+        isOwner(request.resource.data.user1) || isOwner(request.resource.data.user2)
       );
       
       allow update: if isAuthenticated() && (
-        isOwner(resource.data.user1Id) || isOwner(resource.data.user2Id)
+        isOwner(resource.data.user1) || isOwner(resource.data.user2)
       );
       
       allow delete: if false; // Matches should not be deleted
+    }
+    
+    // [SECURITY FIX] Interactions - track likes, dislikes, winks
+    match /interactions/{interactionId} {
+      // [SECURITY] Users can read their own interactions
+      allow read: if isAuthenticated() && isOwner(resource.data.userId);
+      
+      // [SECURITY] Validate interaction creation
+      allow create: if isAuthenticated()
+        && isOwner(request.resource.data.userId)
+        && request.resource.data.type in ['like', 'dislike', 'wink']
+        && request.resource.data.keys().hasAll(['userId', 'targetUserId', 'type', 'createdAt']);
+      
+      // [SECURITY] Users can update their own interactions (for expiration cleanup)
+      allow update: if isAuthenticated() && isOwner(resource.data.userId);
+      
+      // [SECURITY] Users can delete their own interactions (for cleanup)
+      allow delete: if isAuthenticated() && isOwner(resource.data.userId);
     }
     
     // [SECURITY FIX] Reports - one-way write only

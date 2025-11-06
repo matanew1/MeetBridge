@@ -310,7 +310,7 @@ class GeohashService {
       [coord1.latitude, coord1.longitude],
       [coord2.latitude, coord2.longitude]
     );
-    return distanceKm * 1000;
+    return distanceKm; // Return in kilometers, not meters
   }
 
   /**

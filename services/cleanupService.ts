@@ -52,40 +52,11 @@ class CleanupService {
    * Cleanup expired interactions
    */
   async cleanupExpiredInteractions(): Promise<number> {
-    try {
-      console.log('🧹 Running cleanup of expired interactions...');
-
-      const now = Timestamp.now();
-      const interactionsRef = collection(db, 'interactions');
-
-      // Query for interactions with expiresAt field that have expired
-      const expiredQuery = query(
-        interactionsRef,
-        where('expiresAt', '<=', now),
-        where('type', '==', 'dislike')
-      );
-
-      const snapshot = await getDocs(expiredQuery);
-
-      if (snapshot.empty) {
-        console.log('✅ No expired interactions to clean up');
-        return 0;
-      }
-
-      // Batch delete expired interactions
-      const batch = writeBatch(db);
-      snapshot.docs.forEach((doc) => {
-        batch.delete(doc.ref);
-      });
-
-      await batch.commit();
-
-      console.log(`✅ Cleaned up ${snapshot.size} expired interaction(s)`);
-      return snapshot.size;
-    } catch (error) {
-      console.error('❌ Error cleaning up expired interactions:', error);
-      return 0;
-    }
+    // Note: Cleanup is now handled per-user in firebaseServices.getInteractedUserIds()
+    // This prevents permission issues with global queries
+    // Each user's expired interactions are cleaned up when they fetch discovery profiles
+    console.log('✅ Cleanup handled per-user basis (no global cleanup needed)');
+    return 0;
   }
 
   /**
