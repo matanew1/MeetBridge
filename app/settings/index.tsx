@@ -191,7 +191,7 @@ const Settings: React.FC = () => {
     try {
       const result = await deleteAccount(password);
 
-      if (result.success) {
+      if (result?.success) {
         setShowDeleteAccount(false);
         toastService.success(
           'Account Deleted',

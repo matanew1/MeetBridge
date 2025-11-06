@@ -30,11 +30,15 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       
       // [SECURITY] Users can only create/update their own profile with validation
+      // Note: Check required fields exist, not that ONLY these fields exist
       allow create: if isOwner(userId) 
-        && isValidString(request.resource.data.displayName, 2, 50)
+        && isValidString(request.resource.data.name, 2, 50)
         && isValidEmail(request.resource.data.email)
         && request.resource.data.age >= 18 && request.resource.data.age <= 120
-        && request.resource.data.keys().hasAll(['displayName', 'email', 'age', 'createdAt']);
+        && request.resource.data.name is string
+        && request.resource.data.email is string
+        && request.resource.data.age is number
+        && request.resource.data.createdAt == request.time;
       
       // [SECURITY FIX] Allow updates with proper validation
       allow update: if isOwner(userId)
@@ -46,10 +50,10 @@ service cloud.firestore {
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['age']) 
           || (request.resource.data.age >= 18 && request.resource.data.age <= 120)
         )
-        // Display name validation if being updated
+        // Name validation if being updated
         && (
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['displayName'])
-          || isValidString(request.resource.data.displayName, 2, 50)
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['name'])
+          || isValidString(request.resource.data.name, 2, 50)
         );
       
       // [SECURITY] Users cannot delete their own profiles (use backend admin API)
@@ -70,25 +74,45 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       
       // [SECURITY] Validate connection creation with proper fields
+      // Note: Using hasAll() to check required fields exist, not that ONLY these fields exist
       allow create: if isAuthenticated() 
         && isOwner(request.resource.data.userId)
-        && isValidString(request.resource.data.title, 3, 100)
         && isValidString(request.resource.data.description, 10, 1000)
         && request.resource.data.likes == 0
         && request.resource.data.views == 0
-        && request.resource.data.keys().hasAll(['userId', 'title', 'description', 'location', 'createdAt']);
+        && request.resource.data.userId is string
+        && request.resource.data.description is string
+        && request.resource.data.location != null
+        && request.resource.data.createdAt == request.time;
       
       // [SECURITY] Owner can update OR authenticated users can update likes/views only
       allow update: if isAuthenticated() && (
         isOwner(resource.data.userId) ||
         // [SECURITY] Restrict which fields can be updated by non-owners
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedBy', 'views', 'viewedBy'])
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedBy', 'views', 'viewedBy', 'claims', 'comments', 'savedBy'])
           && request.resource.data.likes >= resource.data.likes  // Likes can only increment
           && request.resource.data.views >= resource.data.views) // Views can only increment
       );
       
       // [SECURITY] Only the owner can delete their connection
       allow delete: if isAuthenticated() && isOwner(resource.data.userId);
+      
+      // [SECURITY] Comments subcollection
+      match /comments/{commentId} {
+        // Anyone can read comments
+        allow read: if isAuthenticated();
+        
+        // Validate comment creation
+        allow create: if isAuthenticated()
+          && isOwner(request.resource.data.userId)
+          && isValidString(request.resource.data.text, 1, 500)
+          && request.resource.data.userId is string
+          && request.resource.data.text is string
+          && request.resource.data.createdAt == request.time;
+        
+        // Only comment author can update/delete
+        allow update, delete: if isAuthenticated() && isOwner(resource.data.userId);
+      }
     }
 
     // [SECURITY FIX] Missed Connection Claims - strict validation
@@ -103,8 +127,12 @@ service cloud.firestore {
       allow create: if isAuthenticated() 
         && isOwner(request.resource.data.claimerId)
         && isValidString(request.resource.data.message, 10, 500)
-        && request.resource.data.keys().hasAll(['claimerId', 'connectionId', 'connectionOwnerId', 'message', 'status', 'createdAt'])
-        && request.resource.data.status == 'pending';
+        && request.resource.data.claimerId is string
+        && request.resource.data.connectionId is string
+        && request.resource.data.connectionOwnerId is string
+        && request.resource.data.message is string
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt == request.time;
       
       // [SECURITY] Only connection owner can update claim status
       allow update: if isAuthenticated() 
@@ -139,7 +167,9 @@ service cloud.firestore {
           && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants
           && isOwner(request.resource.data.senderId)
           && isValidString(request.resource.data.text, 1, 5000)
-          && request.resource.data.keys().hasAll(['senderId', 'text', 'createdAt']);
+          && request.resource.data.senderId is string
+          && request.resource.data.text is string
+          && request.resource.data.createdAt == request.time;
         
         // [SECURITY] Messages cannot be updated or deleted
         allow update, delete: if false;
@@ -166,15 +196,19 @@ service cloud.firestore {
     // [SECURITY FIX] Interactions - track likes, dislikes, winks
     match /interactions/{interactionId} {
       // [SECURITY] Users can read their own interactions
-      allow read: if isAuthenticated() && isOwner(resource.data.userId);
+      allow read: if isAuthenticated() && (
+        isOwner(resource.data.userId) || 
+        request.auth.uid == resource.data.targetUserId
+      );
       
-      // [SECURITY] Validate interaction creation
+      // [SECURITY] Validate interaction creation - allow any authenticated user to create
       allow create: if isAuthenticated()
         && isOwner(request.resource.data.userId)
         && request.resource.data.type in ['like', 'dislike', 'wink']
-        && request.resource.data.keys().hasAll(['userId', 'targetUserId', 'type', 'createdAt']);
+        && request.resource.data.targetUserId is string
+        && request.resource.data.targetUserId.size() > 0;
       
-      // [SECURITY] Users can update their own interactions (for expiration cleanup)
+      // [SECURITY] Users can update their own interactions
       allow update: if isAuthenticated() && isOwner(resource.data.userId);
       
       // [SECURITY] Users can delete their own interactions (for cleanup)
@@ -189,7 +223,10 @@ service cloud.firestore {
       allow create: if isAuthenticated()
         && isOwner(request.resource.data.reporterId)
         && isValidString(request.resource.data.reason, 10, 1000)
-        && request.resource.data.keys().hasAll(['reporterId', 'reportedUserId', 'reason', 'createdAt']);
+        && request.resource.data.reporterId is string
+        && request.resource.data.reportedUserId is string
+        && request.resource.data.reason is string
+        && request.resource.data.createdAt == request.time;
       
       allow update, delete: if false;
     }

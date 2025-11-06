@@ -218,7 +218,7 @@ export default function CommentsScreen() {
       const connectionResult = await missedConnectionsService.getConnectionById(
         id as string
       );
-      if (connectionResult.success && connectionResult.data) {
+      if (connectionResult?.success && connectionResult?.data) {
         setConnection(connectionResult.data);
       }
 
@@ -226,7 +226,7 @@ export default function CommentsScreen() {
       const commentsResult = await missedConnectionsService.getComments(
         id as string
       );
-      if (commentsResult.success) {
+      if (commentsResult?.success) {
         setComments(commentsResult.data);
       }
     } catch (error) {
@@ -256,7 +256,7 @@ export default function CommentsScreen() {
       isAnonymous
     );
 
-    if (result.success) {
+    if (result?.success) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setCommentText('');
 
@@ -264,7 +264,7 @@ export default function CommentsScreen() {
       const connectionResult = await missedConnectionsService.getConnectionById(
         id as string
       );
-      if (connectionResult.success && connectionResult.data) {
+      if (connectionResult?.success && connectionResult?.data) {
         setConnection(connectionResult.data);
       }
 
@@ -273,7 +273,7 @@ export default function CommentsScreen() {
         scrollViewRef.current?.scrollToEnd({ animated: true });
       }, 100);
     } else {
-      toastService.error('Error', result.message);
+      toastService.error('Error', result?.message || 'Failed to send comment');
     }
 
     setIsSending(false);
@@ -343,7 +343,7 @@ export default function CommentsScreen() {
               id as string
             );
 
-            if (result.success) {
+            if (result?.success) {
               toastService.info(
                 'Claim Submitted! ✨',
                 "The post creator will be notified. If they confirm, you'll both be matched!"
@@ -352,11 +352,14 @@ export default function CommentsScreen() {
               // Reload connection to show updated claims
               const connectionResult =
                 await missedConnectionsService.getConnectionById(id as string);
-              if (connectionResult.success && connectionResult.data) {
+              if (connectionResult?.success && connectionResult?.data) {
                 setConnection(connectionResult.data);
               }
             } else {
-              toastService.error('Error', result.message);
+              toastService.error(
+                'Error',
+                result?.message || 'Failed to claim connection'
+              );
             }
 
             setIsClaiming(false);

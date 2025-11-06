@@ -35,13 +35,16 @@ export default function CompleteProfileScreen() {
 
       const result = await updateProfile(updatedData);
 
-      if (result.success) {
+      if (result?.success) {
         setIsProfileCompleted(true);
         setShowEditModal(false);
         // Show tutorial after profile completion
         setShowTutorial(true);
       } else {
-        toastService.error('Error', result.message || 'Failed to save profile');
+        toastService.error(
+          'Error',
+          result?.message || 'Failed to save profile'
+        );
       }
     } catch (error) {
       console.error('Error saving profile:', error);

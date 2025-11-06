@@ -50,7 +50,10 @@ const RegisterScreen = () => {
       return false;
     }
     if (formData.password.length < 6) {
-      toastService.error('Error', 'Password must be at least 6 characters long');
+      toastService.error(
+        'Error',
+        'Password must be at least 6 characters long'
+      );
       return false;
     }
     if (formData.password !== formData.confirmPassword) {
@@ -88,14 +91,17 @@ const RegisterScreen = () => {
       };
 
       const result = await register(userData);
-      if (result.success) {
+      if (result?.success) {
         toastService.success(
           'Success',
           "Account created successfully! Let's set up your profile."
         );
         router.replace('/auth/complete-profile');
       } else {
-        toastService.error('Registration Failed', result.message);
+        toastService.error(
+          'Registration Failed',
+          result?.message || 'Registration failed'
+        );
       }
     } catch (error) {
       toastService.error('Error', 'An unexpected error occurred');

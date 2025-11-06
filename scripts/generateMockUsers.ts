@@ -12,16 +12,6 @@ import {
 import { geohashForLocation } from 'geofire-common';
 import * as readline from 'readline';
 
-//FIX: fix slider range in filter modal to 5-500m
-//FIX: move save of edit profile modal in the bottom after all fields
-//FIX: add popup on filter button "Set your filters to discover people nearby" will happen only once at registeration level
-//FIX: notification only to target user not to all users
-//FIX: notification sound (optional)
-
-//TODO: toggle button show my status online/offline to others users everywhere (connection and in chat)
-//TODO: is discovery search show online users only toggle on
-//TODO: add search by name in connections tab
-
 // Firebase configuration
 const firebaseConfig = {
   apiKey: 'AIzaSyBPdV1BiL67xJes80Gv_tozl1E1ZAqslbk',
@@ -363,7 +353,9 @@ async function createMockUser(
   const password = 'Test1234!';
 
   try {
-    console.log(`\n🔄 Creating user: ${userData.name}...`);
+    console.log(
+      `\n🔄 Creating user ${index + 1}/${mockUsers.length}: ${userData.name}...`
+    );
 
     // Create user in Firebase Auth
     const userCredential = await createUserWithEmailAndPassword(
@@ -378,10 +370,6 @@ async function createMockUser(
     // Generate location near base coordinates
     const location = generateNearbyLocation(userData.distanceMeters);
     // Use precision 10 for ~1.2m accuracy (ULTRA HIGH PRECISION for 5-500m range)
-    // Precision 10 provides:
-    // - Excellent accuracy (±1.2m) - perfect for very close proximity matching
-    // - Essential for 5-500m distance range
-    // - Ultra granular location tracking
     const geohash = geohashForLocation(
       [location.latitude, location.longitude],
       10
@@ -400,18 +388,18 @@ async function createMockUser(
       )
     );
 
-    console.log(`📍 Generated location for ${userData.name}:`, {
-      coords: {
-        lat: location.latitude.toFixed(6),
-        lon: location.longitude.toFixed(6),
-      },
-      targetDistanceMeters: userData.distanceMeters,
-      actualDistanceMeters: actualDistance,
-      deviation: Math.abs(actualDistance - userData.distanceMeters) + 'm',
-      geohash,
-      geohashPrecision: 10,
-      geohashAccuracy: '±1.2m',
-    });
+    console.log(
+      `   📍 Location: ${location.latitude.toFixed(
+        6
+      )}, ${location.longitude.toFixed(6)}`
+    );
+    console.log(
+      `   📏 Target: ${
+        userData.distanceMeters
+      }m | Actual: ${actualDistance}m (±${Math.abs(
+        actualDistance - userData.distanceMeters
+      )}m)`
+    );
 
     // Calculate date of birth from age
     const today = new Date();
@@ -419,7 +407,7 @@ async function createMockUser(
     const dateOfBirth = new Date(birthYear, 0, 1);
 
     // Generate multiple random placeholder images (2-5 images per user)
-    const imageCount = Math.floor(Math.random() * 4) + 2; // Random 2-5 images
+    const imageCount = Math.floor(Math.random() * 4) + 2;
     const placeholderImages: string[] = [];
 
     for (let imgIndex = 0; imgIndex < imageCount; imgIndex++) {
@@ -430,23 +418,22 @@ async function createMockUser(
       placeholderImages.push(img);
     }
 
-    // Ensure the main 'image' field is always the first image in the 'images' array
-    const placeholderImage = placeholderImages[0]; // Main image (first in array)
+    const placeholderImage = placeholderImages[0];
 
-    // Create Firestore document
+    // Create Firestore document with all required fields
     const userDoc = {
       id: userId,
       email,
-      name: userData.name, // Removed duplicate: displayName
+      name: userData.name,
       age: userData.age,
       dateOfBirth,
       gender: userData.gender,
       bio: userData.bio,
       interests: userData.interests,
       height: userData.height,
-      image: placeholderImage, // First image (images[0])
-      images: placeholderImages, // Full array including the first image
-      location: locationName, // Use dynamic location name
+      image: placeholderImage,
+      images: placeholderImages,
+      location: locationName,
       coordinates: {
         latitude: location.latitude,
         longitude: location.longitude,
@@ -454,8 +441,8 @@ async function createMockUser(
       geohash,
       preferences: {
         ageRange: [18, 99],
-        maxDistance: 500, // 500m in METERS (matches new 5-500m range)
-        interestedIn: userData.interestedIn, // Removed duplicate: lookingFor (using preferences.interestedIn)
+        maxDistance: 500, // 500m in METERS
+        interestedIn: userData.interestedIn,
       },
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -463,23 +450,13 @@ async function createMockUser(
       isOnline: true,
       notificationsEnabled: true,
       pushToken: '',
+      isProfileComplete: true,
+      hasSeenTutorial: false,
     };
 
     await setDoc(doc(db, 'users', userId), userDoc);
 
-    console.log(`✅ Firestore doc created for: ${userData.name}`);
-    console.log(
-      `   📍 Location: ${location.latitude.toFixed(
-        6
-      )}, ${location.longitude.toFixed(6)}`
-    );
-    console.log(
-      `   📏 Distance: ~${userData.distanceMeters}m (~${(
-        userData.distanceMeters / 1000
-      ).toFixed(1)}km) from base`
-    );
-    console.log(`   �️  Image: ${placeholderImage}`);
-    console.log(`   �📧 Email: ${email} | Password: ${password}`);
+    console.log(`   ✅ ${userData.name} created successfully!`);
 
     return {
       success: true,
@@ -490,7 +467,11 @@ async function createMockUser(
       userImage: placeholderImage,
     };
   } catch (error: any) {
-    console.error(`❌ Error creating ${userData.name}:`, error.message);
+    console.error(`   ❌ Error creating ${userData.name}:`, error.message);
+    // Check if it's a duplicate email error
+    if (error.code === 'auth/email-already-in-use') {
+      console.log(`   ℹ️  User ${email} already exists, skipping...`);
+    }
     return { success: false, error: error.message };
   }
 }
@@ -611,12 +592,25 @@ async function createMockComments(
   );
 }
 
-// Function to get location from user
+// Function to get location from user - simplified
 async function getUserLocation(): Promise<{
   lat: number;
   lon: number;
   locationName: string;
 }> {
+  // Check for command line arguments for auto mode
+  const args = process.argv.slice(2);
+  const autoMode = args.includes('--auto') || args.includes('-y');
+
+  if (autoMode) {
+    console.log('✅ Auto mode: Using default Kriyat Ono location');
+    return {
+      lat: 32.053783,
+      lon: 34.858582,
+      locationName: 'Kriyat Ono, Israel',
+    };
+  }
+
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -625,78 +619,49 @@ async function getUserLocation(): Promise<{
   return new Promise((resolve) => {
     console.log('\n📍 Location Setup for Mock Users');
     console.log('='.repeat(50));
-    console.log('You can either:');
-    console.log(
-      '  1. Use your CURRENT device location (requires location services)'
-    );
-    console.log('  2. Enter coordinates manually');
-    console.log('  3. Use default Kriyat Ono location');
+    console.log('Options:');
+    console.log('  1. Enter custom coordinates');
+    console.log('  2. Use default Kriyat Ono location (Press Enter)');
     console.log('');
 
-    rl.question('Choose option (1/2/3) [default: 3]: ', (answer) => {
-      const choice = answer.trim() || '3';
+    rl.question('Choose option (1/2) [default: 2]: ', (answer) => {
+      const choice = answer.trim() || '2';
 
       if (choice === '1') {
         console.log(
-          '\n⚠️ Note: This script runs in Node.js and cannot access device location.'
-        );
-        console.log('Please use option 2 to enter your coordinates manually.');
-        console.log(
-          'You can find your coordinates at: https://www.latlong.net/\n'
+          '\nEnter your coordinates (find them at https://www.latlong.net/)\n'
         );
 
         rl.question('Enter latitude (e.g., 32.053783): ', (lat) => {
           rl.question('Enter longitude (e.g., 34.858582): ', (lon) => {
-            rl.question('Enter location name (e.g., Kriyat Ono): ', (name) => {
-              rl.close();
-              const latitude = parseFloat(lat.trim());
-              const longitude = parseFloat(lon.trim());
+            rl.question(
+              'Enter location name (e.g., Kriyat Ono, Israel): ',
+              (name) => {
+                rl.close();
+                const latitude = parseFloat(lat.trim());
+                const longitude = parseFloat(lon.trim());
 
-              if (isNaN(latitude) || isNaN(longitude)) {
-                console.log('❌ Invalid coordinates, using Kriyat Ono default');
-                resolve({
-                  lat: 32.053783,
-                  lon: 34.858582,
-                  locationName: 'Kriyat Ono, Israel',
-                });
-              } else {
-                resolve({
-                  lat: latitude,
-                  lon: longitude,
-                  locationName: name.trim() || 'Custom Location',
-                });
+                if (isNaN(latitude) || isNaN(longitude)) {
+                  console.log(
+                    '❌ Invalid coordinates, using Kriyat Ono default'
+                  );
+                  resolve({
+                    lat: 32.053783,
+                    lon: 34.858582,
+                    locationName: 'Kriyat Ono, Israel',
+                  });
+                } else {
+                  console.log(
+                    `✅ Using coordinates: ${latitude}, ${longitude}`
+                  );
+                  resolve({
+                    lat: latitude,
+                    lon: longitude,
+                    locationName: name.trim() || 'Custom Location',
+                  });
+                }
               }
-            });
-          });
-        });
-      } else if (choice === '2') {
-        console.log(
-          '\nEnter your coordinates (you can find them at https://www.latlong.net/)\n'
-        );
-
-        rl.question('Enter latitude (e.g., 32.053783): ', (lat) => {
-          rl.question('Enter longitude (e.g., 34.858582): ', (lon) => {
-            rl.question('Enter location name (e.g., Kriyat Ono): ', (name) => {
-              rl.close();
-              const latitude = parseFloat(lat.trim());
-              const longitude = parseFloat(lon.trim());
-
-              if (isNaN(latitude) || isNaN(longitude)) {
-                console.log('❌ Invalid coordinates, using Kriyat Ono default');
-                resolve({
-                  lat: 32.053783,
-                  lon: 34.858582,
-                  locationName: 'Kriyat Ono, Israel',
-                });
-              } else {
-                console.log(`✅ Using coordinates: ${latitude}, ${longitude}`);
-                resolve({
-                  lat: latitude,
-                  lon: longitude,
-                  locationName: name.trim() || 'Custom Location',
-                });
-              }
-            });
+            );
           });
         });
       } else {
@@ -713,37 +678,24 @@ async function getUserLocation(): Promise<{
 }
 
 async function generateAllMockUsers() {
-  console.log('🚀 Starting mock user generation...');
-  console.log('');
-  console.log(
-    '📍 IMPORTANT: Make sure to choose option 3 (default) to use Kriyat Ono coordinates!'
-  );
-  console.log('   This ensures users are created near your actual location.');
-  console.log('');
+  console.log('🚀 Starting Mock User Generation');
+  console.log('='.repeat(50));
 
   // Get user's preferred location
   const userLocation = await getUserLocation();
   BASE_LAT = userLocation.lat;
   BASE_LON = userLocation.lon;
 
-  console.log('\n📍 Base Location Configuration:');
+  console.log('\n📍 Base Location:');
   console.log(`   Latitude: ${BASE_LAT}`);
   console.log(`   Longitude: ${BASE_LON}`);
   console.log(`   Location: ${userLocation.locationName}`);
-  console.log(
-    `   Base Geohash (precision 10): ${geohashForLocation(
-      [BASE_LAT, BASE_LON],
-      10
-    )}`
-  );
-  console.log(
-    `   Note: All mock users will be generated within 500m of this location`
-  );
-  console.log('');
+  console.log(`   Geohash: ${geohashForLocation([BASE_LAT, BASE_LON], 10)}`);
+  console.log(`\n📊 Creating ${mockUsers.length} mock users...\n`);
 
   const results = [];
 
-  // Step 1: Create users
+  // Step 1: Create users with progress tracking
   for (let i = 0; i < mockUsers.length; i++) {
     const result = await createMockUser(
       mockUsers[i],
@@ -753,36 +705,40 @@ async function generateAllMockUsers() {
     results.push(result);
 
     // Small delay to avoid rate limits
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
 
-  console.log('\n\n📊 User Creation Summary:');
+  // Summary
+  console.log('\n\n' + '='.repeat(50));
+  console.log('📊 GENERATION SUMMARY');
   console.log('='.repeat(50));
+
   const successful = results.filter((r) => r.success).length;
+  const failed = results.length - successful;
+
   console.log(
     `✅ Successfully created: ${successful}/${mockUsers.length} users`
   );
+  if (failed > 0) {
+    console.log(`⚠️  Failed: ${failed} users`);
+  }
 
   if (successful > 0) {
-    console.log('\n📝 Login credentials for all mock users:');
-    console.log('Email format: mock[1-10]@meetbridge.test');
-    console.log('Password: Test1234!');
+    console.log('\n📝 Login Credentials:');
+    console.log('   Email: mock[1-20]@meetbridge.test');
+    console.log('   Password: Test1234!');
 
-    console.log('\n📏 Distance Configuration (ALL IN METERS):');
-    console.log('Filter range: 5m - 500m');
+    console.log('\n📏 Distance Configuration:');
+    console.log('   Filter range: 5m - 500m');
     console.log(
-      `Mock users spread: ${Math.min(
+      `   Users spread: ${Math.min(
         ...mockUsers.map((u) => u.distanceMeters)
       )}m - ${Math.max(...mockUsers.map((u) => u.distanceMeters))}m`
     );
-    console.log('User preferences maxDistance: 500m');
-    console.log('✅ All users are within the 500m discoverable range!');
-    console.log('🎯 Geohash precision: 10 (±1.2m accuracy)');
-    console.log(
-      '🔍 Make sure your app queries with geohash precision 8-9 for 500m range'
-    );
+    console.log('   Geohash precision: 10 (±1.2m accuracy)');
 
     // Step 2: Create posts
+    console.log('\n\n� Creating mock posts and comments...\n');
     const successfulUsers = results
       .filter((r) => r.success)
       .map((r) => ({
@@ -799,16 +755,24 @@ async function generateAllMockUsers() {
         await createMockComments(postIds, successfulUsers);
       }
 
-      console.log('\n\n🎉 All Done!');
+      console.log('\n' + '='.repeat(50));
+      console.log('🎉 COMPLETE!');
       console.log('='.repeat(50));
-      console.log(`✅ Created ${successful} users`);
-      console.log(`✅ Created ${postIds.length} posts`);
+      console.log(`✅ ${successful} users created`);
+      console.log(`✅ ${postIds.length} posts created`);
       console.log(`✅ Comments added to posts`);
+      console.log('\n🚀 Mock data is ready to use!');
     }
+  } else {
+    console.log('\n❌ No users were created successfully.');
+    console.log('Please check the errors above and try again.');
   }
 
   process.exit(0);
 }
 
-// Run the script
-generateAllMockUsers().catch(console.error);
+// Run the script with error handling
+generateAllMockUsers().catch((error) => {
+  console.error('\n❌ Fatal error:', error);
+  process.exit(1);
+});

@@ -49,11 +49,17 @@ const ForgotPasswordScreen = () => {
     setIsLoading(true);
     try {
       const result = await forgotPassword(email.trim());
-      if (result.success) {
+      if (result?.success) {
         setEmailSent(true);
-        toastService.success('Success', result.message);
+        toastService.success(
+          'Success',
+          result?.message || 'Password reset email sent'
+        );
       } else {
-        toastService.error('Error', result.message);
+        toastService.error(
+          'Error',
+          result?.message || 'Failed to send reset email'
+        );
       }
     } catch (error) {
       toastService.error('Error', 'An unexpected error occurred');

@@ -568,8 +568,8 @@ export default function ConnectionsScreen() {
         user?.id || ''
       );
 
-      if (!result.success) {
-        toastService.error('Error', result.message);
+      if (!result?.success) {
+        toastService.error('Error', result?.message || 'Failed to like post');
         // Real-time listeners will handle state updates
       }
     },
@@ -609,8 +609,8 @@ export default function ConnectionsScreen() {
         user?.id || ''
       );
 
-      if (!result.success) {
-        toastService.error('Error', result.message);
+      if (!result?.success) {
+        toastService.error('Error', result?.message || 'Failed to save post');
         // Real-time listeners will handle state updates
       }
     },
@@ -641,7 +641,7 @@ export default function ConnectionsScreen() {
         isAnonymous: createForm.isAnonymous,
       });
 
-      if (result.success) {
+      if (result?.success) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         toastService.success(
           'Success!',
@@ -656,10 +656,13 @@ export default function ConnectionsScreen() {
         });
         // Real-time listeners will update the list automatically
       } else {
-        toastService.error('Error', result.message);
+        toastService.error('Error', result?.message || 'Failed to create post');
       }
-    } catch (error) {
-      toastService.error('Error', 'Failed to create post. Please try again.');
+    } catch (error: any) {
+      console.error('❌ Error creating connection:', error);
+      const errorMessage =
+        error?.message || 'Failed to create post. Please try again.';
+      toastService.error('Error', errorMessage);
     } finally {
       setIsCreating(false);
     }
@@ -683,7 +686,7 @@ export default function ConnectionsScreen() {
         }
       );
 
-      if (result.success) {
+      if (result?.success) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
         // Fetch the updated connection immediately
@@ -713,11 +716,13 @@ export default function ConnectionsScreen() {
           isAnonymous: false,
         });
       } else {
-        toastService.error('Error', result.message);
+        toastService.error('Error', result?.message || 'Failed to update post');
       }
-    } catch (error) {
-      // Error updating post
-      toastService.error('Error', 'Failed to update post. Please try again.');
+    } catch (error: any) {
+      console.error('❌ Error updating connection:', error);
+      const errorMessage =
+        error?.message || 'Failed to update post. Please try again.';
+      toastService.error('Error', errorMessage);
     } finally {
       setIsCreating(false);
     }
@@ -750,13 +755,13 @@ export default function ConnectionsScreen() {
           const result = await missedConnectionsService.claimConnection(
             connection.id
           );
-          if (result.success) {
+          if (result?.success) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             toastService.success('Success!', 'Your claim has been submitted!');
           } else {
             toastService.error(
               'Error',
-              result.message || 'Failed to claim connection'
+              result?.message || 'Failed to claim connection'
             );
           }
         }}
@@ -779,7 +784,7 @@ export default function ConnectionsScreen() {
           const result = await missedConnectionsService.deleteConnection(
             connection.id
           );
-          if (result.success) {
+          if (result?.success) {
             // Real-time listeners will remove the post automatically
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             toastService.success(
@@ -789,7 +794,7 @@ export default function ConnectionsScreen() {
           } else {
             toastService.error(
               'Error',
-              result.message || 'Failed to delete post'
+              result?.message || 'Failed to delete post'
             );
           }
         }}

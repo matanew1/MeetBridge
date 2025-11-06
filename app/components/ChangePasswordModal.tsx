@@ -80,7 +80,7 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
       const result = await changePassword(currentPassword, newPassword);
       console.log('🔐 Password change result:', result);
 
-      if (result.success) {
+      if (result?.success) {
         toastService.success(
           'Success!',
           'Your password has been changed successfully'
@@ -90,7 +90,10 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
         setConfirmPassword('');
         onClose();
       } else {
-        toastService.error('Password Change Failed', result.message);
+        toastService.error(
+          'Password Change Failed',
+          result?.message || 'Failed to change password'
+        );
       }
     } catch (error) {
       console.error('❌ Unexpected error in handleChangePassword:', error);

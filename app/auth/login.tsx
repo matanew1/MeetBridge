@@ -53,10 +53,10 @@ const LoginScreen = () => {
     setIsLoading(true);
     try {
       const result = await login(email.trim(), password);
-      if (result.success) {
+      if (result?.success) {
         router.replace('/search');
       } else {
-        toastService.error('Login Failed', result.message);
+        toastService.error('Login Failed', result?.message || 'Login failed');
       }
     } catch (error) {
       toastService.error('Error', 'An unexpected error occurred');
