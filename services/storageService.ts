@@ -320,57 +320,6 @@ class StorageService {
   }
 
   /**
-   * Upload voice message to Cloudinary
-   */
-  async uploadVoiceMessage(audioUri: string): Promise<string> {
-    try {
-      console.log('🎤 Uploading voice message to Cloudinary...');
-
-      if (
-        !this.cloudinaryConfig.cloudName ||
-        !this.cloudinaryConfig.uploadPreset
-      ) {
-        throw new Error('Cloudinary configuration is missing');
-      }
-
-      const formData = new FormData();
-
-      // Prepare audio file for upload
-      const timestamp = Date.now();
-      const filename = `voice_${timestamp}.m4a`;
-
-      formData.append('file', {
-        uri: audioUri,
-        type: 'audio/m4a',
-        name: filename,
-      } as any);
-
-      formData.append('upload_preset', this.cloudinaryConfig.uploadPreset);
-      formData.append('resource_type', 'video'); // Cloudinary uses 'video' for audio
-      formData.append('folder', 'meetbridge/voice_messages');
-
-      const response = await fetch(
-        `https://api.cloudinary.com/v1_1/${this.cloudinaryConfig.cloudName}/upload`,
-        {
-          method: 'POST',
-          body: formData,
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log('✅ Voice message uploaded successfully');
-      return data.secure_url;
-    } catch (error) {
-      console.error('❌ Error uploading voice message:', error);
-      throw error;
-    }
-  }
-
-  /**
    * Upload chat image with compression
    */
   async uploadChatImage(imageUri: string): Promise<string> {

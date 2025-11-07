@@ -9,7 +9,6 @@ import {
 import { services } from '../services';
 import { APP_CONFIG, DATING_CONSTANTS } from '../constants';
 import cacheService from '../services/cacheService';
-import rateLimitService from '../services/rateLimitService';
 import toastService from '../services/toastService';
 
 // Use Firebase services
@@ -515,27 +514,6 @@ export const useUserStore = create<UserState>((set, get) => ({
       return { isMatch: false };
     }
 
-    // Check rate limit
-    const rateLimitCheck = await rateLimitService.checkRateLimit(
-      currentUser.id,
-      'likes'
-    );
-
-    if (!rateLimitCheck.allowed) {
-      const resetTime = rateLimitCheck.resetAt.toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      toastService.warning(
-        'Daily Limit Reached',
-        `You've reached your daily limit of ${rateLimitService.getLimit(
-          'likes'
-        )} likes. Resets at ${resetTime}.`
-      );
-      set({ isLoadingLike: false });
-      return { isMatch: false };
-    }
-
     set({ isLoadingLike: true, error: null });
 
     try {
@@ -545,9 +523,6 @@ export const useUserStore = create<UserState>((set, get) => ({
       );
 
       if (response.success) {
-        // Increment rate limit counter
-        await rateLimitService.incrementCounter(currentUser.id, 'likes');
-
         // Find the user object before removing from discoverProfiles
         const userProfile = get().discoverProfiles.find(
           (p) => p.id === profileId
@@ -768,14 +743,9 @@ export const useUserStore = create<UserState>((set, get) => ({
     set({ isLoadingConversations: true, error: null });
 
     try {
-      // Check cache first
+      // Clear cache to ensure fresh data with isMissedConnection flag
       const cacheKey = `conversations_${currentUser.id}`;
-      const cached = cacheService.get<Conversation[]>(cacheKey);
-
-      if (cached) {
-        set({ conversations: cached, isLoadingConversations: false });
-        return;
-      }
+      cacheService.delete(cacheKey);
 
       const response = await chatService.getConversations(currentUser.id);
 
@@ -851,26 +821,6 @@ export const useUserStore = create<UserState>((set, get) => ({
     if (!currentUser) return;
 
     try {
-      const rateLimitCheck = await rateLimitService.checkRateLimit(
-        currentUser.id,
-        'messages'
-      );
-
-      if (!rateLimitCheck.allowed) {
-        const resetTime = rateLimitCheck.resetAt.toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-        });
-
-        toastService.warning(
-          'Daily Message Limit Reached',
-          `You've reached your daily limit of ${rateLimitService.getLimit(
-            'messages'
-          )} messages. Resets at ${resetTime}.`
-        );
-        return;
-      }
-
       const response = await chatService.sendMessage(conversationId, {
         senderId: currentUser.id,
         text,
@@ -878,7 +828,6 @@ export const useUserStore = create<UserState>((set, get) => ({
       });
 
       if (response.success) {
-        await rateLimitService.incrementCounter(currentUser.id, 'messages');
         // Don't reload conversations here - the real-time listener in chat screen
         // will update messages automatically. Reloading would cause empty message arrays.
         console.log('✅ Message sent successfully');

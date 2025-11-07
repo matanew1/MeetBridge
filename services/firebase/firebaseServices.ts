@@ -981,6 +981,7 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         animationPlayed: false,
         createdAt: serverTimestamp(),
         expiresAt,
+        matchInitiator: userId, // Track who completed the match (last to like)
       });
 
       batch.update(conversationRef, {
@@ -990,6 +991,51 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
       await batch.commit();
 
       console.log('🎉 Match created:', matchRef.id);
+
+      // Send notifications to both users
+      try {
+        const [user1Doc, user2Doc] = await Promise.all([
+          getDoc(doc(db, 'users', userId)),
+          getDoc(doc(db, 'users', targetUserId)),
+        ]);
+
+        if (user1Doc.exists() && user2Doc.exists()) {
+          const user1Data = user1Doc.data();
+          const user2Data = user2Doc.data();
+
+          // Send notification to the OTHER user (not the one who just liked)
+          if (user2Data.pushToken && user2Data.notificationsEnabled !== false) {
+            const message = {
+              to: user2Data.pushToken,
+              sound: 'default',
+              title: "It's a Match! 💕",
+              body: `You and ${
+                user1Data.name || 'someone'
+              } liked each other! Start chatting now.`,
+              data: {
+                type: 'match',
+                matchId: matchRef.id,
+                conversationId,
+                showAnimation: false, // This user gets notification, not animation
+              },
+              priority: 'high',
+            };
+
+            fetch('https://exp.host/--/api/v2/push/send', {
+              method: 'POST',
+              headers: {
+                Accept: 'application/json',
+                'Accept-encoding': 'gzip, deflate',
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(message),
+            }).catch((e) => console.error('Push notification error:', e));
+          }
+        }
+      } catch (notifError) {
+        console.error('❌ Error sending match notification:', notifError);
+        // Don't fail the match creation if notification fails
+      }
 
       return {
         success: true,
@@ -1085,6 +1131,7 @@ export class FirebaseMatchingService implements IMatchingService {
               id: userDoc.id,
               ...userData,
               lastSeen: convertTimestamp(userData.lastSeen),
+              isMissedConnection: matchData.isMissedConnection || false, // Include the flag from match
             } as User);
           }
         }
@@ -1331,6 +1378,7 @@ export class FirebaseChatService implements IChatService {
           createdAt: convertTimestamp(convData.createdAt),
           updatedAt: convertTimestamp(convData.updatedAt),
           unreadCount: convData.unreadCount || 0,
+          isMissedConnection: convData.isMissedConnection || false,
         });
       }
 
@@ -1404,6 +1452,7 @@ export class FirebaseChatService implements IChatService {
         createdAt: convertTimestamp(convData.createdAt),
         updatedAt: convertTimestamp(convData.updatedAt),
         unreadCount: convData.unreadCount || 0,
+        isMissedConnection: convData.isMissedConnection || false,
       };
 
       return {

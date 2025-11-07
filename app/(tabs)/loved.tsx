@@ -170,9 +170,28 @@ const LikedProfileCard = React.memo(
             </Animated.View>
           </View>
           <View style={styles.cardInfo}>
-            <Text style={[styles.cardTitle, { color: theme.text }]}>
-              {user.name}, {user.age}
-            </Text>
+            <View style={styles.titleRow}>
+              <Text style={[styles.cardTitle, { color: theme.text }]}>
+                {user.name}, {user.age}
+              </Text>
+              {(user as any).isMissedConnection && (
+                <View
+                  style={[
+                    styles.missedBadge,
+                    {
+                      backgroundColor: theme.primary + '20',
+                      borderColor: theme.primary + '40',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[styles.missedBadgeText, { color: theme.primary }]}
+                  >
+                    Missed Match
+                  </Text>
+                </View>
+              )}
+            </View>
             {user.distance && (
               <Text
                 style={[styles.distanceText, { color: theme.textSecondary }]}
@@ -490,6 +509,140 @@ export default function LovedScreen() {
       unsubscribe2();
     };
   }, [selectedProfile]);
+
+  // Real-time listener for new matches (including missed connections)
+  useEffect(() => {
+    const currentUser = useUserStore.getState().currentUser;
+    if (!currentUser) return;
+
+    console.log('🔔 Setting up real-time listener for new matches');
+
+    const {
+      collection,
+      query,
+      where,
+      onSnapshot,
+      getDoc,
+      doc,
+    } = require('firebase/firestore');
+    const { db } = require('../../services/firebase/config');
+
+    // Track if this is the initial load
+    let isInitialLoad1 = true;
+    let isInitialLoad2 = true;
+
+    // Listen for matches where current user is user1 or user2
+    const matchesQuery1 = query(
+      collection(db, 'matches'),
+      where('user1', '==', currentUser.id),
+      where('unmatched', '==', false)
+    );
+
+    const matchesQuery2 = query(
+      collection(db, 'matches'),
+      where('user2', '==', currentUser.id),
+      where('unmatched', '==', false)
+    );
+
+    const handleNewMatch = async (
+      snapshot: any,
+      isUser1: boolean,
+      isInitialLoadRef: { current: boolean }
+    ) => {
+      // Skip initial batch of documents
+      if (isInitialLoadRef.current) {
+        console.log('⏭️ Skipping initial load for match listener');
+        isInitialLoadRef.current = false;
+        return;
+      }
+
+      for (const change of snapshot.docChanges()) {
+        if (change.type === 'added') {
+          const matchData = change.doc.data();
+          const otherUserId = isUser1 ? matchData.user2 : matchData.user1;
+
+          console.log(
+            `✨ New match detected! User ${otherUserId}, isMissedConnection: ${matchData.isMissedConnection}`
+          );
+
+          // Fetch the user's profile
+          try {
+            const userDoc = await getDoc(doc(db, 'users', otherUserId));
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              const newMatchedUser = {
+                id: userDoc.id,
+                ...userData,
+                lastSeen: userData.lastSeen?.toDate?.() || userData.lastSeen,
+                createdAt: userData.createdAt?.toDate?.() || userData.createdAt,
+                updatedAt: userData.updatedAt?.toDate?.() || userData.updatedAt,
+                dateOfBirth:
+                  userData.dateOfBirth?.toDate?.() || userData.dateOfBirth,
+                isMissedConnection: matchData.isMissedConnection || false,
+              };
+
+              // Update store to add the new matched user
+              useUserStore.setState((state) => {
+                // Check if user is already in matchedProfilesData
+                const exists = state.matchedProfilesData.some(
+                  (p) => p.id === otherUserId
+                );
+                if (!exists) {
+                  console.log(
+                    '✅ Adding new match to matchedProfilesData:',
+                    otherUserId
+                  );
+                  return {
+                    matchedProfiles: [...state.matchedProfiles, otherUserId],
+                    matchedProfilesData: [
+                      ...state.matchedProfilesData,
+                      newMatchedUser,
+                    ],
+                  };
+                }
+                return state;
+              });
+            }
+          } catch (error) {
+            console.error('❌ Error fetching matched user profile:', error);
+          }
+        }
+      }
+    };
+
+    const initialLoadRef1 = { current: isInitialLoad1 };
+    const initialLoadRef2 = { current: isInitialLoad2 };
+
+    const unsubscribe1 = onSnapshot(
+      matchesQuery1,
+      (snapshot) => handleNewMatch(snapshot, true, initialLoadRef1),
+      (error: any) => {
+        if (error?.code === 'permission-denied') {
+          console.log('⚠️ Match listener permission denied (user logged out)');
+          return;
+        }
+        console.error('❌ Error in match listener 1:', error);
+      }
+    );
+
+    const unsubscribe2 = onSnapshot(
+      matchesQuery2,
+      (snapshot) => handleNewMatch(snapshot, false, initialLoadRef2),
+      (error: any) => {
+        if (error?.code === 'permission-denied') {
+          console.log('⚠️ Match listener permission denied (user logged out)');
+          return;
+        }
+        console.error('❌ Error in match listener 2:', error);
+      }
+    );
+
+    return () => {
+      console.log('🔕 Cleaning up match listeners');
+      unsubscribe1();
+      unsubscribe2();
+    };
+  }, []);
 
   // Memoized handlers for better performance
   const handleMessage = useCallback(
@@ -897,7 +1050,7 @@ const styles = StyleSheet.create({
   },
   flatListContent: {
     paddingHorizontal: 16,
-    paddingBottom: 100,
+    paddingBottom: 120, // Increased to prevent content from being hidden by bottom tabs
   },
   gridItem: {
     marginBottom: 16,
@@ -957,10 +1110,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 4,
+    flexWrap: 'wrap',
+  },
+  missedBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  missedBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   cardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 4,
   },
   distanceText: {
     fontSize: 14,

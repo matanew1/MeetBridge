@@ -48,6 +48,7 @@ import missedConnectionsService, {
   MissedConnection,
 } from '../../services/firebase/missedConnectionsService';
 import toastService from '../../services/toastService';
+import { useUserStore } from '../../store';
 
 // Helper function
 const formatRelativeTime = (date: Date): string => {
@@ -80,6 +81,7 @@ interface ConnectionItemProps {
   isLiked: boolean;
   isSaved: boolean;
   currentUserId: string | undefined;
+  hasExistingConversation?: boolean;
 }
 
 const ConnectionItem: React.FC<ConnectionItemProps> = React.memo(
@@ -97,6 +99,7 @@ const ConnectionItem: React.FC<ConnectionItemProps> = React.memo(
     isLiked,
     isSaved,
     currentUserId,
+    hasExistingConversation,
   }) => {
     const [showOptions, setShowOptions] = useState(false);
     const isOwner = connection.userId === currentUserId;
@@ -332,16 +335,18 @@ const ConnectionItem: React.FC<ConnectionItemProps> = React.memo(
               </View>
             )}
 
-            <TouchableOpacity
-              style={[styles.claimButton, { backgroundColor: theme.success }]}
-              onPress={(e) => {
-                e.stopPropagation();
-                onClaim();
-              }}
-            >
-              <Sparkles size={14} color="#FFF" />
-              <Text style={styles.claimButtonText}>That's Me!</Text>
-            </TouchableOpacity>
+            {!isOwner && !hasExistingConversation && (
+              <TouchableOpacity
+                style={[styles.claimButton, { backgroundColor: theme.success }]}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  onClaim();
+                }}
+              >
+                <Sparkles size={14} color="#FFF" />
+                <Text style={styles.claimButtonText}>That's Me!</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </TouchableOpacity>
@@ -361,6 +366,7 @@ const ConnectionItem: React.FC<ConnectionItemProps> = React.memo(
       prevProps.connection.location.category ===
         nextProps.connection.location.category &&
       prevProps.connection.isEdited === nextProps.connection.isEdited &&
+      prevProps.hasExistingConversation === nextProps.hasExistingConversation &&
       prevProps.theme === nextProps.theme
     );
   }
@@ -372,6 +378,7 @@ export default function ConnectionsScreen() {
   const theme = isDarkMode ? darkTheme : lightTheme;
   const router = useRouter();
   const { isAuthenticated, user } = useAuth();
+  const { conversations } = useUserStore();
 
   const [connections, setConnections] = useState<MissedConnection[]>([]);
   const [isLocationLoading, setIsLocationLoading] = useState(false);
@@ -726,6 +733,19 @@ export default function ConnectionsScreen() {
     [connections]
   );
 
+  const checkExistingConversation = useCallback(
+    (postOwnerId: string) => {
+      if (!user?.id || !conversations) return false;
+      return conversations.some((conv) => {
+        const participants = conv.participants || [];
+        return (
+          participants.includes(user.id!) && participants.includes(postOwnerId)
+        );
+      });
+    },
+    [user?.id, conversations]
+  );
+
   const renderItem = useCallback(
     ({
       item: connection,
@@ -733,66 +753,93 @@ export default function ConnectionsScreen() {
     }: {
       item: MissedConnection;
       index: number;
-    }) => (
-      <ConnectionItem
-        connection={connection}
-        theme={theme}
-        index={index}
-        onPress={() =>
-          missedConnectionsService.viewConnection(connection.id, user?.id || '')
-        }
-        onLike={() => handleLike(connection.id)}
-        onClaim={async () => {
-          const result = await missedConnectionsService.claimConnection(
-            connection.id
-          );
-          if (result.success) {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            toastService.success('Success!', 'Your claim has been submitted!');
-          } else {
-            toastService.error(
-              'Error',
-              result.message || 'Failed to submit claim'
+    }) => {
+      const hasExistingConversation = checkExistingConversation(
+        connection.userId
+      );
+
+      return (
+        <ConnectionItem
+          connection={connection}
+          theme={theme}
+          index={index}
+          onPress={() =>
+            missedConnectionsService.viewConnection(
+              connection.id,
+              user?.id || ''
+            )
+          }
+          onLike={() => handleLike(connection.id)}
+          onClaim={async () => {
+            const result = await missedConnectionsService.claimConnection(
+              connection.id
             );
+            if (result.success) {
+              Haptics.notificationAsync(
+                Haptics.NotificationFeedbackType.Success
+              );
+              toastService.success(
+                'Success!',
+                'Your claim has been submitted!'
+              );
+            } else {
+              toastService.error(
+                'Error',
+                result.message || 'Failed to submit claim'
+              );
+            }
+          }}
+          onComment={() =>
+            router.push(`/connections/comments/${connection.id}`)
           }
-        }}
-        onComment={() => router.push(`/connections/comments/${connection.id}`)}
-        onEdit={() => {
-          // Always get the latest connection data from state
-          const latestConnection = getLatestConnection(connection.id);
-          if (latestConnection) {
-            setEditingConnection(latestConnection);
-            setEditForm({
-              description: latestConnection.description,
-              category: latestConnection.location.category || 'restaurant',
-              timeOccurred: latestConnection.timeOccurred,
-              isAnonymous: latestConnection.isAnonymous || false,
-            });
-            setShowCreateModal(true);
-          }
-        }}
-        onDelete={async () => {
-          const result = await missedConnectionsService.deleteConnection(
-            connection.id
-          );
-          if (result.success) {
-            // Real-time listeners will remove the post automatically
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            toastService.success('Success', 'Post deleted successfully');
-          } else {
-            toastService.error(
-              'Error',
-              result.message || 'Failed to delete post'
+          onEdit={() => {
+            // Always get the latest connection data from state
+            const latestConnection = getLatestConnection(connection.id);
+            if (latestConnection) {
+              setEditingConnection(latestConnection);
+              setEditForm({
+                description: latestConnection.description,
+                category: latestConnection.location.category || 'restaurant',
+                timeOccurred: latestConnection.timeOccurred,
+                isAnonymous: latestConnection.isAnonymous || false,
+              });
+              setShowCreateModal(true);
+            }
+          }}
+          onDelete={async () => {
+            const result = await missedConnectionsService.deleteConnection(
+              connection.id
             );
-          }
-        }}
-        onSave={() => handleSave(connection.id)}
-        isLiked={connection.likedBy?.includes(user?.id || '') || false}
-        isSaved={connection.savedBy?.includes(user?.id || '') || false}
-        currentUserId={user?.id}
-      />
-    ),
-    [theme, user?.id, handleLike, handleSave, router, getLatestConnection]
+            if (result.success) {
+              // Real-time listeners will remove the post automatically
+              Haptics.notificationAsync(
+                Haptics.NotificationFeedbackType.Success
+              );
+              toastService.success('Success', 'Post deleted successfully');
+            } else {
+              toastService.error(
+                'Error',
+                result.message || 'Failed to delete post'
+              );
+            }
+          }}
+          onSave={() => handleSave(connection.id)}
+          isLiked={connection.likedBy?.includes(user?.id || '') || false}
+          isSaved={connection.savedBy?.includes(user?.id || '') || false}
+          currentUserId={user?.id}
+          hasExistingConversation={hasExistingConversation}
+        />
+      );
+    },
+    [
+      theme,
+      user?.id,
+      handleLike,
+      handleSave,
+      router,
+      getLatestConnection,
+      checkExistingConversation,
+    ]
   );
 
   useEffect(() => {
@@ -1280,7 +1327,7 @@ const styles = StyleSheet.create({
   activeTab: { borderBottomWidth: 3 },
   tabText: { fontSize: 15, fontWeight: '600' },
   list: { flex: 1 },
-  listContent: { paddingHorizontal: 20, paddingBottom: 100 },
+  listContent: { paddingHorizontal: 20, paddingBottom: 120 }, // Increased to prevent content from being hidden by bottom tabs
   connectionItem: {
     flexDirection: 'row',
     paddingVertical: 16,

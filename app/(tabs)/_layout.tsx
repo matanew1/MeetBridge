@@ -26,7 +26,16 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import ProfileModal from '../components/ProfileModal';
+import ClaimNotificationModal from '../components/ClaimNotificationModal';
+import TempMatchModal from '../components/TempMatchModal';
 import notificationService from '../../services/notificationService';
+import toastService from '../../services/toastService';
+import missedConnectionsService, {
+  MissedConnectionClaim,
+  MissedConnection,
+} from '../../services/firebase/missedConnectionsService';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../services/firebase/config';
 import {
   scale,
   verticalScale,
@@ -45,7 +54,16 @@ export default function TabLayout() {
   const router = useRouter();
   const theme = isDarkMode ? darkTheme : lightTheme;
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showClaimsModal, setShowClaimsModal] = useState(false);
+  const [showTempMatchModal, setShowTempMatchModal] = useState(false);
+  const [pendingClaims, setPendingClaims] = useState<
+    Array<MissedConnectionClaim & { connection?: MissedConnection }>
+  >([]);
+  const [pendingChatRequests, setPendingChatRequests] = useState<any[]>([]);
+  const [currentTempMatch, setCurrentTempMatch] = useState<any>(null);
+  const [otherUser, setOtherUser] = useState<any>(null);
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const bellScaleAnim = useRef(new Animated.Value(1)).current;
   const insets = useSafeAreaInsets();
 
   // Redirect to profile completion if needed
@@ -54,6 +72,74 @@ export default function TabLayout() {
       router.replace('/auth/complete-profile');
     }
   }, [user]);
+
+  // Subscribe to pending claims
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const unsubscribe = missedConnectionsService.subscribeToClaimsForUser(
+      user.id,
+      (claims) => {
+        const previousCount = pendingClaims.length;
+        setPendingClaims(claims);
+
+        // Animate bell icon when new claims arrive
+        if (claims.length > previousCount) {
+          Animated.sequence([
+            Animated.timing(bellScaleAnim, {
+              toValue: 1.2,
+              duration: 150,
+              useNativeDriver: true,
+            }),
+            Animated.timing(bellScaleAnim, {
+              toValue: 1,
+              duration: 150,
+              useNativeDriver: true,
+            }),
+          ]).start();
+        }
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user?.id]);
+
+  // Subscribe to chat requests
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const unsubscribe = missedConnectionsService.subscribeToChatRequests(
+      user.id,
+      async (requests) => {
+        const previousCount = pendingChatRequests.length;
+        setPendingChatRequests(requests);
+
+        // Show toast notification for new requests
+        if (requests.length > previousCount) {
+          toastService.info(
+            'Chat Request Received! 💬',
+            'Check your notifications to respond'
+          );
+
+          // Animate bell icon
+          Animated.sequence([
+            Animated.timing(bellScaleAnim, {
+              toValue: 1.2,
+              duration: 150,
+              useNativeDriver: true,
+            }),
+            Animated.timing(bellScaleAnim, {
+              toValue: 1,
+              duration: 150,
+              useNativeDriver: true,
+            }),
+          ]).start();
+        }
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user?.id, pendingChatRequests.length]);
 
   const handleProfilePress = () => {
     Animated.sequence([
@@ -73,6 +159,27 @@ export default function TabLayout() {
 
   const handleCloseProfileModal = () => {
     setShowProfileModal(false);
+  };
+
+  const handleClaimsPress = () => {
+    setShowClaimsModal(true);
+  };
+
+  const handleClaimsClose = () => {
+    setShowClaimsModal(false);
+  };
+
+  const handleClaimProcessed = () => {
+    // Refresh claims list
+    if (user?.id) {
+      missedConnectionsService
+        .getPendingClaimsForUser(user.id)
+        .then((result) => {
+          if (result.success) {
+            setPendingClaims(result.data);
+          }
+        });
+    }
   };
 
   // Calculate responsive dimensions
@@ -159,6 +266,57 @@ export default function TabLayout() {
                 />
               )}
             </TouchableOpacity>
+
+            {/* Claims Notification Bell */}
+            <Animated.View style={{ transform: [{ scale: bellScaleAnim }] }}>
+              <TouchableOpacity
+                style={[
+                  styles.bellButton,
+                  {
+                    backgroundColor:
+                      pendingClaims.length + pendingChatRequests.length > 0
+                        ? theme.primary + '20'
+                        : theme.primaryVariant,
+                    width: isTablet ? scale(48) : scale(44),
+                    height: isTablet ? scale(48) : scale(44),
+                    borderRadius: isTablet ? scale(24) : scale(22),
+                  },
+                ]}
+                onPress={handleClaimsPress}
+                activeOpacity={0.7}
+              >
+                <Bell
+                  size={isTablet ? scale(20) : scale(18)}
+                  color={
+                    pendingClaims.length + pendingChatRequests.length > 0
+                      ? theme.primary
+                      : theme.textSecondary
+                  }
+                  fill={
+                    pendingClaims.length + pendingChatRequests.length > 0
+                      ? theme.primary
+                      : 'none'
+                  }
+                  strokeWidth={
+                    pendingClaims.length + pendingChatRequests.length > 0
+                      ? 2.5
+                      : 2
+                  }
+                />
+                {pendingClaims.length + pendingChatRequests.length > 0 && (
+                  <View
+                    style={[styles.badge, { backgroundColor: theme.error }]}
+                  >
+                    <Text style={styles.badgeText}>
+                      {pendingClaims.length + pendingChatRequests.length > 9
+                        ? '9+'
+                        : pendingClaims.length + pendingChatRequests.length}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </Animated.View>
+
             <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
               <TouchableOpacity
                 style={[
@@ -378,6 +536,45 @@ export default function TabLayout() {
           user={user}
         />
       )}
+
+      {/* Claims Notification Modal */}
+      <ClaimNotificationModal
+        visible={showClaimsModal}
+        onClose={handleClaimsClose}
+        claims={pendingClaims}
+        chatRequests={pendingChatRequests}
+        onClaimProcessed={handleClaimProcessed}
+        onChatRequestClick={async (request) => {
+          // Get other user's data
+          const otherUserId = request.users.find(
+            (id: string) => id !== user?.id
+          );
+          if (otherUserId) {
+            const userDoc = await getDoc(doc(db, 'users', otherUserId));
+            if (userDoc.exists()) {
+              setCurrentTempMatch(request);
+              setOtherUser({
+                id: userDoc.id,
+                ...userDoc.data(),
+              });
+              handleClaimsClose();
+              setShowTempMatchModal(true);
+            }
+          }
+        }}
+      />
+
+      {/* Temporary Match Modal */}
+      <TempMatchModal
+        visible={showTempMatchModal}
+        onClose={() => {
+          setShowTempMatchModal(false);
+          setCurrentTempMatch(null);
+          setOtherUser(null);
+        }}
+        tempMatch={currentTempMatch}
+        otherUser={otherUser}
+      />
     </View>
   );
 }
@@ -429,6 +626,38 @@ const styles = StyleSheet.create({
   darkModeButton: {
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  bellButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: scale(18),
+    height: scale(18),
+    borderRadius: scale(9),
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xs / 2,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  badgeText: {
+    color: '#FFF',
+    fontSize: moderateScale(10),
+    fontWeight: '700',
   },
   iconContainer: {
     justifyContent: 'center',

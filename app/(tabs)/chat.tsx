@@ -11,7 +11,7 @@ import {
   Platform,
   StatusBar,
 } from 'react-native';
-import { MessageCircle } from 'lucide-react-native';
+import { MessageCircle, ImageIcon } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useUserStore } from '../../store';
@@ -184,15 +184,37 @@ const ChatItem = memo(
                 {chat.time}
               </Text>
             </View>
-            <Text
-              style={[
-                styles.chatMessage,
-                { color: theme.textSecondary },
-                chat.unread && styles.unreadMessage,
-              ]}
-            >
-              {chat.lastMessage}
-            </Text>
+            <View style={styles.lastMessageContainer}>
+              {chat.lastMessage.startsWith('http://') ||
+              chat.lastMessage.startsWith('https://') ? (
+                <>
+                  <ImageIcon
+                    size={14}
+                    color={theme.textSecondary}
+                    style={styles.imageIcon}
+                  />
+                  <Text
+                    style={[
+                      styles.chatMessage,
+                      { color: theme.textSecondary },
+                      chat.unread && styles.unreadMessage,
+                    ]}
+                  >
+                    image
+                  </Text>
+                </>
+              ) : (
+                <Text
+                  style={[
+                    styles.chatMessage,
+                    { color: theme.textSecondary },
+                    chat.unread && styles.unreadMessage,
+                  ]}
+                >
+                  {chat.lastMessage}
+                </Text>
+              )}
+            </View>
           </View>
           {chat.unread && (
             <Animated.View
@@ -237,6 +259,10 @@ export default function ChatScreen() {
     loadDiscoverProfiles,
   } = useUserStore();
   const [chats, setChats] = useState<ChatItem[]>([]);
+  const [activeTab, setActiveTab] = useState<'matches' | 'missed'>('matches');
+  const [fetchedProfiles, setFetchedProfiles] = useState<Map<string, any>>(
+    new Map()
+  );
 
   // Get all chat participant IDs for presence monitoring
   const participantIds = useMemo(() => {
@@ -316,14 +342,24 @@ export default function ChatScreen() {
           orderBy('updatedAt', 'desc')
         );
 
+        // Set up listener with includeMetadataChanges to get fresh data
         unsubscribe = onSnapshot(
           conversationsQuery,
+          { includeMetadataChanges: false }, // Only get actual data changes, not metadata
           async (snapshot) => {
             console.log(
               '🔔 Real-time conversation update:',
               snapshot.size,
-              'conversations'
+              'conversations',
+              '- From cache:',
+              snapshot.metadata.fromCache
             );
+
+            // Skip if data is from cache on initial load
+            if (snapshot.metadata.fromCache) {
+              console.log('⏭️ Skipping cached data, waiting for server data');
+              return;
+            }
 
             try {
               // Process the conversations directly from snapshot to avoid cache
@@ -348,6 +384,7 @@ export default function ChatScreen() {
                       }
                     : undefined,
                   unreadCount: data.unreadCount?.[currentUser.id] || 0,
+                  isMissedConnection: data.isMissedConnection || false,
                 };
               });
 
@@ -380,12 +417,94 @@ export default function ChatScreen() {
     };
   }, [currentUser?.id]);
 
+  // Fetch missing profiles from Firestore (for missed connections)
+  useEffect(() => {
+    if (!conversations || conversations.length === 0) return;
+
+    const fetchMissingProfiles = async () => {
+      const { doc, getDoc } = await import('firebase/firestore');
+      const { db } = await import('../../services/firebase/config');
+
+      const missingProfileIds: string[] = [];
+
+      // Find all participant IDs that are not in local state
+      conversations.forEach((conversation) => {
+        const otherParticipantId = conversation.participants?.find(
+          (id) => id !== currentUser?.id
+        );
+
+        if (!otherParticipantId) return;
+
+        // Check if profile exists in local state or fetched profiles
+        const existsInLocalState =
+          (discoverProfiles || []).some((p) => p.id === otherParticipantId) ||
+          (matchedProfilesData || []).some(
+            (p) => p.id === otherParticipantId
+          ) ||
+          fetchedProfiles.has(otherParticipantId);
+
+        if (!existsInLocalState) {
+          missingProfileIds.push(otherParticipantId);
+        }
+      });
+
+      if (missingProfileIds.length === 0) return;
+
+      console.log(
+        '🔍 Fetching missing profiles from Firestore:',
+        missingProfileIds
+      );
+
+      // Fetch all missing profiles
+      const fetchPromises = missingProfileIds.map(async (userId) => {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', userId));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            return {
+              id: userDoc.id,
+              ...userData,
+              createdAt: userData.createdAt?.toDate?.() || new Date(),
+              updatedAt: userData.updatedAt?.toDate?.() || new Date(),
+              dateOfBirth: userData.dateOfBirth?.toDate?.() || new Date(),
+              lastSeen: userData.lastSeen?.toDate?.(),
+            };
+          }
+        } catch (error) {
+          console.error(
+            '❌ Error fetching user from Firestore:',
+            userId,
+            error
+          );
+        }
+        return null;
+      });
+
+      const fetchedUsers = await Promise.all(fetchPromises);
+
+      // Update fetched profiles map
+      setFetchedProfiles((prev) => {
+        const newMap = new Map(prev);
+        fetchedUsers.forEach((user) => {
+          if (user) {
+            console.log('✅ Fetched profile:', user.name, user.id);
+            newMap.set(user.id, user);
+          }
+        });
+        return newMap;
+      });
+    };
+
+    fetchMissingProfiles();
+  }, [conversations, currentUser?.id, discoverProfiles, matchedProfilesData]);
+
   useEffect(() => {
     try {
       console.log('🔍 Chat screen useEffect triggered');
       console.log('Conversations count:', conversations?.length || 0);
       console.log('Discover profiles count:', discoverProfiles?.length || 0);
       console.log('Matched profiles count:', matchedProfilesData?.length || 0);
+      console.log('Active tab:', activeTab);
 
       // Safety check: ensure conversations is defined
       if (!conversations || !Array.isArray(conversations)) {
@@ -394,8 +513,16 @@ export default function ChatScreen() {
         return;
       }
 
+      // Filter conversations based on active tab
+      const filteredConversations = conversations.filter((conv) => {
+        const isMissedConnection = (conv as any).isMissedConnection === true;
+        return activeTab === 'missed'
+          ? isMissedConnection
+          : !isMissedConnection;
+      });
+
       // Sort conversations by most recent first
-      const sortedConversations = [...conversations].sort(
+      const sortedConversations = [...filteredConversations].sort(
         (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
       );
 
@@ -405,14 +532,17 @@ export default function ChatScreen() {
           const otherParticipantId = conversation.participants?.find(
             (id) => id !== currentUser?.id
           );
-          // Look in both discoverProfiles and matchedProfilesData
+          // Look in discoverProfiles, matchedProfilesData, AND fetchedProfiles
           const otherParticipant =
             (discoverProfiles || []).find(
               (profile) => profile.id === otherParticipantId
             ) ||
             (matchedProfilesData || []).find(
               (profile) => profile.id === otherParticipantId
-            );
+            ) ||
+            (otherParticipantId
+              ? fetchedProfiles.get(otherParticipantId)
+              : null);
 
           console.log('Processing conversation:', {
             conversationId: conversation.id,
@@ -474,6 +604,8 @@ export default function ChatScreen() {
     matchedProfilesData,
     currentUser,
     presenceMap,
+    activeTab, // Add activeTab to dependencies
+    fetchedProfiles, // Add fetchedProfiles to dependencies
   ]);
 
   const handleChatPress = useCallback(
@@ -556,9 +688,67 @@ export default function ChatScreen() {
           ]}
         >
           <Text style={[styles.title, { color: theme.text }]}>
-            {t('chat.title')} ({chats.length})
+            {t('chat.title')}
           </Text>
         </Animated.View>
+
+        {/* Tabs */}
+        <View
+          style={[styles.tabsContainer, { borderBottomColor: theme.border }]}
+        >
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'matches' && styles.activeTab]}
+            onPress={() => setActiveTab('matches')}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                { color: theme.textSecondary },
+                activeTab === 'matches' && [
+                  styles.activeTabText,
+                  { color: theme.primary },
+                ],
+              ]}
+            >
+              Matches (
+              {conversations.filter((c: any) => !c.isMissedConnection).length})
+            </Text>
+            {activeTab === 'matches' && (
+              <View
+                style={[
+                  styles.tabIndicator,
+                  { backgroundColor: theme.primary },
+                ]}
+              />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'missed' && styles.activeTab]}
+            onPress={() => setActiveTab('missed')}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                { color: theme.textSecondary },
+                activeTab === 'missed' && [
+                  styles.activeTabText,
+                  { color: theme.primary },
+                ],
+              ]}
+            >
+              Missed (
+              {conversations.filter((c: any) => c.isMissedConnection).length})
+            </Text>
+            {activeTab === 'missed' && (
+              <View
+                style={[
+                  styles.tabIndicator,
+                  { backgroundColor: theme.primary },
+                ]}
+              />
+            )}
+          </TouchableOpacity>
+        </View>
 
         <Animated.View
           style={[
@@ -577,7 +767,9 @@ export default function ChatScreen() {
             ListEmptyComponent={renderEmptyState}
             extraData={theme}
             style={styles.chatList}
-            contentContainerStyle={chats.length === 0 ? { flex: 1 } : undefined}
+            contentContainerStyle={
+              chats.length === 0 ? { flex: 1 } : { paddingBottom: 120 }
+            }
             showsVerticalScrollIndicator={false}
             removeClippedSubviews={true}
             maxToRenderPerBatch={5}
@@ -612,6 +804,36 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     letterSpacing: -0.5,
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    borderBottomWidth: 1,
+    marginBottom: 8,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  activeTab: {
+    // Active tab styling
+  },
+  tabText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  activeTabText: {
+    fontWeight: '700',
+  },
+  tabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    borderRadius: 3,
   },
   content: {
     flex: 1,
@@ -678,6 +900,14 @@ const styles = StyleSheet.create({
   },
   chatTime: {
     fontSize: 12,
+  },
+  lastMessageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  imageIcon: {
+    marginRight: 4,
   },
   chatMessage: {
     fontSize: 14,

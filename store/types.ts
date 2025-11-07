@@ -32,6 +32,7 @@ export interface User {
   pushToken?: string;
   isProfileComplete?: boolean; // Track if user has completed initial profile setup
   hasSeenTutorial?: boolean; // Track if user has seen the onboarding tutorial
+  isMissedConnection?: boolean; // Flag to identify if this match is from missed connections
 }
 
 // Removed: UserProfile alias (use User directly)
@@ -72,6 +73,7 @@ export interface Conversation {
   unreadCount: {
     [userId: string]: number; // Per-user unread counts
   };
+  isMissedConnection?: boolean; // Flag to identify missed connection chats
 }
 
 export interface Match {
@@ -85,6 +87,22 @@ export interface Match {
   unmatchedAt?: Date;
   unmatchedBy?: string;
   animationPlayed?: boolean; // Track if match animation has been shown
+  isMissedConnection?: boolean; // Flag to identify missed connection matches
+  matchInitiator?: string; // User who completed the match (last to like/accept)
+}
+
+export interface TemporaryMatch {
+  id: string;
+  users: [string, string];
+  user1: string;
+  user2: string;
+  claimId: string;
+  connectionId: string;
+  createdAt: Date;
+  expiresAt: Date;
+  status: 'pending' | 'accepted' | 'expired' | 'declined';
+  acceptedBy?: string[];
+  conversationId?: string;
 }
 
 export interface Interaction {

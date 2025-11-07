@@ -68,6 +68,7 @@ interface ProfileDetailProps {
   onUnmatch?: (id: string) => void;
   isLiked?: boolean;
   isDisliked?: boolean;
+  isMissedConnection?: boolean; // Hide heart button for missed connections
 }
 
 const ProfileDetail = ({
@@ -79,6 +80,7 @@ const ProfileDetail = ({
   onUnmatch,
   isLiked = false,
   isDisliked = false,
+  isMissedConnection = false,
 }: ProfileDetailProps) => {
   const { t } = useTranslation();
   const { isDarkMode } = useTheme();
@@ -318,6 +320,27 @@ const ProfileDetail = ({
             </>
           ) : isMatched ? (
             // Already matched - show only unmatch and message
+            <>
+              {onUnmatch && (
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.dislikeButton]}
+                  onPress={() => onUnmatch(user.id)}
+                >
+                  <X size={24} color={theme.error} />
+                </TouchableOpacity>
+              )}
+
+              {onMessage && (
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.messageButton]}
+                  onPress={() => onMessage(user.id)}
+                >
+                  <MessageCircle size={24} color={theme.primary} />
+                </TouchableOpacity>
+              )}
+            </>
+          ) : isMissedConnection ? (
+            // Missed connection - show only unmatch (no like button)
             <>
               {onUnmatch && (
                 <TouchableOpacity

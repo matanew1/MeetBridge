@@ -258,37 +258,3 @@ export function sanitizePhoneNumber(phone: string): string {
 export function sanitizeBoolean(value: any): boolean {
   return value === true || value === 'true';
 }
-
-/**
- * [SECURITY] Rate limiting check (client-side - basic)
- */
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-
-export function checkRateLimit(
-  key: string,
-  maxRequests: number = 10,
-  windowMs: number = 60000
-): boolean {
-  const now = Date.now();
-  const record = rateLimitMap.get(key);
-
-  if (!record || now > record.resetAt) {
-    // Reset the rate limit window
-    rateLimitMap.set(key, { count: 1, resetAt: now + windowMs });
-    return true;
-  }
-
-  if (record.count >= maxRequests) {
-    return false; // Rate limit exceeded
-  }
-
-  record.count++;
-  return true;
-}
-
-/**
- * [SECURITY] Clear rate limit for a key
- */
-export function clearRateLimit(key: string): void {
-  rateLimitMap.delete(key);
-}

@@ -16,7 +16,6 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { db, auth } from './firebase/config';
-import rateLimitService from './rateLimitService';
 import toastService from './toastService';
 
 export interface BlockedUser {
@@ -239,19 +238,6 @@ class BlockReportService {
         return { success: false, message: 'Not authenticated' };
       }
 
-      // Check rate limit
-      const rateLimitCheck = await rateLimitService.checkRateLimit(
-        currentUser.uid,
-        'reports'
-      );
-
-      if (!rateLimitCheck.allowed) {
-        return {
-          success: false,
-          message: `Daily report limit reached. Try again after ${rateLimitCheck.resetAt.toLocaleTimeString()}`,
-        };
-      }
-
       // Validate report target and create report
       if (targetType === 'user' && !targetId) {
         console.error('reportContent called for user but targetId is missing');
@@ -269,9 +255,6 @@ class BlockReportService {
         status: 'pending',
         createdAt: serverTimestamp(),
       });
-
-      // Increment rate limit
-      await rateLimitService.incrementCounter(currentUser.uid, 'reports');
 
       console.log('✅ Content reported successfully');
       return {

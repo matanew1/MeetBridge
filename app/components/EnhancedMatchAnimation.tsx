@@ -203,6 +203,7 @@ const styles = StyleSheet.create({
   actions: {
     width: '100%',
     gap: spacing.sm,
+    marginBottom: verticalScale(100), // Increased to position above bottom tabs
   },
   button: {
     flexDirection: 'row',

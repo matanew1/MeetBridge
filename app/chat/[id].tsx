@@ -29,7 +29,6 @@ import {
   User,
   X,
   UserX,
-  Mic,
   ImageIcon,
   Plus,
 } from 'lucide-react-native';
@@ -47,7 +46,6 @@ import { useUserStore } from '../../store';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import ProfileDetail from '../components/ProfileDetail';
-import VoiceMessageRecorder from '../components/VoiceMessageRecorder';
 import { LoadingOverlay } from '../components/ui';
 import { usePresence } from '../../hooks/usePresence';
 import notificationService from '../../services/notificationService';
@@ -251,14 +249,13 @@ const ChatScreen = () => {
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [showProfileDetail, setShowProfileDetail] = useState(false);
   const [showUnmatchConfirm, setShowUnmatchConfirm] = useState(false);
-  const [heartAnimation, setHeartAnimation] = useState(false);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [showIcebreakers, setShowIcebreakers] = useState(false);
-  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const textInputRef = useRef<TextInput>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
   const previousMessageCountRef = useRef(0);
 
@@ -272,7 +269,6 @@ const ChatScreen = () => {
   const inputSlideAnim = useSharedValue(50);
   const inputFadeAnim = useSharedValue(0);
   const heartScale = useSharedValue(1);
-  const heartOpacity = useSharedValue(1);
 
   // Memoized values for better performance
   const conversation = useMemo(
@@ -313,6 +309,44 @@ const ChatScreen = () => {
 
     return matchedUser || discoverUser;
   }, [matchedProfilesData, discoverProfiles, otherUserId]);
+
+  // Fetch user from Firestore if not found in local state (for missed connections)
+  useEffect(() => {
+    if (!otherUserId || foundUser) return;
+
+    console.log(
+      '🔍 User not found in local state, fetching from Firestore:',
+      otherUserId
+    );
+
+    const fetchUser = async () => {
+      try {
+        const { doc, getDoc } = await import('firebase/firestore');
+        const { db } = await import('../../services/firebase/config');
+
+        const userDoc = await getDoc(doc(db, 'users', otherUserId));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const user = {
+            id: userDoc.id,
+            ...userData,
+            createdAt: userData.createdAt?.toDate?.() || new Date(),
+            updatedAt: userData.updatedAt?.toDate?.() || new Date(),
+            dateOfBirth: userData.dateOfBirth?.toDate?.() || new Date(),
+            lastSeen: userData.lastSeen?.toDate?.(),
+          };
+          console.log('✅ Fetched user from Firestore:', user.name);
+          setOtherUser(user);
+        } else {
+          console.error('❌ User not found in Firestore:', otherUserId);
+        }
+      } catch (error) {
+        console.error('❌ Error fetching user from Firestore:', error);
+      }
+    };
+
+    fetchUser();
+  }, [otherUserId, foundUser]);
 
   // Set active chat to suppress notifications while in this chat
   useEffect(() => {
@@ -484,6 +518,10 @@ const ChatScreen = () => {
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
       () => {
         setKeyboardHeight(0);
+        // Scroll to bottom when keyboard hides (important for after sending message)
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
       }
     );
 
@@ -529,8 +567,12 @@ const ChatScreen = () => {
       // This prevents conflicts between store data and Firestore data
 
       // Mark messages as read (debounced)
-      // Safety check: ensure messages array exists
-      if (conversation.messages && Array.isArray(conversation.messages)) {
+      // Safety check: ensure messages array exists and is an array
+      if (
+        conversation.messages &&
+        Array.isArray(conversation.messages) &&
+        conversation.messages.length > 0
+      ) {
         const unreadMessageIds = conversation.messages
           .filter((msg) => !msg.isRead && msg.senderId !== currentUser.id)
           .map((msg) => msg.id);
@@ -542,7 +584,9 @@ const ChatScreen = () => {
           });
         }
       } else {
-        console.log('⚠️ conversation.messages is not defined or not an array');
+        console.log(
+          'ℹ️ No messages to mark as read yet (conversation just started or messages not loaded)'
+        );
       }
     } else {
       console.log('❌ Missing required data for chat initialization');
@@ -834,13 +878,30 @@ const ChatScreen = () => {
       // Clear input immediately for better UX
       setInputText('');
 
+      // Blur the TextInput to dismiss keyboard
+      textInputRef.current?.blur();
+
+      // Also call Keyboard.dismiss as backup
+      Keyboard.dismiss();
+
       // Send message to Firestore - real-time listener will update UI
       sendMessage(id as string, messageText);
 
-      // Scroll to bottom after a short delay to ensure message is rendered
+      // Multiple scroll attempts with increasing delays to ensure scrolling after:
+      // 1. Keyboard dismissal animation
+      // 2. Message arrives from Firestore
+      // 3. Message renders in FlatList
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
-      }, 150);
+      }, 400);
+
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 700);
+
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 1000);
     }
   }, [inputText, id, currentUser, sendMessage]);
 
@@ -904,50 +965,6 @@ const ChatScreen = () => {
   const handleMessageFromProfile = useCallback(() => {
     setShowProfileDetail(false);
     // Already in chat, so just close the modal
-  }, []);
-
-  const handleSendVoice = useCallback(
-    async (audioUri: string) => {
-      if (!id || !currentUser) return;
-
-      try {
-        setShowVoiceRecorder(false);
-
-        // Upload voice message to storage
-        const voiceUrl = await storageService.uploadVoiceMessage(audioUri);
-
-        // Send voice message (we'll use a special format)
-        await sendMessage(id as string, `🎤 Voice message: ${voiceUrl}`);
-
-        toastService.show('Voice message sent', 'success');
-      } catch (error) {
-        console.error('Error sending voice message:', error);
-        toastService.show('Failed to send voice message', 'error');
-      }
-    },
-    [id, currentUser, sendMessage]
-  );
-
-  const handleStartVoiceRecording = useCallback(async () => {
-    setShowAttachMenu(false);
-
-    // Request permission first
-    try {
-      const { status } = await Audio.requestPermissionsAsync();
-
-      if (status !== 'granted') {
-        toastService.show(
-          'Permission needed',
-          'Please grant microphone access to record voice messages'
-        );
-        return;
-      }
-
-      setShowVoiceRecorder(true);
-    } catch (error) {
-      console.error('Error requesting microphone permission:', error);
-      toastService.show('Failed to request permission', 'error');
-    }
   }, []);
 
   const handlePickImage = useCallback(async () => {
@@ -1112,30 +1129,35 @@ const ChatScreen = () => {
             >
               <ArrowLeft size={24} color={theme.text} />
             </TouchableOpacity>
-            {otherUser.image && otherUser.image.trim() !== '' ? (
-              <Image source={{ uri: otherUser.image }} style={styles.avatar} />
-            ) : (
-              <View
-                style={[
-                  styles.avatar,
-                  {
-                    backgroundColor: theme.surfaceVariant,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  },
-                ]}
-              >
-                <Text
-                  style={{
-                    fontSize: 20,
-                    color: theme.textSecondary,
-                    fontWeight: 'bold',
-                  }}
+            <TouchableOpacity onPress={handleViewProfile} activeOpacity={0.7}>
+              {otherUser.image && otherUser.image.trim() !== '' ? (
+                <Image
+                  source={{ uri: otherUser.image }}
+                  style={styles.avatar}
+                />
+              ) : (
+                <View
+                  style={[
+                    styles.avatar,
+                    {
+                      backgroundColor: theme.surfaceVariant,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    },
+                  ]}
                 >
-                  {otherUser.name?.charAt(0) || '?'}
-                </Text>
-              </View>
-            )}
+                  <Text
+                    style={{
+                      fontSize: 20,
+                      color: theme.textSecondary,
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    {otherUser.name?.charAt(0) || '?'}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
             <View style={styles.userInfo}>
               <Text style={[styles.userName, { color: theme.text }]}>
                 {otherUser.name}
@@ -1233,6 +1255,7 @@ const ChatScreen = () => {
               <Plus size={24} color={theme.primary} />
             </TouchableOpacity>
             <TextInput
+              ref={textInputRef}
               style={[
                 styles.textInput,
                 {
@@ -1248,6 +1271,9 @@ const ChatScreen = () => {
               multiline
               numberOfLines={1}
               textAlign="left"
+              blurOnSubmit={true}
+              returnKeyType="send"
+              onSubmitEditing={handleSendMessage}
               onFocus={() => {
                 setShowAttachMenu(false);
                 // Scroll to bottom when input is focused
@@ -1279,74 +1305,75 @@ const ChatScreen = () => {
 
           {/* Attachment Menu */}
           {showAttachMenu && (
-            <View
-              style={[styles.attachMenu, { backgroundColor: theme.surface }]}
+            <Animated.View
+              style={[
+                styles.attachMenuBubble,
+                {
+                  backgroundColor: theme.surface,
+                  shadowColor: theme.shadow,
+                },
+              ]}
             >
-              <TouchableOpacity
-                style={[
-                  styles.attachMenuItem,
-                  { backgroundColor: theme.background },
-                ]}
-                onPress={handlePickImage}
-                activeOpacity={0.7}
-              >
-                <View
-                  style={[
-                    styles.attachMenuIconWrapper,
-                    { backgroundColor: `${theme.primary}15` },
-                  ]}
-                >
-                  <ImageIcon size={20} color={theme.primary} />
-                </View>
-                <Text style={[styles.attachMenuText, { color: theme.text }]}>
-                  Photo
-                </Text>
-              </TouchableOpacity>
-
-              {Platform.OS !== 'web' && (
+              <View style={styles.attachMenuContent}>
                 <TouchableOpacity
                   style={[
-                    styles.attachMenuItem,
+                    styles.attachMenuButton,
                     { backgroundColor: theme.background },
                   ]}
-                  onPress={handleStartVoiceRecording}
+                  onPress={handlePickImage}
                   activeOpacity={0.7}
                 >
                   <View
                     style={[
-                      styles.attachMenuIconWrapper,
-                      { backgroundColor: `${theme.primary}15` },
+                      styles.attachIconCircle,
+                      { backgroundColor: '#FF6B9D' },
                     ]}
                   >
-                    <Mic size={20} color={theme.primary} />
+                    <ImageIcon size={22} color="#FFF" />
                   </View>
-                  <Text style={[styles.attachMenuText, { color: theme.text }]}>
-                    Voice
+                  <Text
+                    style={[styles.attachButtonText, { color: theme.text }]}
+                  >
+                    Photo
                   </Text>
                 </TouchableOpacity>
-              )}
 
-              <TouchableOpacity
-                style={[
-                  styles.attachMenuItem,
-                  { backgroundColor: theme.background },
-                ]}
-                onPress={handleSendHeart}
-                activeOpacity={0.7}
-              >
                 <View
                   style={[
-                    styles.attachMenuIconWrapper,
-                    { backgroundColor: `${theme.primary}15` },
+                    styles.attachMenuDivider,
+                    { backgroundColor: theme.border },
                   ]}
+                />
+
+                <TouchableOpacity
+                  style={[
+                    styles.attachMenuButton,
+                    { backgroundColor: theme.background },
+                  ]}
+                  onPress={handleSendHeart}
+                  activeOpacity={0.7}
                 >
-                  <Heart size={20} color={theme.primary} />
-                </View>
-                <Text style={[styles.attachMenuText, { color: theme.text }]}>
-                  Heart
-                </Text>
-              </TouchableOpacity>
-            </View>
+                  <View
+                    style={[
+                      styles.attachIconCircle,
+                      { backgroundColor: '#FF3B5C' },
+                    ]}
+                  >
+                    <Heart size={22} color="#FFF" />
+                  </View>
+                  <Text
+                    style={[styles.attachButtonText, { color: theme.text }]}
+                  >
+                    Heart
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Arrow pointer */}
+              <View
+                style={[styles.bubbleArrow, { backgroundColor: theme.surface }]}
+              />
+            </Animated.View>
           )}
         </Animated.View>
       </KeyboardAvoidingView>
@@ -1406,6 +1433,7 @@ const ChatScreen = () => {
             onDislike={() => {}}
             onMessage={handleMessageFromProfile}
             onUnmatch={handleUnmatch}
+            isMissedConnection={(conversation as any)?.isMissedConnection}
           />
         </View>
       )}
@@ -1475,18 +1503,8 @@ const ChatScreen = () => {
         </Modal>
       )}
 
-      {/* Voice Message Recorder Modal */}
-      <VoiceMessageRecorder
-        visible={showVoiceRecorder}
-        onClose={() => setShowVoiceRecorder(false)}
-        onSend={handleSendVoice}
-      />
-
       {/* Loading Overlay for Image Upload */}
-      <LoadingOverlay
-        visible={uploadingImage}
-        message={t('chat.uploadingImage')}
-      />
+      <LoadingOverlay visible={uploadingImage} message="Uploading image..." />
     </View>
   );
 };
@@ -1698,8 +1716,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 20,
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    fontSize: 16,
+    paddingVertical: 10,
+    fontSize: 18,
+    lineHeight: 24,
     maxHeight: 100,
     textAlignVertical: 'center',
   },
@@ -1817,6 +1836,63 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     // color will be set from theme.textOnPrimary or white
+  },
+  attachMenuBubble: {
+    position: 'absolute',
+    bottom: 60,
+    left: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    minWidth: 180,
+  },
+  attachMenuContent: {
+    gap: 4,
+  },
+  attachMenuButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+  },
+  attachIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  attachButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 12,
+    color: '#1A1A1A',
+  },
+  attachMenuDivider: {
+    height: 1,
+    backgroundColor: '#F0F0F0',
+    marginHorizontal: 12,
+    marginVertical: 4,
+  },
+  bubbleArrow: {
+    position: 'absolute',
+    bottom: -8,
+    left: 20,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#FFFFFF',
   },
 });
 

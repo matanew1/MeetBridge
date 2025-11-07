@@ -332,6 +332,7 @@ export default function SearchScreen() {
     likedProfiles,
     dislikedProfiles,
     matchedProfiles,
+    conversations,
     error,
     updateSearchFilters,
     startSearch,
@@ -359,12 +360,23 @@ export default function SearchScreen() {
     const dislikedSet = new Set(dislikedProfiles);
     const seenIds = new Set<string>();
 
+    // Get all user IDs from missed connection conversations
+    const missedConnectionUserIds = new Set(
+      (conversations || [])
+        .filter((conv: any) => conv.isMissedConnection === true)
+        .flatMap((conv: any) => conv.participants || [])
+        .filter((id: string) => id !== currentUser?.id)
+    );
+
     return discoverProfiles
       .filter((profile) => {
         // Quick rejection checks first (most common filters)
         if (matchedSet.has(profile.id)) return false;
         if (likedSet.has(profile.id)) return false;
         if (dislikedSet.has(profile.id)) return false;
+
+        // Filter out users with missed connection conversations
+        if (missedConnectionUserIds.has(profile.id)) return false;
 
         // Deduplicate by ID (check if we've seen this ID before)
         if (seenIds.has(profile.id)) return false;
@@ -387,6 +399,8 @@ export default function SearchScreen() {
     matchedProfiles,
     likedProfiles,
     dislikedProfiles,
+    conversations,
+    currentUser?.id,
     ageRange,
   ]);
 
@@ -1528,7 +1542,7 @@ const styles = StyleSheet.create({
   flatListContent: {
     paddingHorizontal: 16,
     paddingTop: 20,
-    paddingBottom: 100,
+    paddingBottom: 120, // Increased to prevent content from being hidden by bottom tabs
   },
   columnWrapper: {
     justifyContent: 'space-between',
