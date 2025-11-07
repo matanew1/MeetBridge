@@ -3,14 +3,14 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   Image,
   FlatList,
   Animated,
   ListRenderItemInfo,
+  Platform,
+  StatusBar,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { MessageCircle } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
@@ -137,7 +137,30 @@ const ChatItem = memo(
           onPress={onPress}
         >
           <View style={styles.avatarContainer}>
-            <Image source={{ uri: chat.image }} style={styles.chatAvatar} />
+            {chat.image && chat.image.trim() !== '' ? (
+              <Image source={{ uri: chat.image }} style={styles.chatAvatar} />
+            ) : (
+              <View
+                style={[
+                  styles.chatAvatar,
+                  {
+                    backgroundColor: theme.surfaceVariant,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  },
+                ]}
+              >
+                <Text
+                  style={{
+                    fontSize: 24,
+                    color: theme.textSecondary,
+                    fontWeight: 'bold',
+                  }}
+                >
+                  {chat.name?.charAt(0) || '?'}
+                </Text>
+              </View>
+            )}
             {chat.isOnline && (
               <Animated.View
                 style={[
@@ -533,11 +556,13 @@ export default function ChatScreen() {
   );
 
   return (
-    <LinearGradient
-      colors={[theme.background, theme.surfaceVariant]}
-      style={styles.container}
-    >
-      <SafeAreaView style={styles.safeArea}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <StatusBar
+        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        backgroundColor="transparent"
+        translucent
+      />
+      <View style={styles.safeArea}>
         <Animated.View
           style={[
             styles.header,
@@ -579,8 +604,8 @@ export default function ChatScreen() {
             scrollEventThrottle={16}
           />
         </Animated.View>
-      </SafeAreaView>
-    </LinearGradient>
+      </View>
+    </View>
   );
 }
 
@@ -590,7 +615,8 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    paddingTop: 20,
+    paddingTop:
+      Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 20 : 50, // Account for status bar + spacing
   },
   header: {
     flexDirection: 'row',

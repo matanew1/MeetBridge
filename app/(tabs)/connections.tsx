@@ -5,7 +5,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   FlatList,
   Animated,
@@ -16,8 +15,8 @@ import {
   Platform,
   ActivityIndicator,
   ScrollView,
+  StatusBar,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { toastService } from '../../services/toastService';
 import {
   Sparkles,
@@ -160,9 +159,9 @@ const ConnectionItem: React.FC<ConnectionItemProps> = React.memo(
           {/* Tags */}
           {connection.tags && connection.tags.length > 0 && (
             <View style={styles.tagsRow}>
-              {connection.tags.slice(0, 3).map((tag: string) => (
+              {connection.tags.slice(0, 3).map((tag: string, index: number) => (
                 <View
-                  key={tag}
+                  key={`${tag}-${index}`}
                   style={[
                     styles.tag,
                     { backgroundColor: `${theme.primary}15` },
@@ -568,8 +567,13 @@ export default function ConnectionsScreen() {
         user?.id || ''
       );
 
-      if (!result?.success) {
-        toastService.error('Error', result?.message || 'Failed to like post');
+      if (!result) {
+        toastService.error('Error', 'Failed to like post. Please try again.');
+        return;
+      }
+
+      if (!result.success) {
+        toastService.error('Error', result.message || 'Failed to like post');
         // Real-time listeners will handle state updates
       }
     },
@@ -609,8 +613,13 @@ export default function ConnectionsScreen() {
         user?.id || ''
       );
 
-      if (!result?.success) {
-        toastService.error('Error', result?.message || 'Failed to save post');
+      if (!result) {
+        toastService.error('Error', 'Failed to save post. Please try again.');
+        return;
+      }
+
+      if (!result.success) {
+        toastService.error('Error', result.message || 'Failed to save post');
         // Real-time listeners will handle state updates
       }
     },
@@ -641,7 +650,12 @@ export default function ConnectionsScreen() {
         isAnonymous: createForm.isAnonymous,
       });
 
-      if (result?.success) {
+      if (!result) {
+        toastService.error('Error', 'Failed to create post. Please try again.');
+        return;
+      }
+
+      if (result.success) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         toastService.success(
           'Success!',
@@ -656,7 +670,7 @@ export default function ConnectionsScreen() {
         });
         // Real-time listeners will update the list automatically
       } else {
-        toastService.error('Error', result?.message || 'Failed to create post');
+        toastService.error('Error', result.message || 'Failed to create post');
       }
     } catch (error: any) {
       console.error('❌ Error creating connection:', error);
@@ -686,7 +700,12 @@ export default function ConnectionsScreen() {
         }
       );
 
-      if (result?.success) {
+      if (!result) {
+        toastService.error('Error', 'Failed to update post. Please try again.');
+        return;
+      }
+
+      if (result.success) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
         // Fetch the updated connection immediately
@@ -716,7 +735,7 @@ export default function ConnectionsScreen() {
           isAnonymous: false,
         });
       } else {
-        toastService.error('Error', result?.message || 'Failed to update post');
+        toastService.error('Error', result.message || 'Failed to update post');
       }
     } catch (error: any) {
       console.error('❌ Error updating connection:', error);
@@ -755,13 +774,22 @@ export default function ConnectionsScreen() {
           const result = await missedConnectionsService.claimConnection(
             connection.id
           );
-          if (result?.success) {
+
+          if (!result) {
+            toastService.error(
+              'Error',
+              'Failed to claim connection. Please try again.'
+            );
+            return;
+          }
+
+          if (result.success) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             toastService.success('Success!', 'Your claim has been submitted!');
           } else {
             toastService.error(
               'Error',
-              result?.message || 'Failed to claim connection'
+              result.message || 'Failed to claim connection'
             );
           }
         }}
@@ -784,7 +812,16 @@ export default function ConnectionsScreen() {
           const result = await missedConnectionsService.deleteConnection(
             connection.id
           );
-          if (result?.success) {
+
+          if (!result) {
+            toastService.error(
+              'Error',
+              'Failed to delete post. Please try again.'
+            );
+            return;
+          }
+
+          if (result.success) {
             // Real-time listeners will remove the post automatically
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             toastService.success(
@@ -794,7 +831,7 @@ export default function ConnectionsScreen() {
           } else {
             toastService.error(
               'Error',
-              result?.message || 'Failed to delete post'
+              result.message || 'Failed to delete post'
             );
           }
         }}
@@ -863,11 +900,13 @@ export default function ConnectionsScreen() {
   }, [activeTab, theme]);
 
   return (
-    <LinearGradient
-      colors={[theme.background, theme.surfaceVariant]}
-      style={styles.container}
-    >
-      <SafeAreaView style={styles.safeArea}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <StatusBar
+        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        backgroundColor="transparent"
+        translucent
+      />
+      <View style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={[styles.title, { color: theme.text }]}>
@@ -980,7 +1019,7 @@ export default function ConnectionsScreen() {
           maxToRenderPerBatch={5}
           windowSize={5}
         />
-      </SafeAreaView>
+      </View>
 
       {/* Create Post Modal */}
       <Modal
@@ -1255,13 +1294,17 @@ export default function ConnectionsScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  safeArea: { flex: 1, paddingTop: 20 },
+  safeArea: {
+    flex: 1,
+    paddingTop:
+      Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 20 : 50,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -72,7 +72,7 @@ async function deleteAllMockUsers() {
 
   const results = [];
 
-  for (let i = 1; i <= 10; i++) {
+  for (let i = 1; i <= 20; i++) {
     const result = await deleteMockUser(i);
     results.push(result);
 
@@ -83,7 +83,7 @@ async function deleteAllMockUsers() {
   console.log('\n\n📊 Summary:');
   console.log('='.repeat(50));
   const successful = results.filter((r) => r.success).length;
-  console.log(`✅ Successfully deleted: ${successful}/10 users`);
+  console.log(`✅ Successfully deleted: ${successful}/20 users`);
 
   process.exit(0);
 }

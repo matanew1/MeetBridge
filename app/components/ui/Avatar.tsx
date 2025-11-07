@@ -141,7 +141,7 @@ const Avatar: React.FC<AvatarProps> = ({
 
   const renderAvatar = () => (
     <View style={[containerStyle, !statusRing && style]}>
-      {source && !error ? (
+      {source && source.trim() !== '' && !error ? (
         <>
           <Image
             source={{ uri: source }}

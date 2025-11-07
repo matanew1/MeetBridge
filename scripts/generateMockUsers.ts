@@ -27,20 +27,48 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Base location - Will be set from user input or default to Kriyat Ono
-let BASE_LAT = 32.053783; // Default: Kriyat Ono
-let BASE_LON = 34.858582; // Default: Kriyat Ono
+// Base location - Will be set from user input or default to Petah Tikva
+let BASE_LAT = 32.081271689366034; // Default: Petah Tikva
+let BASE_LON = 34.89067520447793; // Default: Petah Tikva
 
 // Helper function to generate random location near base
-function generateNearbyLocation(distanceMeters: number): {
+// Now supports creating realistic clusters around popular spots
+function generateNearbyLocation(
+  distanceMeters: number,
+  clustering: boolean = true
+): {
   latitude: number;
   longitude: number;
 } {
-  // 1 degree ≈ 111km = 111000 meters
-  const degreeOffset = distanceMeters / 111000;
+  // Add random variation to distance (±15%) for more realistic placement
+  // This prevents everyone being at exactly 5m, 10m, etc.
+  const variation = 0.15; // 15% variation
+  const randomFactor = 1 + (Math.random() - 0.5) * 2 * variation;
+  const actualDistance = distanceMeters * randomFactor;
 
-  // Random angle
-  const angle = Math.random() * 2 * Math.PI;
+  // 1 degree ≈ 111km = 111000 meters
+  const degreeOffset = actualDistance / 111000;
+
+  let angle: number;
+
+  if (clustering) {
+    // Create clusters: 70% chance to be in 4 main directions (N, S, E, W)
+    // representing popular areas like cafes, parks, etc.
+    const clusterChance = Math.random();
+    if (clusterChance < 0.7) {
+      // Cluster around 4 main directions
+      const directions = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]; // N, E, S, W
+      const baseDirection = directions[Math.floor(Math.random() * 4)];
+      // Add some randomness (±30 degrees)
+      angle = baseDirection + (Math.random() - 0.5) * (Math.PI / 6);
+    } else {
+      // Random direction for variety
+      angle = Math.random() * 2 * Math.PI;
+    }
+  } else {
+    // Completely random angle
+    angle = Math.random() * 2 * Math.PI;
+  }
 
   // Calculate offset
   const latOffset = degreeOffset * Math.cos(angle);
@@ -347,7 +375,7 @@ const mockComments = [
 async function createMockUser(
   userData: (typeof mockUsers)[0],
   index: number,
-  locationName: string = 'Kriyat Ono, Israel'
+  locationName: string = 'Petah Tikva, Israel'
 ) {
   const email = `mock${index + 1}@meetbridge.test`;
   const password = 'Test1234!';
@@ -367,8 +395,13 @@ async function createMockUser(
 
     console.log(`✅ Auth user created: ${userId}`);
 
-    // Generate location near base coordinates
-    const location = generateNearbyLocation(userData.distanceMeters);
+    // Generate location near base coordinates with clustering for realism
+    // Users closer than 1km use clustering (simulating popular spots)
+    const useClustering = userData.distanceMeters < 1000;
+    const location = generateNearbyLocation(
+      userData.distanceMeters,
+      useClustering
+    );
     // Use precision 10 for ~1.2m accuracy (ULTRA HIGH PRECISION for 5-500m range)
     const geohash = geohashForLocation(
       [location.latitude, location.longitude],
@@ -601,13 +634,51 @@ async function getUserLocation(): Promise<{
   // Check for command line arguments for auto mode
   const args = process.argv.slice(2);
   const autoMode = args.includes('--auto') || args.includes('-y');
+  const useCurrentUser = args.includes('--current') || args.includes('-c');
+
+  // If --current flag is used, try to fetch current user's location
+  if (useCurrentUser) {
+    console.log('🔍 Attempting to fetch current user location...');
+    try {
+      // Prompt for user ID
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+      });
+
+      const userId = await new Promise<string>((resolve) => {
+        rl.question('Enter your user ID: ', (id) => {
+          rl.close();
+          resolve(id.trim());
+        });
+      });
+
+      if (userId) {
+        const userDoc = await getDoc(doc(db, 'users', userId));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          if (userData.location?.coordinates) {
+            console.log('✅ Found user location!');
+            return {
+              lat: userData.location.coordinates.latitude,
+              lon: userData.location.coordinates.longitude,
+              locationName: userData.location.city || 'Your Location',
+            };
+          }
+        }
+      }
+      console.log('⚠️  Could not fetch user location, using default...');
+    } catch (error) {
+      console.log('⚠️  Error fetching user location, using default...');
+    }
+  }
 
   if (autoMode) {
-    console.log('✅ Auto mode: Using default Kriyat Ono location');
+    console.log('✅ Auto mode: Using default Petah Tikva location');
     return {
-      lat: 32.053783,
-      lon: 34.858582,
-      locationName: 'Kriyat Ono, Israel',
+      lat: 32.081271689366034,
+      lon: 34.89067520447793,
+      locationName: 'Petah Tikva, Israel',
     };
   }
 
@@ -621,7 +692,8 @@ async function getUserLocation(): Promise<{
     console.log('='.repeat(50));
     console.log('Options:');
     console.log('  1. Enter custom coordinates');
-    console.log('  2. Use default Kriyat Ono location (Press Enter)');
+    console.log('  2. Use default Petah Tikva location (Press Enter)');
+    console.log('  3. Fetch from your user profile (use --current flag)');
     console.log('');
 
     rl.question('Choose option (1/2) [default: 2]: ', (answer) => {
@@ -632,10 +704,10 @@ async function getUserLocation(): Promise<{
           '\nEnter your coordinates (find them at https://www.latlong.net/)\n'
         );
 
-        rl.question('Enter latitude (e.g., 32.053783): ', (lat) => {
-          rl.question('Enter longitude (e.g., 34.858582): ', (lon) => {
+        rl.question('Enter latitude (e.g., 32.081271): ', (lat) => {
+          rl.question('Enter longitude (e.g., 34.890675): ', (lon) => {
             rl.question(
-              'Enter location name (e.g., Kriyat Ono, Israel): ',
+              'Enter location name (e.g., Petah Tikva, Israel): ',
               (name) => {
                 rl.close();
                 const latitude = parseFloat(lat.trim());
@@ -643,12 +715,12 @@ async function getUserLocation(): Promise<{
 
                 if (isNaN(latitude) || isNaN(longitude)) {
                   console.log(
-                    '❌ Invalid coordinates, using Kriyat Ono default'
+                    '❌ Invalid coordinates, using Petah Tikva default'
                   );
                   resolve({
-                    lat: 32.053783,
-                    lon: 34.858582,
-                    locationName: 'Kriyat Ono, Israel',
+                    lat: 32.081271689366034,
+                    lon: 34.89067520447793,
+                    locationName: 'Petah Tikva, Israel',
                   });
                 } else {
                   console.log(
@@ -666,11 +738,11 @@ async function getUserLocation(): Promise<{
         });
       } else {
         rl.close();
-        console.log('✅ Using default Kriyat Ono location');
+        console.log('✅ Using default Petah Tikva location');
         resolve({
-          lat: 32.053783,
-          lon: 34.858582,
-          locationName: 'Kriyat Ono, Israel',
+          lat: 32.081271689366034,
+          lon: 34.89067520447793,
+          locationName: 'Petah Tikva, Israel',
         });
       }
     });

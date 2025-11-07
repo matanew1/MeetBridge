@@ -10,16 +10,15 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   Image,
   TextInput,
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  Dimensions,
   Modal,
   Keyboard,
+  StatusBar,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
@@ -48,8 +47,6 @@ import { usePresence } from '../../hooks/usePresence';
 import notificationService from '../../services/notificationService';
 import toastService from '../../services/toastService'; // Added toastService import
 import IcebreakerSuggestions from '../components/IcebreakerSuggestions';
-
-const { width } = Dimensions.get('window');
 
 interface Message {
   id: string;
@@ -898,9 +895,11 @@ const ChatScreen = () => {
   // Memoized loading component
   const LoadingComponent = useMemo(
     () => (
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: theme.background }]}
-      >
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <StatusBar
+          barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+          backgroundColor={theme.background}
+        />
         <View style={styles.loadingContainer}>
           {loadingTimeout ? (
             <>
@@ -923,7 +922,7 @@ const ChatScreen = () => {
             </Text>
           )}
         </View>
-      </SafeAreaView>
+      </View>
     ),
     [
       theme.background,
@@ -933,6 +932,7 @@ const ChatScreen = () => {
       t,
       loadingTimeout,
       router,
+      isDarkMode,
     ]
   );
 
@@ -945,12 +945,15 @@ const ChatScreen = () => {
   }
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-    >
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <StatusBar
+        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        backgroundColor={theme.background}
+      />
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
       >
         {/* Header */}
         <Animated.View
@@ -967,7 +970,30 @@ const ChatScreen = () => {
             >
               <ArrowLeft size={24} color={theme.text} />
             </TouchableOpacity>
-            <Image source={{ uri: otherUser.image }} style={styles.avatar} />
+            {otherUser.image && otherUser.image.trim() !== '' ? (
+              <Image source={{ uri: otherUser.image }} style={styles.avatar} />
+            ) : (
+              <View
+                style={[
+                  styles.avatar,
+                  {
+                    backgroundColor: theme.surfaceVariant,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  },
+                ]}
+              >
+                <Text
+                  style={{
+                    fontSize: 20,
+                    color: theme.textSecondary,
+                    fontWeight: 'bold',
+                  }}
+                >
+                  {otherUser.name?.charAt(0) || '?'}
+                </Text>
+              </View>
+            )}
             <View style={styles.userInfo}>
               <Text style={[styles.userName, { color: theme.text }]}>
                 {otherUser.name}
@@ -1234,13 +1260,14 @@ const ChatScreen = () => {
           </View>
         </Modal>
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0,
   },
   keyboardAvoid: {
     flex: 1,
@@ -1272,7 +1299,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: Platform.OS === 'ios' ? 50 : 12, // Add top padding for iOS notch
+    paddingBottom: 12,
     borderBottomWidth: 1,
   },
   headerLeft: {
@@ -1329,7 +1357,7 @@ const styles = StyleSheet.create({
   },
   messageContainer: {
     marginBottom: 16,
-    maxWidth: width * 0.75,
+    maxWidth: '75%', // 75% of screen width
   },
   myMessageContainer: {
     alignSelf: 'flex-end',
@@ -1390,7 +1418,8 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 12, // Extra padding for iOS home indicator
     borderTopWidth: 1,
   },
   inputRow: {

@@ -240,6 +240,8 @@ const ProfileCard = memo(
             <Text style={[styles.distanceText, { color: theme.textOnPrimary }]}>
               {user.distance >= 1000
                 ? `${(user.distance / 1000).toFixed(1)}km`
+                : user.distance < 100
+                ? `${user.distance.toFixed(1)}m`
                 : `${Math.round(user.distance)}m`}
             </Text>
           </View>
@@ -1285,16 +1287,18 @@ export default function SearchScreen() {
         </Animated.View>
       )}
 
-      {/* Conditional rendering: Map View or Grid View */}
-      {viewMode === 'map' ? (
-        <MapViewComponent
-          profiles={sortedDiscoverProfiles}
-          currentUser={currentUser}
-          onProfileSelect={handleProfilePress}
-          maxDistance={maxDistance}
-          theme={theme}
-        />
-      ) : (
+      {/* Map View - Always mounted for preloading, visibility controlled */}
+      <MapViewComponent
+        profiles={sortedDiscoverProfiles}
+        currentUser={currentUser}
+        onProfileSelect={handleProfilePress}
+        maxDistance={maxDistance}
+        theme={theme}
+        isVisible={viewMode === 'map'}
+      />
+
+      {/* Grid View - Only show when not in map mode */}
+      {viewMode !== 'map' && (
         <FlatList
           ref={flatListRef}
           data={sortedDiscoverProfiles}

@@ -33,6 +33,7 @@ interface MapViewComponentProps {
   onProfileSelect: (profile: User) => void;
   maxDistance: number; // in meters
   theme: Theme;
+  isVisible?: boolean; // Optional prop to control visibility for preloading
 }
 
 const MapViewComponent: React.FC<MapViewComponentProps> = ({
@@ -41,8 +42,10 @@ const MapViewComponent: React.FC<MapViewComponentProps> = ({
   onProfileSelect,
   maxDistance,
   theme,
+  isVisible = true,
 }) => {
   const webViewRef = useRef<WebView>(null);
+  const [isMapReady, setIsMapReady] = React.useState(false);
 
   // User's current location
   const userLocation = useMemo(() => {
@@ -78,6 +81,8 @@ const MapViewComponent: React.FC<MapViewComponentProps> = ({
           profile.distance !== null && profile.distance !== undefined
             ? profile.distance >= 1000
               ? `${(profile.distance / 1000).toFixed(1)}km`
+              : profile.distance < 100
+              ? `${profile.distance.toFixed(1)}m`
               : `${Math.round(profile.distance)}m`
             : '';
 
@@ -228,21 +233,43 @@ const MapViewComponent: React.FC<MapViewComponentProps> = ({
       color: ${theme.primary} !important;
       background: ${isDark ? '#2C2C2E' : '#F5F5F7'} !important;
     }
+    /* Scale indicator */
+    .scale-indicator {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: ${
+        isDark ? 'rgba(28, 28, 30, 0.95)' : 'rgba(255, 255, 255, 0.95)'
+      };
+      color: ${isDark ? '#E5E5E5' : '#1A1A1A'};
+      padding: 8px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      box-shadow: 0 2px 8px rgba(0,0,0,${isDark ? '0.5' : '0.15'});
+      border: 1px solid ${isDark ? '#3A3A3C' : '#E5E7EB'};
+      z-index: 1000;
+    }
   </style>
 </head>
 <body>
   <div id="map"></div>
+  <div class="scale-indicator" id="scaleIndicator">~100m</div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    // Initialize map with higher accuracy
+    // Initialize map with higher accuracy for 5m-500m range
     const map = L.map('map', {
       zoomControl: false,
       attributionControl: false,
-      zoomSnap: 0.1,
-      zoomDelta: 0.5,
-      wheelPxPerZoomLevel: 120,
-      maxBoundsViscosity: 1.0
-    }).setView([${userLocation.latitude}, ${userLocation.longitude}], 16);
+      zoomSnap: 0.25,        // Finer zoom increments for precision
+      zoomDelta: 0.5,        // Smoother zoom transitions
+      wheelPxPerZoomLevel: 80, // More responsive wheel zoom
+      maxBoundsViscosity: 1.0,
+      trackResize: true,
+      worldCopyJump: false,
+      maxZoom: 20,           // Allow higher zoom for close range (5m)
+      minZoom: 13            // Reasonable minimum for 500m range
+    }).setView([${userLocation.latitude}, ${userLocation.longitude}], 17);
 
     // Add OpenStreetMap tiles with dark mode support (FREE!)
     const tileLayerUrl = ${isDark} 
@@ -250,9 +277,11 @@ const MapViewComponent: React.FC<MapViewComponentProps> = ({
       : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
     
     L.tileLayer(tileLayerUrl, {
-      maxZoom: 19,
-      minZoom: 10,
-      attribution: '' // Hide attribution
+      maxZoom: 20,          // Support high zoom levels
+      minZoom: 13,
+      attribution: '', // Hide attribution
+      updateWhenZooming: false, // Improve performance
+      keepBuffer: 2        // Keep more tiles loaded for smoother panning
     }).addTo(map);
 
     // Add distance radius circle
@@ -323,15 +352,66 @@ const MapViewComponent: React.FC<MapViewComponentProps> = ({
 
     // Handle recenter command from React Native with better accuracy
     window.recenterMap = function() {
-      map.setView([${userLocation.latitude}, ${userLocation.longitude}], 16, {
+      // Calculate optimal zoom based on maxDistance
+      let optimalZoom = 17; // Default for close range
+      if (${maxDistance} <= 50) {
+        optimalZoom = 19;     // Very close range (5-50m)
+      } else if (${maxDistance} <= 100) {
+        optimalZoom = 18;     // Close range (50-100m)
+      } else if (${maxDistance} <= 250) {
+        optimalZoom = 17;     // Medium-close range (100-250m)
+      } else if (${maxDistance} <= 500) {
+        optimalZoom = 16;     // Medium range (250-500m)
+      } else {
+        optimalZoom = 15;     // Wider range (500m+)
+      }
+      
+      map.setView([${userLocation.latitude}, ${
+      userLocation.longitude
+    }], optimalZoom, {
         animate: true,
         duration: 0.5
       });
     };
     
-    // Improve accuracy by forcing map to recalculate
+    // Update scale indicator based on zoom level
+    function updateScaleIndicator() {
+      const zoom = map.getZoom();
+      const scaleIndicator = document.getElementById('scaleIndicator');
+      let scaleText = '';
+      
+      if (zoom >= 19) {
+        scaleText = '~10-25m';
+      } else if (zoom >= 18) {
+        scaleText = '~25-50m';
+      } else if (zoom >= 17) {
+        scaleText = '~50-100m';
+      } else if (zoom >= 16) {
+        scaleText = '~100-250m';
+      } else if (zoom >= 15) {
+        scaleText = '~250-500m';
+      } else {
+        scaleText = '~500m+';
+      }
+      
+      if (scaleIndicator) {
+        scaleIndicator.textContent = scaleText;
+      }
+    }
+    
+    // Update scale on zoom
+    map.on('zoomend', updateScaleIndicator);
+    
+    // Improve accuracy by forcing map to recalculate and set optimal zoom
     setTimeout(() => {
       map.invalidateSize();
+      window.recenterMap(); // Apply optimal zoom on load
+      updateScaleIndicator(); // Update scale indicator
+      
+      // Notify React Native that map is ready
+      window.ReactNativeWebView?.postMessage(JSON.stringify({
+        type: 'mapReady'
+      }));
     }, 100);
   </script>
 </body>
@@ -350,6 +430,8 @@ const MapViewComponent: React.FC<MapViewComponentProps> = ({
         if (profile) {
           onProfileSelect(profile);
         }
+      } else if (data.type === 'mapReady') {
+        setIsMapReady(true);
       }
     } catch (error) {
       console.error('Error parsing WebView message:', error);
@@ -373,7 +455,7 @@ const MapViewComponent: React.FC<MapViewComponentProps> = ({
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, !isVisible && styles.hidden]}>
       <WebView
         ref={webViewRef}
         source={{ html: generateMapHTML }}
@@ -392,36 +474,40 @@ const MapViewComponent: React.FC<MapViewComponentProps> = ({
         )}
       />
 
-      {/* Recenter button */}
-      <TouchableOpacity
-        style={[
-          styles.recenterButton,
-          {
-            backgroundColor: theme.surface,
-            shadowColor: theme.shadow,
-          },
-        ]}
-        onPress={handleRecenterMap}
-        activeOpacity={0.8}
-      >
-        <Navigation size={24} color={theme.primary} />
-      </TouchableOpacity>
+      {/* Recenter button - only show when visible */}
+      {isVisible && (
+        <TouchableOpacity
+          style={[
+            styles.recenterButton,
+            {
+              backgroundColor: theme.surface,
+              shadowColor: theme.shadow,
+            },
+          ]}
+          onPress={handleRecenterMap}
+          activeOpacity={0.8}
+        >
+          <Navigation size={24} color={theme.primary} />
+        </TouchableOpacity>
+      )}
 
-      {/* Profile count badge */}
-      <View
-        style={[
-          styles.countBadge,
-          {
-            backgroundColor: theme.surface,
-            shadowColor: theme.shadow,
-          },
-        ]}
-      >
-        <MapPin size={16} color={theme.primary} />
-        <Text style={[styles.countText, { color: theme.text }]}>
-          {validProfiles.length} nearby
-        </Text>
-      </View>
+      {/* Profile count badge - only show when visible */}
+      {isVisible && (
+        <View
+          style={[
+            styles.countBadge,
+            {
+              backgroundColor: theme.surface,
+              shadowColor: theme.shadow,
+            },
+          ]}
+        >
+          <MapPin size={16} color={theme.primary} />
+          <Text style={[styles.countText, { color: theme.text }]}>
+            {validProfiles.length} nearby
+          </Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -429,6 +515,12 @@ const MapViewComponent: React.FC<MapViewComponentProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  hidden: {
+    position: 'absolute',
+    left: -10000, // Move offscreen to keep loaded but hidden
+    width: width,
+    height: height,
   },
   map: {
     flex: 1,

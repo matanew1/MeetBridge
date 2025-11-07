@@ -139,21 +139,9 @@ export default function TabLayout() {
                 styles.darkModeButton,
                 {
                   backgroundColor: theme.primaryVariant,
-                  width: isTablet
-                    ? scale(50)
-                    : deviceInfo.isSmallDevice
-                    ? scale(40)
-                    : scale(44),
-                  height: isTablet
-                    ? scale(50)
-                    : deviceInfo.isSmallDevice
-                    ? scale(40)
-                    : scale(44),
-                  borderRadius: isTablet
-                    ? scale(25)
-                    : deviceInfo.isSmallDevice
-                    ? scale(20)
-                    : scale(22),
+                  width: isTablet ? scale(48) : scale(44),
+                  height: isTablet ? scale(48) : scale(44),
+                  borderRadius: isTablet ? scale(24) : scale(22),
                 },
               ]}
               onPress={toggleDarkMode}
@@ -161,24 +149,12 @@ export default function TabLayout() {
             >
               {isDarkMode ? (
                 <Sun
-                  size={
-                    isTablet
-                      ? scale(24)
-                      : deviceInfo.isSmallDevice
-                      ? scale(18)
-                      : scale(20)
-                  }
+                  size={isTablet ? scale(24) : scale(20)}
                   color={theme.primary}
                 />
               ) : (
                 <Moon
-                  size={
-                    isTablet
-                      ? scale(24)
-                      : deviceInfo.isSmallDevice
-                      ? scale(18)
-                      : scale(20)
-                  }
+                  size={isTablet ? scale(24) : scale(20)}
                   color={theme.primary}
                 />
               )}
@@ -188,21 +164,9 @@ export default function TabLayout() {
                 style={[
                   styles.profileButton,
                   {
-                    width: isTablet
-                      ? scale(50)
-                      : deviceInfo.isSmallDevice
-                      ? scale(40)
-                      : scale(44),
-                    height: isTablet
-                      ? scale(50)
-                      : deviceInfo.isSmallDevice
-                      ? scale(40)
-                      : scale(44),
-                    borderRadius: isTablet
-                      ? scale(25)
-                      : deviceInfo.isSmallDevice
-                      ? scale(20)
-                      : scale(22),
+                    width: isTablet ? scale(48) : scale(44),
+                    height: isTablet ? scale(48) : scale(44),
+                    borderRadius: isTablet ? scale(24) : scale(22),
                     borderWidth: 2,
                     borderColor: theme.primary,
                     ...Platform.select({
@@ -230,16 +194,8 @@ export default function TabLayout() {
                   style={[
                     styles.headerProfile,
                     {
-                      width: isTablet
-                        ? scale(50)
-                        : deviceInfo.isSmallDevice
-                        ? scale(40)
-                        : scale(44),
-                      height: isTablet
-                        ? scale(50)
-                        : deviceInfo.isSmallDevice
-                        ? scale(40)
-                        : scale(44),
+                      width: isTablet ? scale(48) : scale(44),
+                      height: isTablet ? scale(48) : scale(44),
                     },
                   ]}
                 />
@@ -267,25 +223,19 @@ export default function TabLayout() {
                 elevation: 16,
               },
             }),
-            paddingTop: isTablet ? spacing.md : spacing.sm,
-            paddingBottom:
-              Math.max(insets.bottom, spacing.xs) +
-              (isTablet ? spacing.md : spacing.sm),
-            paddingHorizontal: isTablet
-              ? spacing.xl
-              : deviceInfo.isSmallDevice
-              ? spacing.sm
-              : spacing.md,
-            marginBottom: Platform.select({
-              ios: spacing.sm,
-              android: spacing.xs,
-              default: spacing.xs,
+            paddingTop: spacing.sm,
+            paddingBottom: Platform.select({
+              ios: spacing.lg,
+              android: spacing.md,
+              default: spacing.md,
             }),
-            marginHorizontal: isTablet
-              ? spacing.xl
-              : deviceInfo.isSmallDevice
-              ? spacing.sm
-              : spacing.md,
+            paddingHorizontal: isTablet ? spacing.xl : spacing.md,
+            marginBottom: Platform.select({
+              ios: spacing.md,
+              android: spacing.sm,
+              default: spacing.sm,
+            }),
+            marginHorizontal: spacing.md,
             height: tabBarHeight,
             position: 'absolute',
             bottom: 0,
@@ -300,24 +250,20 @@ export default function TabLayout() {
             fontSize: isTablet
               ? moderateScale(13)
               : deviceInfo.isSmallDevice
-              ? moderateScale(9)
-              : moderateScale(10),
+              ? moderateScale(9.5)
+              : moderateScale(10.5),
             fontWeight: '600',
-            marginTop: deviceInfo.isSmallDevice
-              ? spacing.xs / 3
-              : spacing.xs / 2,
-            letterSpacing: 0.15,
+            marginTop: spacing.xs / 2,
+            letterSpacing: 0.2,
             textAlign: 'center',
           },
           tabBarIconStyle: {
-            marginTop: deviceInfo.isSmallDevice ? 0 : spacing.xs / 2,
+            marginTop: spacing.xs / 2,
           },
           tabBarItemStyle: {
-            paddingVertical: deviceInfo.isSmallDevice
-              ? spacing.xs / 2
-              : spacing.xs,
+            paddingVertical: spacing.xs,
             borderRadius: borderRadius.lg,
-            marginHorizontal: deviceInfo.isSmallDevice ? 0 : spacing.xs / 4,
+            marginHorizontal: spacing.xs / 4,
             flex: 1,
           },
         }}
@@ -441,12 +387,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: isTablet
-      ? spacing.xl
-      : deviceInfo.isSmallDevice
-      ? spacing.md
-      : spacing.lg,
-    paddingBottom: isTablet ? spacing.md : spacing.sm,
+    paddingHorizontal: isTablet ? spacing.xl : spacing.lg,
+    paddingBottom: spacing.md,
   },
   headerContent: {
     flexDirection: 'row',
@@ -465,7 +407,7 @@ const styles = StyleSheet.create({
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: deviceInfo.isSmallDevice ? spacing.xs : spacing.sm,
+    gap: spacing.sm,
   },
   logoText: {
     fontWeight: '800',
@@ -491,29 +433,14 @@ const styles = StyleSheet.create({
   iconContainer: {
     justifyContent: 'center',
     alignItems: 'center',
-    minWidth: isTablet
-      ? scale(48)
-      : deviceInfo.isSmallDevice
-      ? scale(36)
-      : scale(40),
-    minHeight: isTablet
-      ? scale(48)
-      : deviceInfo.isSmallDevice
-      ? scale(36)
-      : scale(40),
+    minWidth: scale(40),
+    minHeight: scale(40),
     borderRadius: borderRadius.xl,
+    transition: 'all 0.3s ease',
   },
   activeIconContainer: {
-    paddingHorizontal: isTablet
-      ? spacing.md
-      : deviceInfo.isSmallDevice
-      ? spacing.sm
-      : spacing.md,
-    paddingVertical: isTablet
-      ? spacing.sm
-      : deviceInfo.isSmallDevice
-      ? spacing.xs
-      : spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderRadius: borderRadius.xl,
     ...Platform.select({
       ios: {

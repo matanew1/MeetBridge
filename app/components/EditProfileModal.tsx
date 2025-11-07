@@ -169,6 +169,39 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     }
   }, [visible]);
 
+  // Auto-detect location when modal opens and location field is empty
+  useEffect(() => {
+    const detectLocation = async () => {
+      // Only run when modal becomes visible and we haven't already set location
+      if (
+        visible &&
+        !formData.location &&
+        user?.coordinates &&
+        isFormInitialized
+      ) {
+        try {
+          const cityName = await smartLocationManager.getCityFromCoordinates(
+            user.coordinates.latitude,
+            user.coordinates.longitude
+          );
+
+          if (cityName) {
+            setFormData((prev) => ({
+              ...prev,
+              location: cityName,
+            }));
+            console.log('✅ Auto-detected location:', cityName);
+          }
+        } catch (error) {
+          console.error('Error auto-detecting location:', error);
+          // Don't show error to user, just log it
+        }
+      }
+    };
+
+    detectLocation();
+  }, [visible, user?.coordinates, isFormInitialized]); // Removed formData.location from dependencies
+
   const handleSave = async () => {
     if (isSaving) return;
 
@@ -176,11 +209,13 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     try {
       if (!formData.name.trim()) {
         toastService.error('Error', 'Name is required');
+        setIsSaving(false);
         return;
       }
 
       if (!formData.dateOfBirth) {
         toastService.error('Error', 'Date of birth is required');
+        setIsSaving(false);
         return;
       }
 
@@ -196,6 +231,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           'Error',
           'Invalid date of birth. Please select a valid date.'
         );
+        setIsSaving(false);
         return;
       }
 
@@ -203,6 +239,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       const age = calculateAge(dobDate);
       if (age === null || age < 18) {
         toastService.error('Error', 'You must be at least 18 years old');
+        setIsSaving(false);
         return;
       }
 
@@ -691,31 +728,30 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   </Text>
                 </View>
 
-                {/* Location is automatically tracked in the background */}
-                <View
+                <TextInput
                   style={[
-                    styles.locationInfo,
+                    styles.input,
                     {
+                      color: theme.text,
                       backgroundColor: theme.surface,
                       borderColor: theme.border,
                     },
                   ]}
+                  value={formData.location}
+                  onChangeText={(text) =>
+                    setFormData((prev) => ({ ...prev, location: text }))
+                  }
+                  placeholder="Your city will be detected automatically..."
+                  placeholderTextColor={theme.textSecondary}
+                />
+                <Text
+                  style={[
+                    styles.locationInfoSubtext,
+                    { color: theme.textSecondary, marginTop: 8 },
+                  ]}
                 >
-                  <Text
-                    style={[styles.locationInfoText, { color: theme.text }]}
-                  >
-                    {user?.location || 'Location updating automatically...'}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.locationInfoSubtext,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    Your location is automatically updated in the background to
-                    show you the best nearby matches.
-                  </Text>
-                </View>
+                  Your city is automatically detected from your GPS location
+                </Text>
               </View>
             </View>
 

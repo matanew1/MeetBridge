@@ -126,11 +126,28 @@ const LikedProfileCard = React.memo(
           activeOpacity={0.8}
         >
           <View style={styles.imageContainer}>
-            <Image
-              source={{ uri: user.image }}
-              style={styles.cardImage}
-              resizeMode="cover"
-            />
+            {user.image && user.image.trim() !== '' ? (
+              <Image
+                source={{ uri: user.image }}
+                style={styles.cardImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View
+                style={[
+                  styles.cardImage,
+                  {
+                    backgroundColor: theme.surfaceVariant,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  },
+                ]}
+              >
+                <Text style={{ fontSize: 40, color: theme.textSecondary }}>
+                  {user.name?.charAt(0) || '?'}
+                </Text>
+              </View>
+            )}
             <Animated.View
               style={[
                 styles.heartOverlay,

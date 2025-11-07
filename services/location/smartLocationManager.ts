@@ -76,6 +76,33 @@ TaskManager.defineTask(
               location.coords.longitude >= -180 &&
               location.coords.longitude <= 180
             ) {
+              // Get city name using reverse geocoding
+              let cityName = '';
+              try {
+                const ExpoLocation = require('expo-location');
+                const reverseGeocode = await ExpoLocation.reverseGeocodeAsync({
+                  latitude: location.coords.latitude,
+                  longitude: location.coords.longitude,
+                });
+
+                if (reverseGeocode && reverseGeocode.length > 0) {
+                  const address = reverseGeocode[0];
+                  // Build location string: "City, Country" or just "City"
+                  cityName =
+                    address.city || address.district || address.subregion || '';
+                  if (cityName && address.country) {
+                    cityName = `${cityName}, ${address.country}`;
+                  } else if (address.country) {
+                    cityName = address.country;
+                  }
+
+                  console.log('🏙️ Detected location:', cityName);
+                }
+              } catch (geoError) {
+                console.warn('⚠️ Reverse geocoding failed:', geoError);
+                // Continue without city name
+              }
+
               await updateDoc(doc(db, 'users', userId), {
                 coordinates: {
                   latitude: location.coords.latitude,
@@ -83,6 +110,7 @@ TaskManager.defineTask(
                 },
                 geohash,
                 lastLocationUpdate: new Date(),
+                ...(cityName && { location: cityName }), // Only update if we got a city name
               });
 
               console.log('✅ Background location updated in Firebase');
@@ -298,6 +326,41 @@ class SmartLocationManager {
         background: 'denied',
         canAskAgain: false,
       };
+    }
+  }
+
+  /**
+   * Get city name from coordinates using reverse geocoding
+   */
+  async getCityFromCoordinates(
+    latitude: number,
+    longitude: number
+  ): Promise<string> {
+    try {
+      const reverseGeocode = await Location.reverseGeocodeAsync({
+        latitude,
+        longitude,
+      });
+
+      if (reverseGeocode && reverseGeocode.length > 0) {
+        const address = reverseGeocode[0];
+        // Build location string: "City, Country" or just "City"
+        let cityName =
+          address.city || address.district || address.subregion || '';
+        if (cityName && address.country) {
+          cityName = `${cityName}, ${address.country}`;
+        } else if (address.country) {
+          cityName = address.country;
+        }
+
+        console.log('🏙️ Detected location:', cityName);
+        return cityName;
+      }
+
+      return '';
+    } catch (error) {
+      console.error('Error getting city name:', error);
+      return '';
     }
   }
 

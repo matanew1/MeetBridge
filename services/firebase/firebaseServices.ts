@@ -505,8 +505,8 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
             console.log(
               `📏 Distance check for ${data.displayName || userId}:`,
               {
-                distance: distance.toFixed(2) + 'km',
-                maxDistance: filters.maxDistance + 'km',
+                distance: distance.toFixed(1) + 'm',
+                maxDistance: filters.maxDistance + 'm',
                 willInclude: distance <= filters.maxDistance,
               }
             );
@@ -515,7 +515,7 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
               console.log(
                 `🚫 Filtered by distance: ${
                   data.displayName || userId
-                } (${distance.toFixed(2)}km > ${filters.maxDistance}km)`
+                } (${distance.toFixed(1)}m > ${filters.maxDistance}m)`
               );
               filteredOutStats.distance++;
               return;
