@@ -1833,7 +1833,7 @@ class MissedConnectionsService {
           user2: chatRequestData.users[1],
           conversationId: conversationRef.id,
           createdAt: serverTimestamp(),
-          animationPlayed: false,
+          animationPlayed: true, // Animation already played during chat request acceptance
           unmatched: false, // Required field to appear in Winks tab queries
           isMissedConnection: true, // Flag to identify missed connection matches
           matchInitiator: user.uid, // Track who completed the match (second to accept)

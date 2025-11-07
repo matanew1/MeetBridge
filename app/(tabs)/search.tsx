@@ -640,6 +640,7 @@ export default function SearchScreen() {
           // Check if animation has already been played for this match
           const matchData = change.doc.data();
           const animationAlreadyPlayed = matchData.animationPlayed === true;
+          const isMissedConnection = matchData.isMissedConnection === true;
 
           // Check if this match is already being shown (avoid duplicate from likeProfile response)
           const currentMatchData = matchData;
@@ -664,8 +665,12 @@ export default function SearchScreen() {
             };
           });
 
-          // Show match animation only if not already played and not currently showing
-          if (!animationAlreadyPlayed && !isAlreadyShowing) {
+          // Show match animation only if not already played, not currently showing, and not a missed connection
+          if (
+            !animationAlreadyPlayed &&
+            !isAlreadyShowing &&
+            !isMissedConnection
+          ) {
             setMatchData({
               user: matchedUser,
               matchId: change.doc.id,
@@ -687,6 +692,10 @@ export default function SearchScreen() {
             if (animationAlreadyPlayed) {
               console.log(
                 `⏭️ Skipping match animation (already played) for: ${matchedUser.name}`
+              );
+            } else if (isMissedConnection) {
+              console.log(
+                `⏭️ Skipping match animation (missed connection) for: ${matchedUser.name}`
               );
             } else {
               console.log(
