@@ -44,6 +44,18 @@ export { presenceService };
 // Export icebreaker service
 export { default as icebreakerService } from './icebreakerService';
 
+// Export rate limiting service
+export { default as rateLimitService } from './rateLimitService';
+
+// Export block/report service
+export { default as blockReportService } from './blockReportService';
+
+// Export image compression service
+export { default as imageCompressionService } from './imageCompressionService';
+
+// Export storage service
+export { default as storageService } from './storageService';
+
 // Export location services (new smart location system)
 export {
   smartLocationManager,

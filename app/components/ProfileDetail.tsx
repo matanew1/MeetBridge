@@ -18,6 +18,7 @@ import {
   X,
   MessageCircle,
   MapPin,
+  AlertCircle,
 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -32,6 +33,7 @@ import {
 } from '../../utils/responsive';
 import { PREDEFINED_INTERESTS } from '../../constants/interests';
 import ZodiacBadge from './ZodiacBadge';
+import BlockReportModal from './BlockReportModal';
 import { auth, db } from '../../services/firebase/config';
 import {
   doc,
@@ -41,6 +43,7 @@ import {
   where,
   getDocs,
 } from 'firebase/firestore';
+import { useUserStore } from '../../store';
 
 const { width, height } = Dimensions.get('window');
 
@@ -84,6 +87,10 @@ const ProfileDetail = ({
   const imageScrollRef = useRef<FlatList>(null);
   const [isMatched, setIsMatched] = useState(false);
   const [checkingMatch, setCheckingMatch] = useState(true);
+  const [showBlockReportModal, setShowBlockReportModal] = useState(false);
+  const removeProfileFromLists = useUserStore(
+    (state) => state.removeProfileFromLists
+  );
 
   // Check if users are already matched
   useEffect(() => {
@@ -149,9 +156,14 @@ const ProfileDetail = ({
           <ArrowRight size={24} color={theme.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.text }]}>
-          {t('profile.title')}
+          {user.name}
         </Text>
-        <View style={styles.placeholder} />
+        <TouchableOpacity
+          onPress={() => setShowBlockReportModal(true)}
+          style={styles.closeButton}
+        >
+          <AlertCircle size={24} color={theme.textSecondary} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -362,6 +374,18 @@ const ProfileDetail = ({
           )}
         </View>
       </ScrollView>
+
+      {/* Block/Report Modal */}
+      <BlockReportModal
+        visible={showBlockReportModal}
+        onClose={() => setShowBlockReportModal(false)}
+        userId={user.id}
+        userName={user.name}
+        onBlockSuccess={() => {
+          removeProfileFromLists(user.id);
+          onClose();
+        }}
+      />
     </SafeAreaView>
   );
 };

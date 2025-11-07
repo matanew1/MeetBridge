@@ -15,6 +15,7 @@ import { MessageCircle } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useUserStore } from '../../store';
+import { EnhancedEmptyState } from '../components/ui';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import { useMultiplePresence } from '../../hooks/usePresence';
@@ -530,29 +531,11 @@ export default function ChatScreen() {
   }, [chats.length]);
 
   const renderEmptyState = () => (
-    <Animated.View
-      style={[
-        styles.emptyState,
-        {
-          opacity: emptyFadeAnim,
-          transform: [{ translateY: emptyTextAnim }],
-        },
-      ]}
-    >
-      <Animated.View
-        style={{
-          transform: [{ scale: emptyIconAnim }],
-        }}
-      >
-        <MessageCircle size={60} color={theme.textSecondary} />
-      </Animated.View>
-      <Text style={[styles.emptyTitle, { color: theme.text }]}>
-        {t('chat.noConversations')}
-      </Text>
-      <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-        {t('chat.startMatching')}
-      </Text>
-    </Animated.View>
+    <EnhancedEmptyState
+      type="chat"
+      onAction={() => router.push('/(tabs)/search')}
+      actionLabel={t('common.startSwiping')}
+    />
   );
 
   return (
@@ -623,7 +606,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingTop: 20,
     paddingBottom: 24,
   },
   title: {

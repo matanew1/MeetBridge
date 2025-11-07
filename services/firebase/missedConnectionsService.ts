@@ -18,6 +18,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from './config';
 import { geohashService } from '../location';
+import rateLimitService from '../rateLimitService';
 
 export interface Comment {
   id: string;
@@ -111,6 +112,23 @@ class MissedConnectionsService {
         return { success: false, message: 'User not authenticated' };
       }
 
+      const rateLimitCheck = await rateLimitService.checkRateLimit(
+        user.uid,
+        'missedConnections'
+      );
+
+      if (!rateLimitCheck.allowed) {
+        const resetTime = rateLimitCheck.resetAt.toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+
+        return {
+          success: false,
+          message: `You've reached your daily limit for posting missed connections. Try again after ${resetTime}.`,
+        };
+      }
+
       // Get user profile for display info
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       const userData = userDoc.exists() ? userDoc.data() : null;
@@ -142,6 +160,8 @@ class MissedConnectionsService {
         collection(db, 'missed_connections'),
         connectionData
       );
+
+      await rateLimitService.incrementCounter(user.uid, 'missedConnections');
 
       console.log('✅ Missed connection created:', docRef.id);
       return {

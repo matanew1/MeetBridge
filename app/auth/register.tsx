@@ -284,13 +284,13 @@ const RegisterScreen = () => {
               Already have an account?{' '}
               {isWeb ? (
                 <TouchableOpacity onPress={() => router.push('/auth/login')}>
-                  <Text style={[styles.linkText, { color: theme.primary }]}>
+                  <Text style={{ color: theme.primary, fontWeight: '600' }}>
                     Sign In
                   </Text>
                 </TouchableOpacity>
               ) : (
                 <Link href="/auth/login" asChild>
-                  <Text style={[styles.linkText, { color: theme.primary }]}>
+                  <Text style={{ color: theme.primary, fontWeight: '600' }}>
                     Sign In
                   </Text>
                 </Link>

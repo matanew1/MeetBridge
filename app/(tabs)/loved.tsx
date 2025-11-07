@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useUserStore } from '../../store';
 import ProfileDetail from '../components/ProfileDetail';
+import { EnhancedEmptyState } from '../components/ui';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 
@@ -556,21 +557,13 @@ export default function LovedScreen() {
   // Memoized empty state component
   const renderEmptyState = useCallback(
     (type: 'loved' | 'matches') => (
-      <View style={styles.emptyState}>
-        {type === 'loved' ? (
-          <Heart size={60} color={theme.textSecondary} />
-        ) : (
-          <Users size={60} color={theme.textSecondary} />
-        )}
-        <Text style={[styles.emptyTitle, { color: theme.text }]}>
-          {type === 'loved' ? t('loved.noLiked') : t('loved.noMatches')}
-        </Text>
-        <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-          {type === 'loved' ? t('loved.keepSwiping') : t('loved.startSwiping')}
-        </Text>
-      </View>
+      <EnhancedEmptyState
+        type={type === 'loved' ? 'loved' : 'matches'}
+        onAction={() => router.push('/(tabs)/search')}
+        actionLabel={t('common.startSwiping')}
+      />
     ),
-    [theme, t]
+    [theme, t, router]
   );
 
   // FlatList render item with useCallback for optimal performance

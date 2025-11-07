@@ -765,7 +765,9 @@ class SmartLocationManager {
     if (this.locationWatcher) {
       try {
         // Check if remove method exists (native platforms)
-        if (typeof this.locationWatcher.remove === 'function') {
+        if (isWeb && typeof Location.removeWatchAsync === 'function') {
+          await Location.removeWatchAsync(this.locationWatcher as any);
+        } else if (typeof this.locationWatcher.remove === 'function') {
           this.locationWatcher.remove();
         }
         console.log('✅ Location tracking stopped');

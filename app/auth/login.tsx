@@ -94,17 +94,13 @@ const LoginScreen = () => {
               </Text>
               {isWeb ? (
                 <TouchableOpacity onPress={() => router.push('/auth/register')}>
-                  <Text
-                    style={[{ color: theme.textSecondary }, styles.linkText]}
-                  >
+                  <Text style={{ color: theme.primary, fontWeight: '600' }}>
                     Sign Up
                   </Text>
                 </TouchableOpacity>
               ) : (
                 <Link href="/auth/register" asChild>
-                  <Text
-                    style={[{ color: theme.textSecondary }, styles.linkText]}
-                  >
+                  <Text style={{ color: theme.primary, fontWeight: '600' }}>
                     Sign Up
                   </Text>
                 </Link>
@@ -204,15 +200,11 @@ const LoginScreen = () => {
                 <TouchableOpacity
                   onPress={() => router.push('/auth/forgot-password')}
                 >
-                  <Text style={{ color: theme.textSecondary }}>
-                    Forgot Password?
-                  </Text>
+                  <Text style={{ color: theme.primary }}>Forgot Password?</Text>
                 </TouchableOpacity>
               ) : (
                 <Link href="/auth/forgot-password" asChild>
-                  <Text style={{ color: theme.textSecondary }}>
-                    Forgot Password?
-                  </Text>
+                  <Text style={{ color: theme.primary }}>Forgot Password?</Text>
                 </Link>
               )}
             </TouchableOpacity>

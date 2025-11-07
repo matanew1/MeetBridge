@@ -9,6 +9,8 @@ import {
 import { services } from '../services';
 import { APP_CONFIG, DATING_CONSTANTS } from '../constants';
 import cacheService from '../services/cacheService';
+import rateLimitService from '../services/rateLimitService';
+import toastService from '../services/toastService';
 
 // Use Firebase services
 const userProfileService = services.userProfile;
@@ -85,6 +87,7 @@ interface UserState {
   unmatchProfile: (profileId: string) => Promise<void>;
   reportProfile: (profileId: string, reason: string) => Promise<void>;
   subscribeToDiscoveryUpdates: () => (() => void) | null; // Returns unsubscribe function
+  removeProfileFromLists: (profileId: string) => void;
 
   // Actions - Getters
   getLikedProfiles: () => User[];
@@ -512,6 +515,27 @@ export const useUserStore = create<UserState>((set, get) => ({
       return { isMatch: false };
     }
 
+    // Check rate limit
+    const rateLimitCheck = await rateLimitService.checkRateLimit(
+      currentUser.id,
+      'likes'
+    );
+
+    if (!rateLimitCheck.allowed) {
+      const resetTime = rateLimitCheck.resetAt.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      toastService.warning(
+        'Daily Limit Reached',
+        `You've reached your daily limit of ${rateLimitService.getLimit(
+          'likes'
+        )} likes. Resets at ${resetTime}.`
+      );
+      set({ isLoadingLike: false });
+      return { isMatch: false };
+    }
+
     set({ isLoadingLike: true, error: null });
 
     try {
@@ -521,6 +545,9 @@ export const useUserStore = create<UserState>((set, get) => ({
       );
 
       if (response.success) {
+        // Increment rate limit counter
+        await rateLimitService.incrementCounter(currentUser.id, 'likes');
+
         // Find the user object before removing from discoverProfiles
         const userProfile = get().discoverProfiles.find(
           (p) => p.id === profileId
@@ -701,6 +728,27 @@ export const useUserStore = create<UserState>((set, get) => ({
     }
   },
 
+  removeProfileFromLists: (profileId) => {
+    set((state) => ({
+      discoverProfiles: state.discoverProfiles.filter(
+        (profile) => profile.id !== profileId
+      ),
+      likedProfiles: state.likedProfiles.filter((id) => id !== profileId),
+      dislikedProfiles: state.dislikedProfiles.filter((id) => id !== profileId),
+      matchedProfiles: state.matchedProfiles.filter((id) => id !== profileId),
+      likedProfilesData: state.likedProfilesData.filter(
+        (profile) => profile.id !== profileId
+      ),
+      matchedProfilesData: state.matchedProfilesData.filter(
+        (profile) => profile.id !== profileId
+      ),
+      conversations: state.conversations.filter(
+        (conv) => !conv.participants.includes(profileId)
+      ),
+    }));
+    cacheService.invalidateByPrefix('conversations_');
+  },
+
   // Getters
   getLikedProfiles: () => {
     const { likedProfilesData } = get();
@@ -803,6 +851,26 @@ export const useUserStore = create<UserState>((set, get) => ({
     if (!currentUser) return;
 
     try {
+      const rateLimitCheck = await rateLimitService.checkRateLimit(
+        currentUser.id,
+        'messages'
+      );
+
+      if (!rateLimitCheck.allowed) {
+        const resetTime = rateLimitCheck.resetAt.toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+
+        toastService.warning(
+          'Daily Message Limit Reached',
+          `You've reached your daily limit of ${rateLimitService.getLimit(
+            'messages'
+          )} messages. Resets at ${resetTime}.`
+        );
+        return;
+      }
+
       const response = await chatService.sendMessage(conversationId, {
         senderId: currentUser.id,
         text,
@@ -810,6 +878,7 @@ export const useUserStore = create<UserState>((set, get) => ({
       });
 
       if (response.success) {
+        await rateLimitService.incrementCounter(currentUser.id, 'messages');
         // Don't reload conversations here - the real-time listener in chat screen
         // will update messages automatically. Reloading would cause empty message arrays.
         console.log('✅ Message sent successfully');

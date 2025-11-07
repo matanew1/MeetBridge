@@ -29,6 +29,9 @@ import {
   User,
   X,
   UserX,
+  Mic,
+  ImageIcon,
+  Plus,
 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import Animated, {
@@ -39,14 +42,19 @@ import Animated, {
   interpolate,
 } from 'react-native-reanimated';
 import { Audio } from 'expo-audio';
+import * as ImagePicker from 'expo-image-picker';
 import { useUserStore } from '../../store';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import ProfileDetail from '../components/ProfileDetail';
+import VoiceMessageRecorder from '../components/VoiceMessageRecorder';
+import { LoadingOverlay } from '../components/ui';
 import { usePresence } from '../../hooks/usePresence';
 import notificationService from '../../services/notificationService';
-import toastService from '../../services/toastService'; // Added toastService import
+import toastService from '../../services/toastService';
 import IcebreakerSuggestions from '../components/IcebreakerSuggestions';
+import { storageService } from '../../services';
+import { imageCompressionService } from '../../services';
 
 interface Message {
   id: string;
@@ -67,6 +75,14 @@ const MessageItem: React.FC<MessageItemProps> = memo(
     const fadeAnim = useSharedValue(0);
 
     const isHeartMessage = useMemo(() => message.text === '❤️', [message.text]);
+    const isImageMessage = useMemo(() => {
+      const text = message.text.trim();
+      return (
+        (text.startsWith('http://') || text.startsWith('https://')) &&
+        (text.includes('cloudinary') ||
+          text.match(/\.(jpg|jpeg|png|gif|webp)$/i))
+      );
+    }, [message.text]);
 
     React.useEffect(() => {
       // Disable animation for existing messages to reduce jumping
@@ -110,21 +126,34 @@ const MessageItem: React.FC<MessageItemProps> = memo(
       () => [
         styles.messageBubble,
         isHeartMessage ? styles.heartMessage : null,
+        isImageMessage ? styles.imageMessage : null,
         message.isFromCurrentUser
           ? [
               styles.myMessage,
               {
-                backgroundColor: isHeartMessage ? 'transparent' : theme.primary,
+                backgroundColor:
+                  isHeartMessage || isImageMessage
+                    ? 'transparent'
+                    : theme.primary,
               },
             ]
           : [
               styles.otherMessage,
               {
-                backgroundColor: isHeartMessage ? 'transparent' : theme.surface,
+                backgroundColor:
+                  isHeartMessage || isImageMessage
+                    ? 'transparent'
+                    : theme.surface,
               },
             ],
       ],
-      [isHeartMessage, message.isFromCurrentUser, theme.primary, theme.surface]
+      [
+        isHeartMessage,
+        isImageMessage,
+        message.isFromCurrentUser,
+        theme.primary,
+        theme.surface,
+      ]
     );
 
     const textStyle = useMemo(
@@ -173,7 +202,15 @@ const MessageItem: React.FC<MessageItemProps> = memo(
         ]}
       >
         <View style={bubbleStyle}>
-          <Text style={textStyle}>{message.text}</Text>
+          {isImageMessage ? (
+            <Image
+              source={{ uri: message.text }}
+              style={styles.messageImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <Text style={textStyle}>{message.text}</Text>
+          )}
         </View>
         <Text style={timeStyle}>{formattedTime}</Text>
       </Animated.View>
@@ -218,6 +255,9 @@ const ChatScreen = () => {
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [showIcebreakers, setShowIcebreakers] = useState(false);
+  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
   const previousMessageCountRef = useRef(0);
@@ -580,6 +620,9 @@ const ChatScreen = () => {
         // Update messages from Firestore (single source of truth)
         setMessages(newMessages);
 
+        // Show icebreakers only if there are no messages yet
+        setShowIcebreakers(newMessages.length === 0);
+
         // Scroll to bottom when messages are loaded or updated
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: false });
@@ -803,6 +846,8 @@ const ChatScreen = () => {
 
   const handleSendHeart = useCallback(() => {
     if (id && currentUser) {
+      setShowAttachMenu(false);
+
       // Optimized heart animation
       heartScale.value = withSpring(
         1.4,
@@ -860,6 +905,103 @@ const ChatScreen = () => {
     setShowProfileDetail(false);
     // Already in chat, so just close the modal
   }, []);
+
+  const handleSendVoice = useCallback(
+    async (audioUri: string) => {
+      if (!id || !currentUser) return;
+
+      try {
+        setShowVoiceRecorder(false);
+
+        // Upload voice message to storage
+        const voiceUrl = await storageService.uploadVoiceMessage(audioUri);
+
+        // Send voice message (we'll use a special format)
+        await sendMessage(id as string, `🎤 Voice message: ${voiceUrl}`);
+
+        toastService.show('Voice message sent', 'success');
+      } catch (error) {
+        console.error('Error sending voice message:', error);
+        toastService.show('Failed to send voice message', 'error');
+      }
+    },
+    [id, currentUser, sendMessage]
+  );
+
+  const handleStartVoiceRecording = useCallback(async () => {
+    setShowAttachMenu(false);
+
+    // Request permission first
+    try {
+      const { status } = await Audio.requestPermissionsAsync();
+
+      if (status !== 'granted') {
+        toastService.show(
+          'Permission needed',
+          'Please grant microphone access to record voice messages'
+        );
+        return;
+      }
+
+      setShowVoiceRecorder(true);
+    } catch (error) {
+      console.error('Error requesting microphone permission:', error);
+      toastService.show('Failed to request permission', 'error');
+    }
+  }, []);
+
+  const handlePickImage = useCallback(async () => {
+    if (!id || !currentUser) return;
+
+    setShowAttachMenu(false);
+
+    try {
+      // Request permissions
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (status !== 'granted') {
+        toastService.show(
+          'Permission needed',
+          'Please grant photo library access'
+        );
+        return;
+      }
+
+      // Pick image
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setUploadingImage(true);
+
+        // Compress image
+        const compressionResult =
+          await imageCompressionService.compressChatImage(result.assets[0].uri);
+
+        console.log('📷 Compressed image URI:', compressionResult.uri);
+
+        // Upload to storage
+        const imageUrl = await storageService.uploadChatImage(
+          compressionResult.uri
+        );
+
+        // Send image message - just send the URL directly
+        await sendMessage(id as string, imageUrl);
+
+        setUploadingImage(false);
+        toastService.show('Photo sent', 'success');
+      }
+    } catch (error) {
+      console.error('Error sending photo:', error);
+      setUploadingImage(false);
+      toastService.show('Failed to send photo', 'error');
+    }
+  }, [id, currentUser, sendMessage]);
 
   // Optimized render function for FlatList
   const renderMessage = useCallback(
@@ -1085,12 +1227,10 @@ const ChatScreen = () => {
           <View style={styles.inputRow}>
             <TouchableOpacity
               style={styles.attachButton}
-              onPress={handleSendHeart}
+              onPress={() => setShowAttachMenu(!showAttachMenu)}
               activeOpacity={0.7}
             >
-              <Animated.View style={heartAnimatedStyle}>
-                <Heart size={18} color={theme.primary} />
-              </Animated.View>
+              <Plus size={24} color={theme.primary} />
             </TouchableOpacity>
             <TextInput
               style={[
@@ -1106,8 +1246,10 @@ const ChatScreen = () => {
               placeholder={t('chat.messageInputPlaceholder')}
               placeholderTextColor={theme.textSecondary}
               multiline
+              numberOfLines={1}
               textAlign="left"
               onFocus={() => {
+                setShowAttachMenu(false);
                 // Scroll to bottom when input is focused
                 setTimeout(() => {
                   flatListRef.current?.scrollToEnd({ animated: true });
@@ -1134,6 +1276,78 @@ const ChatScreen = () => {
               />
             </TouchableOpacity>
           </View>
+
+          {/* Attachment Menu */}
+          {showAttachMenu && (
+            <View
+              style={[styles.attachMenu, { backgroundColor: theme.surface }]}
+            >
+              <TouchableOpacity
+                style={[
+                  styles.attachMenuItem,
+                  { backgroundColor: theme.background },
+                ]}
+                onPress={handlePickImage}
+                activeOpacity={0.7}
+              >
+                <View
+                  style={[
+                    styles.attachMenuIconWrapper,
+                    { backgroundColor: `${theme.primary}15` },
+                  ]}
+                >
+                  <ImageIcon size={20} color={theme.primary} />
+                </View>
+                <Text style={[styles.attachMenuText, { color: theme.text }]}>
+                  Photo
+                </Text>
+              </TouchableOpacity>
+
+              {Platform.OS !== 'web' && (
+                <TouchableOpacity
+                  style={[
+                    styles.attachMenuItem,
+                    { backgroundColor: theme.background },
+                  ]}
+                  onPress={handleStartVoiceRecording}
+                  activeOpacity={0.7}
+                >
+                  <View
+                    style={[
+                      styles.attachMenuIconWrapper,
+                      { backgroundColor: `${theme.primary}15` },
+                    ]}
+                  >
+                    <Mic size={20} color={theme.primary} />
+                  </View>
+                  <Text style={[styles.attachMenuText, { color: theme.text }]}>
+                    Voice
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                style={[
+                  styles.attachMenuItem,
+                  { backgroundColor: theme.background },
+                ]}
+                onPress={handleSendHeart}
+                activeOpacity={0.7}
+              >
+                <View
+                  style={[
+                    styles.attachMenuIconWrapper,
+                    { backgroundColor: `${theme.primary}15` },
+                  ]}
+                >
+                  <Heart size={20} color={theme.primary} />
+                </View>
+                <Text style={[styles.attachMenuText, { color: theme.text }]}>
+                  Heart
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </Animated.View>
       </KeyboardAvoidingView>
 
@@ -1260,6 +1474,19 @@ const ChatScreen = () => {
           </View>
         </Modal>
       )}
+
+      {/* Voice Message Recorder Modal */}
+      <VoiceMessageRecorder
+        visible={showVoiceRecorder}
+        onClose={() => setShowVoiceRecorder(false)}
+        onSend={handleSendVoice}
+      />
+
+      {/* Loading Overlay for Image Upload */}
+      <LoadingOverlay
+        visible={uploadingImage}
+        message={t('chat.uploadingImage')}
+      />
     </View>
   );
 };
@@ -1406,6 +1633,16 @@ const styles = StyleSheet.create({
     lineHeight: 36,
     textAlign: 'center',
   },
+  imageMessage: {
+    backgroundColor: 'transparent',
+    padding: 0,
+    overflow: 'hidden',
+  },
+  messageImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 16,
+  },
   messageTime: {
     fontSize: 11,
     marginTop: 4,
@@ -1430,6 +1667,32 @@ const styles = StyleSheet.create({
   attachButton: {
     padding: 8,
   },
+  attachMenu: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  attachMenuItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  attachMenuIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  attachMenuText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
   textInput: {
     flex: 1,
     borderWidth: 1,
@@ -1437,7 +1700,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     fontSize: 16,
-    height: 40,
+    maxHeight: 100,
     textAlignVertical: 'center',
   },
   sendButton: {

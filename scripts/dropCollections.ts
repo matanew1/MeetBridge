@@ -1,26 +1,56 @@
-import { initializeApp } from 'firebase/app';
+import { readFileSync } from 'fs';
 import {
-  getFirestore,
-  collection,
-  getDocs,
-  deleteDoc,
-  doc,
-  writeBatch,
-} from 'firebase/firestore';
+  applicationDefault,
+  cert,
+  getApps,
+  initializeApp,
+} from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
-// Firebase configuration
-const firebaseConfig = {
-  apiKey: 'AIzaSyBPdV1BiL67xJes80Gv_tozl1E1ZAqslbk',
-  authDomain: 'meetbridge-b5cdc.firebaseapp.com',
-  projectId: 'meetbridge-b5cdc',
-  storageBucket: 'meetbridge-b5cdc.firebasestorage.app',
-  messagingSenderId: '331612362377',
-  appId: '1:331612362377:web:6ad392ab246120d4461858',
-};
+const DEFAULT_PROJECT_ID = 'meetbridge-b5cdc';
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+function initializeFirestore() {
+  if (getApps().length > 0) {
+    return getFirestore();
+  }
+
+  const projectId = process.env.FIREBASE_PROJECT_ID || DEFAULT_PROJECT_ID;
+  const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
+  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+
+  let credential;
+
+  try {
+    if (serviceAccountJson) {
+      credential = cert(JSON.parse(serviceAccountJson));
+    } else if (serviceAccountPath) {
+      const fileContents = readFileSync(serviceAccountPath, 'utf-8');
+      credential = cert(JSON.parse(fileContents));
+    } else {
+      console.log(
+        'ℹ️  FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_SERVICE_ACCOUNT_PATH not provided. Using application default credentials.'
+      );
+      credential = applicationDefault();
+    }
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Unknown credential error';
+    console.error(
+      '\n❌ Unable to initialize Firebase Admin credentials:',
+      message
+    );
+    console.error(
+      '   Provide either FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_SERVICE_ACCOUNT_PATH environment variables.'
+    );
+    process.exit(1);
+  }
+
+  const app = initializeApp({ credential, projectId });
+  console.log(`🔐 Initialized Firebase Admin for project: ${projectId}`);
+  return getFirestore(app);
+}
+
+const db = initializeFirestore();
 
 /**
  * Delete a collection in batches
@@ -28,12 +58,12 @@ const db = getFirestore(app);
 async function deleteCollection(collectionName: string) {
   console.log(`\n🗑️  Starting to delete collection: ${collectionName}`);
 
-  const collectionRef = collection(db, collectionName);
+  const collectionRef = db.collection(collectionName);
   const batchSize = 500; // Firestore limit
   let deletedCount = 0;
 
   while (true) {
-    const snapshot = await getDocs(collectionRef);
+    const snapshot = await collectionRef.limit(batchSize).get();
 
     if (snapshot.empty) {
       console.log(`✅ Collection "${collectionName}" is now empty`);
@@ -41,26 +71,17 @@ async function deleteCollection(collectionName: string) {
     }
 
     // Use batch for efficient deletion
-    const batch = writeBatch(db);
-    let batchCount = 0;
+    const batch = db.batch();
 
     snapshot.docs.forEach((document) => {
-      if (batchCount < batchSize) {
-        batch.delete(document.ref);
-        batchCount++;
-        deletedCount++;
-      }
+      batch.delete(document.ref);
+      deletedCount++;
     });
 
     await batch.commit();
     console.log(
-      `   Deleted ${batchCount} documents... (Total: ${deletedCount})`
+      `   Deleted ${snapshot.size} documents... (Total: ${deletedCount})`
     );
-
-    // If we deleted less than batchSize, we're done
-    if (batchCount < batchSize) {
-      break;
-    }
   }
 
   console.log(
@@ -80,33 +101,31 @@ async function deleteSubcollections(
     `\n🗑️  Deleting subcollection "${subcollectionName}" from all documents in "${parentCollectionName}"`
   );
 
-  const parentRef = collection(db, parentCollectionName);
-  const parentSnapshot = await getDocs(parentRef);
+  const parentRef = db.collection(parentCollectionName);
+  const parentSnapshot = await parentRef.get();
 
   let totalDeleted = 0;
 
   for (const parentDoc of parentSnapshot.docs) {
-    const subcollectionRef = collection(
-      db,
-      parentCollectionName,
-      parentDoc.id,
-      subcollectionName
-    );
-    const subcollectionSnapshot = await getDocs(subcollectionRef);
+    const subcollectionRef = parentDoc.ref.collection(subcollectionName);
 
-    if (!subcollectionSnapshot.empty) {
-      const batch = writeBatch(db);
-      let batchCount = 0;
+    while (true) {
+      const subcollectionSnapshot = await subcollectionRef.limit(500).get();
+
+      if (subcollectionSnapshot.empty) {
+        break;
+      }
+
+      const batch = db.batch();
 
       subcollectionSnapshot.docs.forEach((subDoc) => {
         batch.delete(subDoc.ref);
-        batchCount++;
         totalDeleted++;
       });
 
       await batch.commit();
       console.log(
-        `   Deleted ${batchCount} messages from conversation ${parentDoc.id}`
+        `   Deleted ${subcollectionSnapshot.size} documents from ${parentDoc.id}/${subcollectionName}`
       );
     }
   }

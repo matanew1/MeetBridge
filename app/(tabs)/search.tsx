@@ -47,6 +47,11 @@ import FilterModal from '../components/FilterModal';
 import DiscoveryAnimation from '../components/DiscoveryAnimation';
 import EnhancedMatchAnimation from '../components/EnhancedMatchAnimation';
 import MapViewComponent from '../components/MapViewComponent';
+import {
+  EnhancedEmptyState,
+  LoadingOverlay,
+  ErrorRetry,
+} from '../components/ui';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { lightTheme, darkTheme, Theme } from '../../constants/theme';
@@ -327,6 +332,7 @@ export default function SearchScreen() {
     likedProfiles,
     dislikedProfiles,
     matchedProfiles,
+    error,
     updateSearchFilters,
     startSearch,
     clearSearch,
@@ -340,6 +346,7 @@ export default function SearchScreen() {
     loadConversations,
     createConversation,
     currentUser,
+    clearError,
   } = useUserStore();
 
   // Sort profiles by distance and filter out matched/liked/disliked profiles (handle null distances)
@@ -865,19 +872,37 @@ export default function SearchScreen() {
     ]
   );
 
+  const onRefresh = useCallback(async () => {
+    console.log('🔄 Pull-to-refresh triggered');
+    setRefreshing(true);
+    try {
+      // Clear the discover profiles cache to force fresh data from Firebase
+      const cacheKey = `discoverProfiles_${JSON.stringify(searchFilters)}`;
+      console.log('🗑️ Clearing cache:', cacheKey);
+
+      // Call the cache service to remove old cache
+      // We do this by calling loadDiscoverProfiles with refresh=true
+      // which will clear the cached profiles
+      await loadDiscoverProfiles(true);
+      console.log('✅ Profiles refreshed successfully from Firebase');
+    } catch (error) {
+      console.error('❌ Error refreshing profiles:', error);
+    } finally {
+      setRefreshing(false);
+      setPullDistance(0);
+      setIsPulling(false);
+    }
+  }, [loadDiscoverProfiles, searchFilters]);
+
   const ListEmptyComponent = useCallback(
     () => (
-      <View style={styles.emptyState}>
-        <Heart size={60} color={theme.textSecondary} />
-        <Text style={[styles.emptyTitle, { color: theme.text }]}>
-          {t('search.noProfiles')}
-        </Text>
-        <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-          {t('search.checkBackLater')}
-        </Text>
-      </View>
+      <EnhancedEmptyState
+        type="discover"
+        onAction={onRefresh}
+        actionLabel={t('common.refresh')}
+      />
     ),
-    [theme, t]
+    [theme, t, onRefresh]
   );
 
   const handleUnmatch = (profileId: string) => {
@@ -926,28 +951,6 @@ export default function SearchScreen() {
   const handleFilterPress = () => {
     setShowFilterModal(true);
   };
-
-  const onRefresh = useCallback(async () => {
-    console.log('🔄 Pull-to-refresh triggered');
-    setRefreshing(true);
-    try {
-      // Clear the discover profiles cache to force fresh data from Firebase
-      const cacheKey = `discoverProfiles_${JSON.stringify(searchFilters)}`;
-      console.log('🗑️ Clearing cache:', cacheKey);
-
-      // Call the cache service to remove old cache
-      // We do this by calling loadDiscoverProfiles with refresh=true
-      // which will clear the cached profiles
-      await loadDiscoverProfiles(true);
-      console.log('✅ Profiles refreshed successfully from Firebase');
-    } catch (error) {
-      console.error('❌ Error refreshing profiles:', error);
-    } finally {
-      setRefreshing(false);
-      setPullDistance(0);
-      setIsPulling(false);
-    }
-  }, [loadDiscoverProfiles, searchFilters]);
 
   // Custom pull-to-refresh handlers
   const handleScrollBeginDrag = useCallback(() => {
@@ -1188,12 +1191,22 @@ export default function SearchScreen() {
   if (isAuthLoading || !isAuthenticated) {
     return (
       <View style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.primary} />
-          <Text style={[styles.loadingText, { color: theme.text }]}>
-            {t('common.loading')}
-          </Text>
-        </View>
+        <LoadingOverlay visible={true} message={t('common.loading')} />
+      </View>
+    );
+  }
+
+  // Show error state with retry
+  if (error && !isLoadingDiscover) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <ErrorRetry
+          message={error}
+          onRetry={() => {
+            clearError();
+            loadDiscoverProfiles(true);
+          }}
+        />
       </View>
     );
   }

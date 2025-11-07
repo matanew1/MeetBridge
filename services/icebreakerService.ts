@@ -153,16 +153,18 @@ class IcebreakerService {
     }
 
     // 4. Fill with generic icebreakers if needed
+    let genericCounter = 0;
     while (icebreakers.length < count) {
       const randomGeneric =
         this.genericIcebreakers[
           Math.floor(Math.random() * this.genericIcebreakers.length)
         ];
+      const uniqueId = `${randomGeneric.id}_${Date.now()}_${genericCounter++}`;
       // Avoid duplicates
-      if (!icebreakers.find((ib) => ib.id === randomGeneric.id)) {
+      if (!icebreakers.find((ib) => ib.id === uniqueId)) {
         icebreakers.push({
           ...randomGeneric,
-          id: `${randomGeneric.id}_${Date.now()}`,
+          id: uniqueId,
         });
       }
     }
