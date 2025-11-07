@@ -11,14 +11,12 @@ import {
   Animated,
   TextInput,
   Modal,
-  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   Sparkles,
   Plus,
@@ -49,6 +47,7 @@ import { smartLocationManager } from '../../services/location';
 import missedConnectionsService, {
   MissedConnection,
 } from '../../services/firebase/missedConnectionsService';
+import toastService from '../../services/toastService';
 
 // Helper function
 const formatRelativeTime = (date: Date): string => {
@@ -455,14 +454,14 @@ export default function ConnectionsScreen() {
           if (locationData) {
             setCurrentLocation(locationData);
           } else {
-            Alert.alert(
+            toastService.error(
               'Location Error',
               'Unable to detect your current location. Please try again.'
             );
           }
         } catch (error) {
           console.error('Error detecting location:', error);
-          Alert.alert(
+          toastService.error(
             'Location Error',
             'Unable to detect your current location. Please try again.'
           );
@@ -537,7 +536,10 @@ export default function ConnectionsScreen() {
   const handleLike = useCallback(
     async (connectionId: string) => {
       if (!isAuthenticated) {
-        Alert.alert('Sign In Required', 'Please sign in to like a post.');
+        toastService.error(
+          'Sign In Required',
+          'Please sign in to like a post.'
+        );
         return;
       }
 
@@ -566,7 +568,7 @@ export default function ConnectionsScreen() {
       );
 
       if (!result.success) {
-        Alert.alert('Error', result.message);
+        toastService.error('Error', result.message || 'Failed to like post');
         // Real-time listeners will handle state updates
       }
     },
@@ -576,7 +578,7 @@ export default function ConnectionsScreen() {
   const handleSave = useCallback(
     async (connectionId: string) => {
       if (!isAuthenticated) {
-        Alert.alert('Sign In Required', 'Please sign in to save posts.');
+        toastService.error('Sign In Required', 'Please sign in to save posts.');
         return;
       }
 
@@ -604,7 +606,7 @@ export default function ConnectionsScreen() {
       );
 
       if (!result.success) {
-        Alert.alert('Error', result.message);
+        toastService.error('Error', result.message || 'Failed to save post');
         // Real-time listeners will handle state updates
       }
     },
@@ -613,7 +615,7 @@ export default function ConnectionsScreen() {
 
   const handleCreatePost = useCallback(async () => {
     if (!createForm.description.trim() || !currentLocation) {
-      Alert.alert(
+      toastService.error(
         'Error',
         'Please fill in all required fields and ensure location is detected.'
       );
@@ -637,7 +639,10 @@ export default function ConnectionsScreen() {
 
       if (result.success) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Alert.alert('Success!', 'Your missed connection has been posted!');
+        toastService.success(
+          'Success!',
+          'Your missed connection has been posted!'
+        );
         setShowCreateModal(false);
         setCreateForm({
           description: '',
@@ -647,10 +652,10 @@ export default function ConnectionsScreen() {
         });
         // Real-time listeners will update the list automatically
       } else {
-        Alert.alert('Error', result.message);
+        toastService.error('Error', result.message || 'Failed to create post');
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to create post. Please try again.');
+      toastService.error('Error', 'Failed to create post. Please try again.');
     } finally {
       setIsCreating(false);
     }
@@ -658,7 +663,7 @@ export default function ConnectionsScreen() {
 
   const handleEditPost = useCallback(async () => {
     if (!editingConnection || !editForm.description.trim()) {
-      Alert.alert('Error', 'Please fill in all required fields.');
+      toastService.error('Error', 'Please fill in all required fields.');
       return;
     }
 
@@ -692,7 +697,7 @@ export default function ConnectionsScreen() {
           );
         }
 
-        Alert.alert('Success!', 'Your post has been updated!');
+        toastService.success('Success!', 'Your post has been updated!');
 
         // Close modal and reset form
         setShowCreateModal(false);
@@ -704,11 +709,11 @@ export default function ConnectionsScreen() {
           isAnonymous: false,
         });
       } else {
-        Alert.alert('Error', result.message);
+        toastService.error('Error', result.message || 'Failed to update post');
       }
     } catch (error) {
       console.error('Error updating post:', error);
-      Alert.alert('Error', 'Failed to update post. Please try again.');
+      toastService.error('Error', 'Failed to update post. Please try again.');
     } finally {
       setIsCreating(false);
     }
@@ -737,24 +742,19 @@ export default function ConnectionsScreen() {
           missedConnectionsService.viewConnection(connection.id, user?.id || '')
         }
         onLike={() => handleLike(connection.id)}
-        onClaim={() => {
-          Alert.alert("That's You?", 'Were you at this location?', [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Yes, verify',
-              onPress: async () => {
-                const result = await missedConnectionsService.claimConnection(
-                  connection.id
-                );
-                if (result.success) {
-                  Haptics.notificationAsync(
-                    Haptics.NotificationFeedbackType.Success
-                  );
-                  Alert.alert('Success!', 'Your claim has been submitted!');
-                }
-              },
-            },
-          ]);
+        onClaim={async () => {
+          const result = await missedConnectionsService.claimConnection(
+            connection.id
+          );
+          if (result.success) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            toastService.success('Success!', 'Your claim has been submitted!');
+          } else {
+            toastService.error(
+              'Error',
+              result.message || 'Failed to submit claim'
+            );
+          }
         }}
         onComment={() => router.push(`/connections/comments/${connection.id}`)}
         onEdit={() => {
@@ -772,29 +772,19 @@ export default function ConnectionsScreen() {
           }
         }}
         onDelete={async () => {
-          Alert.alert(
-            'Delete Post',
-            'Are you sure you want to delete this post?',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Delete',
-                style: 'destructive',
-                onPress: async () => {
-                  const result =
-                    await missedConnectionsService.deleteConnection(
-                      connection.id
-                    );
-                  if (result.success) {
-                    // Real-time listeners will remove the post automatically
-                    Haptics.notificationAsync(
-                      Haptics.NotificationFeedbackType.Success
-                    );
-                  }
-                },
-              },
-            ]
+          const result = await missedConnectionsService.deleteConnection(
+            connection.id
           );
+          if (result.success) {
+            // Real-time listeners will remove the post automatically
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            toastService.success('Success', 'Post deleted successfully');
+          } else {
+            toastService.error(
+              'Error',
+              result.message || 'Failed to delete post'
+            );
+          }
         }}
         onSave={() => handleSave(connection.id)}
         isLiked={connection.likedBy?.includes(user?.id || '') || false}
@@ -861,10 +851,7 @@ export default function ConnectionsScreen() {
   }, [activeTab, theme]);
 
   return (
-    <LinearGradient
-      colors={[theme.background, theme.surfaceVariant]}
-      style={styles.container}
-    >
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
@@ -879,7 +866,7 @@ export default function ConnectionsScreen() {
               ]}
               onPress={() => {
                 if (!isAuthenticated) {
-                  Alert.alert(
+                  toastService.error(
                     'Sign In Required',
                     'Please sign in to create a post.'
                   );
@@ -1139,7 +1126,10 @@ export default function ConnectionsScreen() {
                     ]}
                     onPress={() => {
                       // Could implement time picker here
-                      Alert.alert('Time Selector', 'Time picker would go here');
+                      toastService.info(
+                        'Time Picker',
+                        'Time picker coming soon'
+                      );
                     }}
                   >
                     <Clock size={20} color={theme.primary} />
@@ -1250,7 +1240,7 @@ export default function ConnectionsScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </LinearGradient>
+    </View>
   );
 }
 
