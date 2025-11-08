@@ -440,10 +440,13 @@ export const useUserStore = create<UserState>((set, get) => ({
       return;
     }
 
-    console.log('🔄 Loading existing matches from Firestore...');
+    console.log('🔄 Loading fresh matches from Firestore - NO CACHE');
     set({ isLoadingDiscover: true, error: null });
 
     try {
+      // Invalidate cache to force fresh data
+      cacheService.invalidateByPrefix('matches_');
+
       const response = await matchingService.getMatches(currentUser.id);
 
       if (response.success) {
@@ -476,10 +479,13 @@ export const useUserStore = create<UserState>((set, get) => ({
       return;
     }
 
-    console.log('🔄 Loading existing likes from Firestore...');
+    console.log('🔄 Loading fresh likes from Firestore - NO CACHE');
     set({ isLoadingDiscover: true, error: null });
 
     try {
+      // Invalidate cache to force fresh data
+      cacheService.invalidateByPrefix('likes_');
+
       const response = await matchingService.getLikedProfiles(currentUser.id);
 
       if (response.success) {
@@ -740,12 +746,15 @@ export const useUserStore = create<UserState>((set, get) => ({
     const { currentUser } = get();
     if (!currentUser) return;
 
+    console.log('🔄 Loading fresh conversations from Firestore - NO CACHE');
     set({ isLoadingConversations: true, error: null });
 
     try {
       // Clear cache to ensure fresh data with isMissedConnection flag
       const cacheKey = `conversations_${currentUser.id}`;
       cacheService.delete(cacheKey);
+      // Also invalidate all conversation-related cache
+      cacheService.invalidateByPrefix('conversations_');
 
       const response = await chatService.getConversations(currentUser.id);
 

@@ -147,18 +147,52 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.error('Error initializing notifications:', error);
       }
 
-      // Start location tracking
-      const { status: existingStatus } =
-        await Location.getForegroundPermissionsAsync();
+      // Start location tracking - remove permission restrictions
+      console.log('📍 Starting location services...');
 
-      if (existingStatus !== 'granted') {
-        console.log('📍 Requesting location permissions for tracking...');
-        const { status: newStatus } =
-          await Location.requestForegroundPermissionsAsync();
-        if (newStatus !== 'granted') {
-          console.warn('📍 Location permission denied, tracking disabled');
-          return;
+      // Try to request permissions but continue even if denied
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          console.warn(
+            '📍 Location permission not granted, will try anyway...'
+          );
         }
+      } catch (permError) {
+        console.warn('📍 Permission request failed, continuing:', permError);
+      }
+
+      // Get initial location immediately
+      console.log('📍 Getting initial location...');
+      try {
+        const initialLocation = await smartLocationManager.getCurrentLocation(
+          true
+        );
+        if (initialLocation) {
+          const geohash = geohashService.encode(
+            initialLocation.latitude,
+            initialLocation.longitude,
+            9
+          );
+
+          const userRef = doc(db, 'users', firebaseUser.uid);
+          await updateDoc(userRef, {
+            coordinates: {
+              latitude: initialLocation.latitude,
+              longitude: initialLocation.longitude,
+            },
+            geohash,
+            lastLocationUpdate: serverTimestamp(),
+          });
+
+          console.log('✅ Initial location set:', {
+            lat: initialLocation.latitude.toFixed(7),
+            lon: initialLocation.longitude.toFixed(7),
+            geohash,
+          });
+        }
+      } catch (locError) {
+        console.warn('⚠️ Could not get initial location:', locError);
       }
 
       console.log('📍 Starting continuous location tracking...');
@@ -219,8 +253,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       );
 
       // Start background tracking (works even when app is closed)
-      await smartLocationManager.startBackgroundTracking(firebaseUser.uid);
-      console.log('✅ Background location tracking started');
+      try {
+        await smartLocationManager.startBackgroundTracking(firebaseUser.uid);
+        console.log('✅ Background location tracking started');
+      } catch (bgError) {
+        console.warn('⚠️ Background tracking failed:', bgError);
+      }
 
       if (success) {
         console.log('✅ Location tracking started');

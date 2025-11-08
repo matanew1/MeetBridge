@@ -104,16 +104,13 @@ class BlockReportService {
         updatedAt: serverTimestamp(),
       });
 
-      // Unmatch if matched
-      await this.unmatchIfMatched(currentUser.uid, blockedUserId);
-
-      // Delete any conversations
-      await this.deleteConversations(currentUser.uid, blockedUserId);
+      // Delete ALL related collections for BOTH users (complete unmatch)
+      await this.deleteAllUserRelations(currentUser.uid, blockedUserId);
 
       // Ensure both users are excluded from discovery via interactions
       await this.syncBlockedInteractions(currentUser.uid, blockedUserId);
 
-      console.log('✅ User blocked successfully');
+      console.log('✅ User blocked successfully - all relations deleted');
       return { success: true, message: 'User blocked successfully' };
     } catch (error) {
       console.error('Error blocking user:', error);
@@ -271,6 +268,88 @@ class BlockReportService {
   }
 
   // Helper methods
+  private async deleteAllUserRelations(
+    userId: string,
+    targetUserId: string
+  ): Promise<void> {
+    try {
+      console.log(
+        `🗑️ Deleting all relations between ${userId} and ${targetUserId}`
+      );
+
+      const batch = writeBatch(db);
+
+      // 1. Delete matches (both directions)
+      const matchId1 = `${userId}_${targetUserId}`;
+      const matchId2 = `${targetUserId}_${userId}`;
+
+      const match1Ref = doc(db, 'matches', matchId1);
+      const match2Ref = doc(db, 'matches', matchId2);
+
+      batch.delete(match1Ref);
+      batch.delete(match2Ref);
+
+      // Also query by sorted IDs
+      const [user1, user2] = [userId, targetUserId].sort();
+      const matchQuery = query(
+        collection(db, 'matches'),
+        where('user1', '==', user1),
+        where('user2', '==', user2)
+      );
+      const matchSnapshot = await getDocs(matchQuery);
+      matchSnapshot.docs.forEach((matchDoc) => {
+        batch.delete(matchDoc.ref);
+      });
+
+      // 2. Delete conversations (both directions)
+      const convId1 = `conv_${userId}_${targetUserId}`;
+      const convId2 = `conv_${targetUserId}_${userId}`;
+
+      // Delete messages in conversations
+      for (const convId of [convId1, convId2]) {
+        const messagesQuery = query(
+          collection(db, 'conversations', convId, 'messages')
+        );
+        const messagesSnapshot = await getDocs(messagesQuery);
+        messagesSnapshot.docs.forEach((messageDoc) => {
+          batch.delete(messageDoc.ref);
+        });
+
+        batch.delete(doc(db, 'conversations', convId));
+      }
+
+      // 3. Delete all interactions (both directions)
+      const interactions1Query = query(
+        collection(db, 'interactions'),
+        where('userId', '==', userId),
+        where('targetUserId', '==', targetUserId)
+      );
+      const interactions2Query = query(
+        collection(db, 'interactions'),
+        where('userId', '==', targetUserId),
+        where('targetUserId', '==', userId)
+      );
+
+      const [interactions1Snapshot, interactions2Snapshot] = await Promise.all([
+        getDocs(interactions1Query),
+        getDocs(interactions2Query),
+      ]);
+
+      interactions1Snapshot.docs.forEach((interactionDoc) => {
+        batch.delete(interactionDoc.ref);
+      });
+      interactions2Snapshot.docs.forEach((interactionDoc) => {
+        batch.delete(interactionDoc.ref);
+      });
+
+      await batch.commit();
+      console.log('✅ All relations deleted successfully');
+    } catch (error) {
+      console.error('Error deleting all user relations:', error);
+      throw error;
+    }
+  }
+
   private async unmatchIfMatched(
     userId: string,
     targetUserId: string

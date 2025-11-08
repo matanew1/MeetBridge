@@ -1277,8 +1277,7 @@ export class FirebaseMatchingService implements IMatchingService {
         batch.delete(doc(db, 'conversations', conversationId));
       }
 
-      // Delete existing interactions instead of converting to dislike
-      // This allows users to see each other again immediately after unmatch
+      // Delete existing interactions and create pass interactions with 24-hour expiry
       const existingInteractionsQuery = query(
         collection(db, 'interactions'),
         where('userId', 'in', [userId, targetUserId]),
@@ -1292,9 +1291,35 @@ export class FirebaseMatchingService implements IMatchingService {
         batch.delete(interactionDoc.ref);
       });
 
+      // Create pass interactions with 24-hour expiry for both users
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 24);
+
+      // User1 -> User2 pass interaction
+      const interaction1Ref = doc(collection(db, 'interactions'));
+      batch.set(interaction1Ref, {
+        userId: userId,
+        targetUserId: targetUserId,
+        type: 'pass',
+        createdAt: serverTimestamp(),
+        expiresAt: expiresAt,
+      });
+
+      // User2 -> User1 pass interaction
+      const interaction2Ref = doc(collection(db, 'interactions'));
+      batch.set(interaction2Ref, {
+        userId: targetUserId,
+        targetUserId: userId,
+        type: 'pass',
+        createdAt: serverTimestamp(),
+        expiresAt: expiresAt,
+      });
+
       await batch.commit();
 
-      console.log('✅ Unmatch complete - interactions deleted');
+      console.log(
+        '✅ Unmatch complete - pass interactions created with 24-hour expiry'
+      );
 
       return {
         data: true,

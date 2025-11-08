@@ -12,6 +12,7 @@ import {
 import { Heart, MessageCircle, Users, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { useUserStore } from '../../store';
 import ProfileDetail from '../components/ProfileDetail';
 import { EnhancedEmptyState } from '../components/ui';
@@ -381,7 +382,8 @@ export default function LovedScreen() {
     loadCurrentUser(); // Ensure current user is loaded for actions
     loadConversations(); // Load existing conversations
 
-    // Load existing matches and likes from Firestore
+    // Load existing matches and likes from Firestore - FRESH DATA
+    console.log('🔥 Loved tab: Loading fresh matches and likes from Firebase');
     const { loadMatches, loadLikes } = useUserStore.getState();
     loadMatches();
     loadLikes();
@@ -390,6 +392,20 @@ export default function LovedScreen() {
       loadDiscoverProfiles(true);
     }
   }, []);
+
+  // ⚡ ALWAYS refresh matches and likes when loved tab is focused - NO CACHE
+  useFocusEffect(
+    useCallback(() => {
+      console.log(
+        '🔄 Loved tab focused - refreshing matches and likes from Firebase'
+      );
+      if (currentUser) {
+        const { loadMatches, loadLikes } = useUserStore.getState();
+        loadMatches();
+        loadLikes();
+      }
+    }, [currentUser])
+  );
 
   // Prefetch images for better scrolling performance
   useEffect(() => {

@@ -387,11 +387,21 @@ class SmartLocationManager {
 
       this.metrics.cacheMisses++;
 
-      // Check permissions
-      const permissions = await this.checkPermissions();
-      if (permissions.foreground !== 'granted') {
-        console.warn('⚠️ Location permissions not granted');
-        return this.currentLocation; // Return last known location
+      // Try to get location without strict permission checks
+      // Request permissions if not already granted
+      try {
+        const permissions = await this.checkPermissions();
+        if (permissions.foreground !== 'granted') {
+          console.log('📍 Requesting location permissions...');
+          const requested = await this.requestPermissions(false);
+          if (requested.foreground !== 'granted') {
+            console.warn(
+              '⚠️ Location permissions not granted, trying anyway...'
+            );
+          }
+        }
+      } catch (permError) {
+        console.warn('⚠️ Permission check failed, continuing:', permError);
       }
 
       // Determine accuracy level based on config
@@ -399,7 +409,7 @@ class SmartLocationManager {
         ? Location.Accuracy.Balanced
         : Location.Accuracy.BestForNavigation;
 
-      // Get fresh location
+      // Get fresh location - try regardless of permission status
       const location = await Location.getCurrentPositionAsync({
         accuracy,
         maximumAge: 0,
@@ -551,14 +561,28 @@ class SmartLocationManager {
    * Start continuous location tracking
    */
   async startTracking(
-    callback?: (update: LocationUpdate) => void
+    callback?: (update: LocationUpdate) => void,
+    options?: {
+      accuracy?: Location.Accuracy;
+      timeInterval?: number;
+      distanceInterval?: number;
+    }
   ): Promise<boolean> {
     try {
-      const permissions = await this.checkPermissions();
-
-      if (permissions.foreground !== 'granted') {
-        console.warn('⚠️ Location permissions not granted');
-        return false;
+      // Try to get permissions, but continue even if denied
+      try {
+        const permissions = await this.checkPermissions();
+        if (permissions.foreground !== 'granted') {
+          console.log('📍 Requesting location permissions...');
+          const requested = await this.requestPermissions(false);
+          if (requested.foreground !== 'granted') {
+            console.warn(
+              '⚠️ Location permissions not granted, trying anyway...'
+            );
+          }
+        }
+      } catch (permError) {
+        console.warn('⚠️ Permission check failed, continuing:', permError);
       }
 
       if (this.locationWatcher) {
@@ -569,13 +593,20 @@ class SmartLocationManager {
         this.updateCallbacks.add(callback);
       }
 
-      const accuracy = this.config.powerSaveMode
-        ? Location.Accuracy.Balanced
-        : Location.Accuracy.BestForNavigation;
+      const accuracy =
+        options?.accuracy ||
+        (this.config.powerSaveMode
+          ? Location.Accuracy.Balanced
+          : Location.Accuracy.BestForNavigation);
 
-      const timeInterval = this.config.batteryOptimization
-        ? this.config.updateInterval * 2
-        : this.config.updateInterval;
+      const timeInterval =
+        options?.timeInterval ||
+        (this.config.batteryOptimization
+          ? this.config.updateInterval * 2
+          : this.config.updateInterval);
+
+      const distanceInterval =
+        options?.distanceInterval || this.config.movementThreshold;
 
       console.log('📍 Starting location tracking...');
 
@@ -583,7 +614,7 @@ class SmartLocationManager {
         {
           accuracy,
           timeInterval,
-          distanceInterval: this.config.movementThreshold,
+          distanceInterval,
           showsBackgroundLocationIndicator: true,
           foregroundService: {
             notificationTitle: 'MeetBridge',

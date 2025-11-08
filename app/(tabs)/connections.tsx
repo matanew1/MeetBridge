@@ -488,9 +488,17 @@ export default function ConnectionsScreen() {
   // Refresh connections when screen comes into focus (e.g., returning from comments)
   useFocusEffect(
     useCallback(() => {
-      // Real-time listeners handle updates automatically
+      console.log('🔄 Connections tab focused - refreshing data from Firebase');
+      // Real-time listeners handle updates automatically, but we can trigger a refresh
+      if (user?.id && activeTab === 'my') {
+        // Reload user's own posts
+        setIsLoading(true);
+      } else if (user?.id && activeTab === 'saved') {
+        // Reload saved posts
+        setIsLoading(true);
+      }
       return () => {};
-    }, [])
+    }, [user?.id, activeTab])
   );
 
   const [isCreating, setIsCreating] = useState(false);

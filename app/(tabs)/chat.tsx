@@ -14,6 +14,7 @@ import {
 import { MessageCircle, ImageIcon } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { useUserStore } from '../../store';
 import { EnhancedEmptyState } from '../components/ui';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -318,6 +319,9 @@ export default function ChatScreen() {
     loadConversations();
 
     // Load matches to ensure we have profile data for chat participants
+    console.log(
+      '🔥 Chat tab: Loading fresh conversations and matches from Firebase'
+    );
     const { loadMatches } = useUserStore.getState();
     loadMatches();
 
@@ -416,6 +420,18 @@ export default function ChatScreen() {
       }
     };
   }, [currentUser?.id]);
+
+  // ⚡ ALWAYS refresh conversations when chat tab is focused - NO CACHE
+  useFocusEffect(
+    useCallback(() => {
+      console.log(
+        '🔄 Chat tab focused - refreshing conversations from Firebase'
+      );
+      if (currentUser) {
+        loadConversations();
+      }
+    }, [currentUser, loadConversations])
+  );
 
   // Fetch missing profiles from Firestore (for missed connections)
   useEffect(() => {
