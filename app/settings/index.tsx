@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,9 @@ import {
   TouchableOpacity,
   Switch,
   Platform,
+  Modal,
+  FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -47,6 +50,7 @@ import {
 } from '../../utils/responsive';
 import toastSerivce from '../../services/toastService';
 import { User as UserType } from '../../types/models/user';
+import blockReportService from '../../services/blockReportService';
 
 interface SettingItemProps {
   icon: React.ReactNode;
@@ -168,6 +172,44 @@ const Settings: React.FC = () => {
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [showBlockedUsers, setShowBlockedUsers] = useState(false);
+  const [blockedUsersProfiles, setBlockedUsersProfiles] = useState<UserType[]>(
+    []
+  );
+  const [loadingBlockedUsers, setLoadingBlockedUsers] = useState(false);
+
+  useEffect(() => {
+    if (showBlockedUsers && user?.blockedUsers?.length) {
+      loadBlockedUsersProfiles();
+    }
+  }, [showBlockedUsers, user?.blockedUsers]);
+
+  const loadBlockedUsersProfiles = async () => {
+    if (!user?.blockedUsers?.length) return;
+
+    setLoadingBlockedUsers(true);
+    try {
+      const profiles: UserType[] = [];
+      for (const blockedUserId of user.blockedUsers) {
+        // Fetch each blocked user's profile
+        const { getDoc, doc } = await import('firebase/firestore');
+        const { db } = await import('../../services/firebase/config');
+        const userDoc = await getDoc(doc(db, 'users', blockedUserId));
+        if (userDoc.exists()) {
+          profiles.push({
+            id: userDoc.id,
+            ...userDoc.data(),
+          } as UserType);
+        }
+      }
+      setBlockedUsersProfiles(profiles);
+    } catch (error) {
+      console.error('Error loading blocked users:', error);
+      toastService.error('Error', 'Failed to load blocked users');
+    } finally {
+      setLoadingBlockedUsers(false);
+    }
+  };
 
   const handleLogout = () => {
     toastService.info('Logout', 'Are you sure you want to logout?', [
@@ -209,6 +251,31 @@ const Settings: React.FC = () => {
 
   const handleEditProfile = () => {
     setShowEditProfile(true);
+  };
+
+  const handleUnblockUser = async (
+    blockedUserId: string,
+    blockedUserName: string
+  ) => {
+    try {
+      const result = await blockReportService.unblockUser(blockedUserId);
+      if (result.success) {
+        toastService.success(
+          'User Unblocked',
+          `${blockedUserName} has been unblocked`
+        );
+        // Refresh user profile to update blockedUsers array
+        if (refreshUserProfile) {
+          await refreshUserProfile();
+        }
+        // Reload blocked users profiles
+        await loadBlockedUsersProfiles();
+      } else {
+        toastService.error('Error', result.message);
+      }
+    } catch (error) {
+      toastService.error('Error', 'Failed to unblock user');
+    }
   };
 
   const handleSaveProfile = async (updatedData: Partial<User>) => {
@@ -323,6 +390,12 @@ const Settings: React.FC = () => {
                 'Advanced privacy settings coming soon'
               )
             }
+          />
+          <SettingItem
+            icon={<Ban />}
+            title="Blocked Users"
+            subtitle={`${user?.blockedUsers?.length || 0} blocked users`}
+            onPress={() => setShowBlockedUsers(true)}
           />
           <SettingItem
             icon={<Eye />}
@@ -472,6 +545,97 @@ const Settings: React.FC = () => {
         </View>
       </ScrollView>
 
+      {/* Blocked Users Modal */}
+      <Modal
+        visible={showBlockedUsers}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowBlockedUsers(false)}
+      >
+        <SafeAreaView
+          style={[styles.modalContainer, { backgroundColor: theme.background }]}
+        >
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              style={[
+                styles.modalBackButton,
+                { backgroundColor: theme.surface },
+              ]}
+              onPress={() => setShowBlockedUsers(false)}
+            >
+              <ChevronLeft size={scale(24)} color={theme.text} />
+            </TouchableOpacity>
+            <Text
+              style={[
+                styles.modalTitle,
+                { color: theme.text, ...theme.typography.h1 },
+              ]}
+            >
+              Blocked Users
+            </Text>
+            <View style={{ width: scale(44) }} />
+          </View>
+
+          {loadingBlockedUsers ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={theme.primary} />
+              <Text
+                style={[styles.loadingText, { color: theme.textSecondary }]}
+              >
+                Loading blocked users...
+              </Text>
+            </View>
+          ) : blockedUsersProfiles.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                No blocked users
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={blockedUsersProfiles}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <View
+                  style={[
+                    styles.blockedUserItem,
+                    { borderBottomColor: theme.borderLight },
+                  ]}
+                >
+                  <View style={styles.blockedUserInfo}>
+                    <Text
+                      style={[styles.blockedUserName, { color: theme.text }]}
+                    >
+                      {item.displayName || item.name || 'Unknown User'}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.blockedUserId,
+                        { color: theme.textSecondary },
+                      ]}
+                    >
+                      @{item.id}
+                    </Text>
+                  </View>
+                  <Button
+                    title="Unblock"
+                    onPress={() =>
+                      handleUnblockUser(
+                        item.id,
+                        item.displayName || item.name || 'User'
+                      )
+                    }
+                    variant="outline"
+                    size="small"
+                  />
+                </View>
+              )}
+              contentContainerStyle={styles.blockedUsersList}
+            />
+          )}
+        </SafeAreaView>
+      </Modal>
+
       {/* Edit Profile Modal */}
       <EditProfileModal
         visible={showEditProfile}
@@ -568,6 +732,68 @@ const styles = StyleSheet.create({
   },
   footerText: {
     marginBottom: spacing.xs,
+  },
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  modalBackButton: {
+    width: scale(44),
+    height: scale(44),
+    borderRadius: borderRadius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    flex: 1,
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: spacing.md,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  blockedUsersList: {
+    padding: spacing.lg,
+  },
+  blockedUserItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#e0e0e0',
+  },
+  blockedUserInfo: {
+    flex: 1,
+  },
+  blockedUserName: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  blockedUserId: {
+    fontSize: 14,
+    marginTop: spacing.xs / 2,
   },
 });
 
