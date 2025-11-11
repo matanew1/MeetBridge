@@ -1101,6 +1101,8 @@ export class FirebaseMatchingService implements IMatchingService {
       }
       const currentUserData = currentUserDoc.data();
       const blockedUsers = new Set(currentUserData.blockedUsers || []);
+      console.log(`🔍 getMatches called for user ${userId}`);
+      console.log(`🚫 User's blocked users: ${JSON.stringify(currentUserData.blockedUsers || [])}`);
 
       const matchesQuery1 = query(
         collection(db, 'matches'),
@@ -1123,15 +1125,22 @@ export class FirebaseMatchingService implements IMatchingService {
         getDocs(matchesQuery2),
       ]);
 
+      console.log(`📊 Query results: user1 matches: ${matchesSnapshot1.size}, user2 matches: ${matchesSnapshot2.size}`);
+
       const matchedUsers: User[] = [];
       const seenUserIds = new Set<string>();
 
       const allMatches = [...matchesSnapshot1.docs, ...matchesSnapshot2.docs];
+      console.log(`📊 Total matches found: ${allMatches.length}`);
 
       for (const matchDoc of allMatches) {
         const matchData = matchDoc.data();
         const otherUserId =
           matchData.user1 === userId ? matchData.user2 : matchData.user1;
+
+        console.log(`🔍 Processing match ${matchDoc.id}: current user ${userId}, other user ${otherUserId}`);
+        console.log(`🚫 Blocked users: ${Array.from(blockedUsers)}`);
+        console.log(`🚫 Is other user blocked? ${blockedUsers.has(otherUserId)}`);
 
         if (!seenUserIds.has(otherUserId) && !blockedUsers.has(otherUserId)) {
           seenUserIds.add(otherUserId);
@@ -1139,13 +1148,18 @@ export class FirebaseMatchingService implements IMatchingService {
           const userDoc = await getDoc(doc(db, 'users', otherUserId));
           if (userDoc.exists()) {
             const userData = userDoc.data();
+            console.log(`✅ Found user document for ${otherUserId}: ${userData.displayName || userData.name}`);
             matchedUsers.push({
               id: userDoc.id,
               ...userData,
               lastSeen: convertTimestamp(userData.lastSeen),
               isMissedConnection: matchData.isMissedConnection || false, // Include the flag from match
             } as User);
+          } else {
+            console.log(`❌ User document not found for ${otherUserId}`);
           }
+        } else {
+          console.log(`🚫 Skipping user ${otherUserId} - seen: ${seenUserIds.has(otherUserId)}, blocked: ${blockedUsers.has(otherUserId)}`);
         }
       }
 
