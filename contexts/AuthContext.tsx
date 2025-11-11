@@ -323,18 +323,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             }
           } else {
             // User exists in Firebase Auth but not in Firestore
-            // This should ONLY happen in rare cases - DO NOT auto-create defaults for existing users
+            // This should ONLY happen in rare cases - clean up the orphaned auth record
             console.error(
               '❌ CRITICAL: User exists in Firebase Auth but not in Firestore:',
               firebaseUser.uid
             );
             console.error('📍 Document path attempted:', userDocRef.path);
             console.error(
-              '❌ User should register properly. Not creating default profile to prevent data loss.'
+              '🧹 Attempting to clean up orphaned authentication record...'
             );
 
-            // Sign out the user to force proper registration
-            await auth.signOut();
+            try {
+              // Use the cleanup service to properly handle orphaned auth records
+              const cleanupResult = await services.auth.cleanupOrphanedAuth(firebaseUser);
+              console.log('🧹 Cleanup result:', cleanupResult);
+              
+              if (cleanupResult.success) {
+                console.log('✅ Orphaned auth record cleaned up successfully');
+              } else {
+                console.error('❌ Failed to clean up orphaned auth record:', cleanupResult.message);
+              }
+            } catch (cleanupError) {
+              console.error('❌ Error during orphaned auth cleanup:', cleanupError);
+            }
+
+            // Clear user state regardless of cleanup success
             setUser(null);
             setFirebaseUser(null);
           }

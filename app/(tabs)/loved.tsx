@@ -284,6 +284,7 @@ export default function LovedScreen() {
     loadCurrentUser,
     loadConversations,
     createConversation,
+    currentUser,
   } = useUserStore();
   const [activeTab, setActiveTab] = useState<'loved' | 'matches'>('loved');
   const [selectedProfile, setSelectedProfile] = useState<any>(null);

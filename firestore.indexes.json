@@ -1,172 +1,46 @@
 {
     "indexes": [
         {
-            "collectionGroup": "discovery_queue",
-            "queryScope": "COLLECTION",
-            "fields": [
-                {
-                    "fieldPath": "userId",
-                    "order": "ASCENDING"
-                },
-                {
-                    "fieldPath": "shown",
-                    "order": "ASCENDING"
-                },
-                {
-                    "fieldPath": "score",
-                    "order": "DESCENDING"
-                }
-            ]
-        },
-        {
-            "collectionGroup": "discovery_queue",
-            "queryScope": "COLLECTION",
-            "fields": [
-                {
-                    "fieldPath": "userId",
-                    "order": "ASCENDING"
-                },
-                {
-                    "fieldPath": "expiresAt",
-                    "order": "ASCENDING"
-                }
-            ]
-        },
-        {
             "collectionGroup": "interactions",
             "queryScope": "COLLECTION",
             "fields": [
-                {
-                    "fieldPath": "userId",
-                    "order": "ASCENDING"
-                },
-                {
-                    "fieldPath": "targetUserId",
-                    "order": "ASCENDING"
-                }
-            ]
-        },
-        {
-            "collectionGroup": "interactions",
-            "queryScope": "COLLECTION",
-            "fields": [
-                {
-                    "fieldPath": "userId",
-                    "order": "ASCENDING"
-                },
                 {
                     "fieldPath": "type",
                     "order": "ASCENDING"
                 },
                 {
-                    "fieldPath": "createdAt",
-                    "order": "DESCENDING"
-                }
-            ]
-        },
-        {
-            "collectionGroup": "interactions",
-            "queryScope": "COLLECTION",
-            "fields": [
-                {
-                    "fieldPath": "targetUserId",
-                    "order": "ASCENDING"
-                },
-                {
-                    "fieldPath": "userId",
-                    "order": "ASCENDING"
-                }
-            ]
-        },
-        {
-            "collectionGroup": "matches",
-            "queryScope": "COLLECTION",
-            "fields": [
-                {
-                    "fieldPath": "user1",
-                    "order": "ASCENDING"
-                },
-                {
-                    "fieldPath": "unmatched",
-                    "order": "ASCENDING"
-                },
-                {
-                    "fieldPath": "createdAt",
-                    "order": "DESCENDING"
-                }
-            ]
-        },
-        {
-            "collectionGroup": "matches",
-            "queryScope": "COLLECTION",
-            "fields": [
-                {
-                    "fieldPath": "user2",
-                    "order": "ASCENDING"
-                },
-                {
-                    "fieldPath": "unmatched",
-                    "order": "ASCENDING"
-                },
-                {
-                    "fieldPath": "createdAt",
-                    "order": "DESCENDING"
-                }
-            ]
-        },
-        {
-            "collectionGroup": "matches",
-            "queryScope": "COLLECTION",
-            "fields": [
-                {
-                    "fieldPath": "user1",
-                    "order": "ASCENDING"
-                },
-                {
-                    "fieldPath": "user2",
-                    "order": "ASCENDING"
-                }
-            ]
-        },
-        {
-            "collectionGroup": "conversations",
-            "queryScope": "COLLECTION",
-            "fields": [
-                {
-                    "fieldPath": "participants",
-                    "arrayConfig": "CONTAINS"
-                },
-                {
-                    "fieldPath": "updatedAt",
-                    "order": "DESCENDING"
-                }
-            ]
-        },
-        {
-            "collectionGroup": "missed_connections",
-            "queryScope": "COLLECTION",
-            "fields": [
-                {
-                    "fieldPath": "location.category",
-                    "order": "ASCENDING"
-                },
-                {
-                    "fieldPath": "createdAt",
-                    "order": "DESCENDING"
-                }
-            ]
-        },
-        {
-            "collectionGroup": "missed_connections",
-            "queryScope": "COLLECTION",
-            "fields": [
-                {
                     "fieldPath": "userId",
                     "order": "ASCENDING"
                 },
                 {
                     "fieldPath": "createdAt",
-                    "order": "DESCENDING"
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "__name__",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "matches",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "unmatched",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "user1",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "createdAt",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "__name__",
+                    "order": "ASCENDING"
                 }
             ]
         },
@@ -176,39 +50,55 @@
             "fields": [
                 {
                     "fieldPath": "savedBy",
-                    "arrayConfig": "CONTAINS"
-                },
-                {
-                    "fieldPath": "createdAt",
-                    "order": "DESCENDING"
-                }
-            ]
-        },
-        {
-            "collectionGroup": "missed_connection_claims",
-            "queryScope": "COLLECTION",
-            "fields": [
-                {
-                    "fieldPath": "connectionId",
                     "order": "ASCENDING"
                 },
                 {
                     "fieldPath": "createdAt",
-                    "order": "DESCENDING"
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "__name__",
+                    "order": "ASCENDING"
                 }
             ]
         },
         {
-            "collectionGroup": "missed_connection_claims",
+            "collectionGroup": "missed_connections",
             "queryScope": "COLLECTION",
             "fields": [
                 {
-                    "fieldPath": "claimerId",
+                    "fieldPath": "userId",
                     "order": "ASCENDING"
                 },
                 {
                     "fieldPath": "createdAt",
-                    "order": "DESCENDING"
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "__name__",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "matches",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "unmatched",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "user2",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "createdAt",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "__name__",
+                    "order": "ASCENDING"
                 }
             ]
         },
@@ -226,25 +116,11 @@
                 },
                 {
                     "fieldPath": "createdAt",
-                    "order": "DESCENDING"
-                }
-            ]
-        },
-        {
-            "collectionGroup": "temporary_matches",
-            "queryScope": "COLLECTION",
-            "fields": [
-                {
-                    "fieldPath": "users",
-                    "arrayConfig": "CONTAINS"
-                },
-                {
-                    "fieldPath": "status",
                     "order": "ASCENDING"
                 },
                 {
-                    "fieldPath": "createdAt",
-                    "order": "DESCENDING"
+                    "fieldPath": "__name__",
+                    "order": "ASCENDING"
                 }
             ]
         },
@@ -254,7 +130,7 @@
             "fields": [
                 {
                     "fieldPath": "users",
-                    "arrayConfig": "CONTAINS"
+                    "order": "ASCENDING"
                 },
                 {
                     "fieldPath": "status",
@@ -262,7 +138,11 @@
                 },
                 {
                     "fieldPath": "createdAt",
-                    "order": "DESCENDING"
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "__name__",
+                    "order": "ASCENDING"
                 }
             ]
         }

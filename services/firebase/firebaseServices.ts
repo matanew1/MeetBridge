@@ -1239,25 +1239,49 @@ export class FirebaseMatchingService implements IMatchingService {
     targetUserId: string
   ): Promise<ApiResponse<boolean>> {
     try {
-      const [user1, user2] = [userId, targetUserId].sort();
+      // Try to find match with alphabetically sorted user IDs (regular matches)
+      const [sortedUser1, sortedUser2] = [userId, targetUserId].sort();
 
-      const matchQuery = query(
+      let matchQuery = query(
         collection(db, 'matches'),
-        where('user1', '==', user1),
-        where('user2', '==', user2)
+        where('user1', '==', sortedUser1),
+        where('user2', '==', sortedUser2)
       );
-      const matchSnapshot = await getDocs(matchQuery);
+      let matchSnapshot = await getDocs(matchQuery);
+
+      // If not found, try the reverse order (for missed connection matches)
+      if (matchSnapshot.empty) {
+        matchQuery = query(
+          collection(db, 'matches'),
+          where('user1', '==', sortedUser2),
+          where('user2', '==', sortedUser1)
+        );
+        matchSnapshot = await getDocs(matchQuery);
+      }
 
       if (matchSnapshot.empty) {
+        console.log(
+          'No match record found, but unmatch goal is already achieved'
+        );
         return {
-          data: false,
-          success: false,
-          message: 'Match not found',
+          data: true,
+          success: true,
+          message: 'Profile unmatched (no match record existed)',
         };
       }
 
       const matchDoc = matchSnapshot.docs[0];
       const matchData = matchDoc.data();
+
+      // Check if already unmatched
+      if (matchData.unmatched === true) {
+        console.log('Match already unmatched, no action needed');
+        return {
+          data: true,
+          success: true,
+          message: 'Profile already unmatched',
+        };
+      }
       const conversationId = matchData.conversationId;
 
       const batch = writeBatch(db);
@@ -1277,7 +1301,7 @@ export class FirebaseMatchingService implements IMatchingService {
         batch.delete(doc(db, 'conversations', conversationId));
       }
 
-      // Delete existing interactions and create pass interactions with 24-hour expiry
+      // Delete existing interactions between the users
       const existingInteractionsQuery = query(
         collection(db, 'interactions'),
         where('userId', 'in', [userId, targetUserId]),
@@ -1291,35 +1315,9 @@ export class FirebaseMatchingService implements IMatchingService {
         batch.delete(interactionDoc.ref);
       });
 
-      // Create pass interactions with 24-hour expiry for both users
-      const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + 24);
-
-      // User1 -> User2 pass interaction
-      const interaction1Ref = doc(collection(db, 'interactions'));
-      batch.set(interaction1Ref, {
-        userId: userId,
-        targetUserId: targetUserId,
-        type: 'pass',
-        createdAt: serverTimestamp(),
-        expiresAt: expiresAt,
-      });
-
-      // User2 -> User1 pass interaction
-      const interaction2Ref = doc(collection(db, 'interactions'));
-      batch.set(interaction2Ref, {
-        userId: targetUserId,
-        targetUserId: userId,
-        type: 'pass',
-        createdAt: serverTimestamp(),
-        expiresAt: expiresAt,
-      });
-
       await batch.commit();
 
-      console.log(
-        '✅ Unmatch complete - pass interactions created with 24-hour expiry'
-      );
+      console.log('✅ Unmatch complete - all interactions removed');
 
       return {
         data: true,
@@ -2028,26 +2026,48 @@ export class FirebaseAuthService implements IAuthService {
         );
 
         try {
-          await deleteUser(firebaseUser);
-          console.log('✅ Orphaned auth record deleted successfully');
-
-          return {
-            data: true,
-            success: true,
-            message:
-              'Orphaned authentication record has been cleaned up. Please register again.',
-          };
-        } catch (deleteError) {
-          console.error(
-            '❌ Failed to delete orphaned auth record:',
-            deleteError
+          // NOTE: Deleting a Firebase Authentication user from the client can
+          // fail (requires recent auth) and is potentially dangerous — an
+          // attacker could trigger this path. Instead of attempting to delete
+          // the auth record from the client, sign the user out and surface a
+          // clear message instructing the user to re-register. If permanent
+          // deletion is required, handle it via a trusted server-side (Admin
+          // SDK) flow.
+          console.warn(
+            '⚠️ Not deleting auth user from client. Signing out instead.'
           );
+
           await signOut(auth);
 
           return {
             data: false,
             success: false,
-            message: 'Authentication mismatch detected. Please log in again.',
+            message:
+              'No matching user profile found. You have been signed out. Please register again or contact support.',
+          };
+        } catch (deleteError) {
+          // If signOut or the above flow fails, try to sign the user out and
+          // return an explanatory error. Do not attempt to perform admin
+          // actions from the client.
+          console.error(
+            '❌ Failed while handling orphaned auth case (client-side):',
+            deleteError
+          );
+
+          try {
+            await signOut(auth);
+          } catch (signOutErr) {
+            console.error(
+              '❌ Failed to sign out during orphaned auth handling:',
+              signOutErr
+            );
+          }
+
+          return {
+            data: false,
+            success: false,
+            message:
+              'Authentication mismatch detected. You have been signed out. Please log in again or contact support.',
           };
         }
       }

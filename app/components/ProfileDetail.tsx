@@ -167,7 +167,6 @@ const ProfileDetail = ({
           <AlertCircle size={24} color={theme.textSecondary} />
         </TouchableOpacity>
       </View>
-
       <ScrollView
         style={[styles.scrollView, { backgroundColor: theme.background }]}
         showsVerticalScrollIndicator={false}
@@ -262,6 +261,82 @@ const ProfileDetail = ({
             )}
           </View>
 
+          {/* Action Buttons - Centered and Prominent */}
+          <View style={styles.contentActionButtons}>
+            {checkingMatch ? (
+              <View style={styles.contentActionButton}>
+                <Text style={{ color: theme.textSecondary, fontSize: 16 }}>
+                  Loading...
+                </Text>
+              </View>
+            ) : isMatched ? (
+              // Already matched - show unmatch and message
+              <>
+                {onMessage && (
+                  <TouchableOpacity
+                    style={[styles.contentActionButton, styles.messageButton]}
+                    onPress={() => onMessage(user.id)}
+                  >
+                    <MessageCircle size={28} color={theme.primary} />
+                  </TouchableOpacity>
+                )}
+                {onUnmatch && (
+                  <TouchableOpacity
+                    style={[styles.contentActionButton, styles.dislikeButton]}
+                    onPress={() => onUnmatch(user.id)}
+                  >
+                    <X size={28} color={theme.error} />
+                  </TouchableOpacity>
+                )}
+              </>
+            ) : isMissedConnection ? (
+              // Missed connection - show only unmatch
+              <>
+                {onUnmatch && (
+                  <TouchableOpacity
+                    style={[styles.contentActionButton, styles.dislikeButton]}
+                    onPress={() => onUnmatch(user.id)}
+                  >
+                    <X size={28} color={theme.error} />
+                  </TouchableOpacity>
+                )}
+              </>
+            ) : (
+              // Not matched yet - show like and dislike
+              <>
+                <TouchableOpacity
+                  style={[
+                    styles.contentActionButton,
+                    styles.likeButton,
+                    isLiked && { opacity: 0.5 },
+                  ]}
+                  onPress={() => onLike(user.id)}
+                  disabled={isLiked}
+                >
+                  <Heart
+                    size={28}
+                    color={isLiked ? theme.textSecondary : theme.primary}
+                    fill={isLiked ? theme.primary : 'transparent'}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.contentActionButton,
+                    styles.dislikeButton,
+                    isDisliked && { opacity: 0.5 },
+                  ]}
+                  onPress={() => onDislike(user.id)}
+                  disabled={isDisliked}
+                >
+                  <X
+                    size={28}
+                    color={isDisliked ? theme.textSecondary : theme.error}
+                  />
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+
           {/* Bio */}
           {user.bio && (
             <View
@@ -297,107 +372,7 @@ const ProfileDetail = ({
             </View>
           )}
         </View>
-        {/* Action Buttons */}
-        <View
-          style={[
-            styles.actionButtons,
-            {
-              backgroundColor: theme.surface,
-              borderTopColor: theme.border,
-            },
-          ]}
-        >
-          {checkingMatch ? (
-            // Show loading state while checking match status
-            <>
-              <View style={styles.actionButton}>
-                <Text style={{ color: theme.textSecondary, fontSize: 12 }}>
-                  Loading...
-                </Text>
-              </View>
-              <View style={styles.actionButton} />
-              <View style={styles.actionButton} />
-            </>
-          ) : isMatched ? (
-            // Already matched - show only unmatch and message
-            <>
-              {onUnmatch && (
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.dislikeButton]}
-                  onPress={() => onUnmatch(user.id)}
-                >
-                  <X size={24} color={theme.error} />
-                </TouchableOpacity>
-              )}
-
-              {onMessage && (
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.messageButton]}
-                  onPress={() => onMessage(user.id)}
-                >
-                  <MessageCircle size={24} color={theme.primary} />
-                </TouchableOpacity>
-              )}
-            </>
-          ) : isMissedConnection ? (
-            // Missed connection - show only unmatch (no like button)
-            <>
-              {onUnmatch && (
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.dislikeButton]}
-                  onPress={() => onUnmatch(user.id)}
-                >
-                  <X size={24} color={theme.error} />
-                </TouchableOpacity>
-              )}
-
-              {onMessage && (
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.messageButton]}
-                  onPress={() => onMessage(user.id)}
-                >
-                  <MessageCircle size={24} color={theme.primary} />
-                </TouchableOpacity>
-              )}
-            </>
-          ) : (
-            // Not matched yet - show all options
-            <>
-              <TouchableOpacity
-                style={[
-                  styles.actionButton,
-                  styles.dislikeButton,
-                  isDisliked && { opacity: 0.5 },
-                ]}
-                onPress={() => onDislike(user.id)}
-                disabled={isDisliked}
-              >
-                <X
-                  size={24}
-                  color={isDisliked ? theme.textSecondary : theme.error}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.actionButton,
-                  styles.likeButton,
-                  isLiked && { opacity: 0.5 },
-                ]}
-                onPress={() => onLike(user.id)}
-                disabled={isLiked}
-              >
-                <Heart
-                  size={24}
-                  color={isLiked ? theme.textSecondary : theme.primary}
-                  fill={isLiked ? theme.primary : 'transparent'}
-                />
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
       </ScrollView>
-
       {/* Block/Report Modal */}
       <BlockReportModal
         visible={showBlockReportModal}
@@ -659,6 +634,47 @@ const styles = StyleSheet.create({
   },
   likeButton: {
     backgroundColor: 'rgba(76, 175, 80, 0.1)',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerActionButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  contentActionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 24,
+    paddingVertical: 30,
+    paddingHorizontal: 40,
+  },
+  contentActionButton: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   unmatchSection: {
     paddingHorizontal: 40,

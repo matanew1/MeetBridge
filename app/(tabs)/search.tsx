@@ -579,14 +579,44 @@ export default function SearchScreen() {
     );
 
     const handleMatchChange = async (change: any, isUser1: boolean) => {
-      const matchData = change.doc.data();
-      const otherUserId = isUser1 ? matchData.user2 : matchData.user1;
+      // Safety check for change object
+      if (!change || !change.doc) {
+        console.warn('Invalid change object received:', change);
+        return;
+      }
+
+      const firestoreMatchData = change.doc.data();
+
+      // Safety check for required fields
+      if (
+        !firestoreMatchData ||
+        !firestoreMatchData.user1 ||
+        !firestoreMatchData.user2
+      ) {
+        console.warn('Invalid match data received:', firestoreMatchData);
+        return;
+      }
+
+      const otherUserId = isUser1
+        ? firestoreMatchData.user2
+        : firestoreMatchData.user1;
 
       // Handle match removal (unmatch)
       if (change.type === 'removed') {
         console.log(
           `🚫 Real-time unmatch detected in search! User ${otherUserId} was unmatched`
         );
+
+        // Cancel match animation if it's showing for this unmatched user
+        if (
+          matchData &&
+          matchData.user?.id === otherUserId &&
+          showMatchAnimation
+        ) {
+          console.log('🎬 Cancelling match animation for unmatched user');
+          setShowMatchAnimation(false);
+          setMatchData(null);
+        }
 
         // Remove match from processed matches
         processedMatchesRef.current.delete(change.doc.id);
