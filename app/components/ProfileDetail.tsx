@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
   profileImage: {
     width: width * 0.8,
     height: width * 0.8,
-    borderRadius: 24,
+    borderRadius: 10,
     maxHeight: 320,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,

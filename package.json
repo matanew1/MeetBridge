@@ -10,15 +10,8 @@
     "build:web": "npx expo export --platform web",
     "lint": "npx expo lint",
     "generate-mock-users": "ts-node scripts/generateMockUsers.ts",
-    "generate-mock-users-auto": "ts-node scripts/generateMockUsers.ts --auto",
-    "generate-mock-users-current": "ts-node scripts/generateMockUsers.ts --current",
     "delete-mock-users": "ts-node scripts/deleteMockUsers.ts",
-    "check-mock-users": "ts-node scripts/checkMockUsersGeohash.ts",
-    "test-geohash-query": "ts-node scripts/testGeohashQuery.ts",
-    "update-my-profile": "ts-node scripts/updateMyProfile.ts",
-    "drop-collections": "ts-node scripts/dropCollections.ts",
-    "drop-collection": "ts-node scripts/dropCollections.ts",
-    "migrate-dob": "ts-node scripts/migrateDateOfBirth.ts"
+    "drop-collections": "ts-node scripts/dropCollections.ts"
   },
   "dependencies": {
     "@expo/config-plugins": "^54.0.1",

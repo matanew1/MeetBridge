@@ -19,6 +19,7 @@ import {
 import { db, auth } from './config';
 import { geohashService } from '../location';
 import notificationService from '../notificationService';
+import storageService from '../storageService';
 
 export interface Comment {
   id: string;
@@ -54,6 +55,7 @@ export interface MissedConnection {
   };
   description: string;
   tags?: string[];
+  images?: string[];
   timeOccurred: Date;
   createdAt: Date;
   likes: number;
@@ -103,6 +105,7 @@ class MissedConnectionsService {
     };
     description: string;
     tags?: string[];
+    images?: string[];
     timeOccurred: Date;
     isAnonymous?: boolean;
   }): Promise<{ success: boolean; connectionId?: string; message: string }> {
@@ -116,6 +119,37 @@ class MissedConnectionsService {
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       const userData = userDoc.exists() ? userDoc.data() : null;
 
+      // Handle image upload to Cloudinary
+      let uploadedImages: string[] = [];
+      if (data.images && data.images.length > 0) {
+        console.log('📤 Uploading images to Cloudinary...');
+        for (const imageUri of data.images) {
+          if (
+            typeof imageUri === 'string' &&
+            (imageUri.startsWith('file://') ||
+              imageUri.startsWith('content://') ||
+              imageUri.startsWith('data:') ||
+              imageUri.startsWith('/'))
+          ) {
+            console.log('📤 Uploading image to Cloudinary...');
+            const uploadResult = await storageService.uploadImage(imageUri);
+
+            if (uploadResult.success && uploadResult.secureUrl) {
+              uploadedImages.push(uploadResult.secureUrl);
+              console.log('✅ Image uploaded:', uploadResult.secureUrl);
+            } else {
+              console.warn('⚠️ Failed to upload image:', imageUri);
+              // Keep the original URI if upload fails
+              uploadedImages.push(imageUri);
+            }
+          } else {
+            // Keep existing Cloudinary URLs or other valid URLs
+            uploadedImages.push(imageUri);
+          }
+        }
+        console.log('✅ Images processed:', uploadedImages);
+      }
+
       const connectionData = {
         userId: user.uid,
         userName: data.isAnonymous
@@ -125,6 +159,7 @@ class MissedConnectionsService {
         location: data.location,
         description: data.description,
         tags: data.tags || [],
+        images: uploadedImages,
         timeOccurred: data.timeOccurred,
         createdAt: serverTimestamp(),
         likes: 0,
@@ -173,6 +208,7 @@ class MissedConnectionsService {
       isAnonymous?: boolean;
       category?: string;
       tags?: string[];
+      images?: string[];
     }
   ): Promise<{ success: boolean; message: string }> {
     try {
@@ -228,6 +264,39 @@ class MissedConnectionsService {
       }
       if (updates.tags !== undefined) {
         updateData.tags = updates.tags;
+      }
+      if (updates.images !== undefined) {
+        // Handle image upload to Cloudinary
+        let uploadedImages: string[] = [];
+        if (updates.images.length > 0) {
+          console.log('📤 Uploading images to Cloudinary...');
+          for (const imageUri of updates.images) {
+            if (
+              typeof imageUri === 'string' &&
+              (imageUri.startsWith('file://') ||
+                imageUri.startsWith('content://') ||
+                imageUri.startsWith('data:') ||
+                imageUri.startsWith('/'))
+            ) {
+              console.log('📤 Uploading image to Cloudinary...');
+              const uploadResult = await storageService.uploadImage(imageUri);
+
+              if (uploadResult.success && uploadResult.secureUrl) {
+                uploadedImages.push(uploadResult.secureUrl);
+                console.log('✅ Image uploaded:', uploadResult.secureUrl);
+              } else {
+                console.warn('⚠️ Failed to upload image:', imageUri);
+                // Keep the original URI if upload fails
+                uploadedImages.push(imageUri);
+              }
+            } else {
+              // Keep existing Cloudinary URLs or other valid URLs
+              uploadedImages.push(imageUri);
+            }
+          }
+          console.log('✅ Images processed:', uploadedImages);
+        }
+        updateData.images = uploadedImages;
       }
 
       // If changing anonymity, update user info
@@ -317,6 +386,7 @@ class MissedConnectionsService {
           location: data.location,
           description: data.description,
           tags: data.tags || [],
+          images: data.images || [],
           timeOccurred: convertTimestamp(data.timeOccurred),
           createdAt: convertTimestamp(data.createdAt),
           likes: data.likes || 0,
@@ -710,6 +780,7 @@ class MissedConnectionsService {
           location: data.location,
           description: data.description,
           tags: data.tags || [],
+          images: data.images || [],
           timeOccurred: convertTimestamp(data.timeOccurred),
           createdAt: convertTimestamp(data.createdAt),
           likes: data.likes || 0,
@@ -765,6 +836,7 @@ class MissedConnectionsService {
         location: data.location,
         description: data.description,
         tags: data.tags || [],
+        images: data.images || [],
         timeOccurred: convertTimestamp(data.timeOccurred),
         createdAt: convertTimestamp(data.createdAt),
         likes: data.likes || 0,
@@ -1013,6 +1085,7 @@ class MissedConnectionsService {
           location: data.location,
           description: data.description,
           tags: data.tags || [],
+          images: data.images || [],
           timeOccurred: convertTimestamp(data.timeOccurred),
           createdAt: convertTimestamp(data.createdAt),
           likes: data.likes || 0,
@@ -1073,6 +1146,7 @@ class MissedConnectionsService {
           location: data.location,
           description: data.description,
           tags: data.tags || [],
+          images: data.images || [],
           timeOccurred: convertTimestamp(data.timeOccurred),
           createdAt: convertTimestamp(data.createdAt),
           likes: data.likes || 0,
@@ -1307,6 +1381,7 @@ class MissedConnectionsService {
           location: data.location,
           description: data.description,
           tags: data.tags || [],
+          images: data.images || [],
           timeOccurred: convertTimestamp(data.timeOccurred),
           createdAt: convertTimestamp(data.createdAt),
           likes: data.likes || 0,
@@ -1355,6 +1430,7 @@ class MissedConnectionsService {
           location: data.location,
           description: data.description,
           tags: data.tags || [],
+          images: data.images || [],
           timeOccurred: convertTimestamp(data.timeOccurred),
           createdAt: convertTimestamp(data.createdAt),
           likes: data.likes || 0,

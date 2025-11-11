@@ -124,12 +124,10 @@ export class FirebaseUserProfileService implements IUserProfileService {
       let dataToUpdate: Record<string, any> = { ...userData };
 
       // Sanitize string fields
-      if (dataToUpdate.displayName) {
-        dataToUpdate.displayName = sanitizeDisplayName(
-          dataToUpdate.displayName
-        );
-        if (!dataToUpdate.displayName) {
-          throw new Error('Invalid display name');
+      if (dataToUpdate.name) {
+        dataToUpdate.name = sanitizeDisplayName(dataToUpdate.name);
+        if (!dataToUpdate.name) {
+          throw new Error('Invalid name');
         }
       }
 
@@ -456,9 +454,7 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
           const userId = docSnapshot.id;
           const data = { ...docSnapshot.data(), id: userId };
 
-          console.log(
-            `👤 Found candidate: ${data.displayName || userId} (${userId})`
-          );
+          console.log(`👤 Found candidate: ${data.name || userId} (${userId})`);
 
           if (
             seenIds.has(userId) ||
@@ -502,19 +498,16 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
               }
             );
 
-            console.log(
-              `📏 Distance check for ${data.displayName || userId}:`,
-              {
-                distance: distance.toFixed(1) + 'm',
-                maxDistance: filters.maxDistance + 'm',
-                willInclude: distance <= filters.maxDistance,
-              }
-            );
+            console.log(`📏 Distance check for ${data.name || userId}:`, {
+              distance: distance.toFixed(1) + 'm',
+              maxDistance: filters.maxDistance + 'm',
+              willInclude: distance <= filters.maxDistance,
+            });
 
             if (distance > filters.maxDistance) {
               console.log(
                 `🚫 Filtered by distance: ${
-                  data.displayName || userId
+                  data.name || userId
                 } (${distance.toFixed(1)}m > ${filters.maxDistance}m)`
               );
               filteredOutStats.distance++;
@@ -1102,7 +1095,11 @@ export class FirebaseMatchingService implements IMatchingService {
       const currentUserData = currentUserDoc.data();
       const blockedUsers = new Set(currentUserData.blockedUsers || []);
       console.log(`🔍 getMatches called for user ${userId}`);
-      console.log(`🚫 User's blocked users: ${JSON.stringify(currentUserData.blockedUsers || [])}`);
+      console.log(
+        `🚫 User's blocked users: ${JSON.stringify(
+          currentUserData.blockedUsers || []
+        )}`
+      );
 
       const matchesQuery1 = query(
         collection(db, 'matches'),
@@ -1125,7 +1122,9 @@ export class FirebaseMatchingService implements IMatchingService {
         getDocs(matchesQuery2),
       ]);
 
-      console.log(`📊 Query results: user1 matches: ${matchesSnapshot1.size}, user2 matches: ${matchesSnapshot2.size}`);
+      console.log(
+        `📊 Query results: user1 matches: ${matchesSnapshot1.size}, user2 matches: ${matchesSnapshot2.size}`
+      );
 
       const matchedUsers: User[] = [];
       const seenUserIds = new Set<string>();
@@ -1138,9 +1137,13 @@ export class FirebaseMatchingService implements IMatchingService {
         const otherUserId =
           matchData.user1 === userId ? matchData.user2 : matchData.user1;
 
-        console.log(`🔍 Processing match ${matchDoc.id}: current user ${userId}, other user ${otherUserId}`);
+        console.log(
+          `🔍 Processing match ${matchDoc.id}: current user ${userId}, other user ${otherUserId}`
+        );
         console.log(`🚫 Blocked users: ${Array.from(blockedUsers)}`);
-        console.log(`🚫 Is other user blocked? ${blockedUsers.has(otherUserId)}`);
+        console.log(
+          `🚫 Is other user blocked? ${blockedUsers.has(otherUserId)}`
+        );
 
         if (!seenUserIds.has(otherUserId) && !blockedUsers.has(otherUserId)) {
           seenUserIds.add(otherUserId);
@@ -1148,7 +1151,11 @@ export class FirebaseMatchingService implements IMatchingService {
           const userDoc = await getDoc(doc(db, 'users', otherUserId));
           if (userDoc.exists()) {
             const userData = userDoc.data();
-            console.log(`✅ Found user document for ${otherUserId}: ${userData.displayName || userData.name}`);
+            console.log(
+              `✅ Found user document for ${otherUserId}: ${
+                userData.name || userData.name
+              }`
+            );
             matchedUsers.push({
               id: userDoc.id,
               ...userData,
@@ -1159,7 +1166,11 @@ export class FirebaseMatchingService implements IMatchingService {
             console.log(`❌ User document not found for ${otherUserId}`);
           }
         } else {
-          console.log(`🚫 Skipping user ${otherUserId} - seen: ${seenUserIds.has(otherUserId)}, blocked: ${blockedUsers.has(otherUserId)}`);
+          console.log(
+            `🚫 Skipping user ${otherUserId} - seen: ${seenUserIds.has(
+              otherUserId
+            )}, blocked: ${blockedUsers.has(otherUserId)}`
+          );
         }
       }
 

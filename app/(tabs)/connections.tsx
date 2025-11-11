@@ -48,7 +48,12 @@ import missedConnectionsService, {
   MissedConnection,
 } from '../../services/firebase/missedConnectionsService';
 import toastService from '../../services/toastService';
-import { useUserStore } from '../../store';
+import * as ImagePicker from 'expo-image-picker';
+import { Camera, Image as ImageIcon } from 'lucide-react-native';
+import { userStore, useUserStore } from '../../store/userStore';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../services/firebase/config';
+import ProfileDetail from '../components/ProfileDetail';
 
 // Helper function
 const formatRelativeTime = (date: Date): string => {
@@ -78,6 +83,8 @@ interface ConnectionItemProps {
   onEdit: () => void;
   onDelete: () => void;
   onSave: () => void;
+  onViewProfile: () => void;
+  onViewImages: (images: string[], startIndex: number) => void;
   isLiked: boolean;
   isSaved: boolean;
   currentUserId: string | undefined;
@@ -96,6 +103,8 @@ const ConnectionItem: React.FC<ConnectionItemProps> = React.memo(
     onEdit,
     onDelete,
     onSave,
+    onViewProfile,
+    onViewImages,
     isLiked,
     isSaved,
     currentUserId,
@@ -123,14 +132,33 @@ const ConnectionItem: React.FC<ConnectionItemProps> = React.memo(
         <View style={styles.connectionContent}>
           {/* User Profile */}
           <View style={styles.userSection}>
-            <Image
-              source={
-                connection.userImage
-                  ? { uri: connection.userImage }
-                  : require('../../assets/images/placeholder.png')
-              }
-              style={styles.userAvatar}
-            />
+            {!isOwner ? (
+              <TouchableOpacity
+                onPress={(e) => {
+                  e.stopPropagation();
+                  onViewProfile();
+                }}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={
+                    connection.userImage
+                      ? { uri: connection.userImage }
+                      : require('../../assets/images/placeholder.png')
+                  }
+                  style={styles.userAvatar}
+                />
+              </TouchableOpacity>
+            ) : (
+              <Image
+                source={
+                  connection.userImage
+                    ? { uri: connection.userImage }
+                    : require('../../assets/images/placeholder.png')
+                }
+                style={styles.userAvatar}
+              />
+            )}
             <View style={styles.userInfo}>
               <Text style={[styles.userName, { color: theme.text }]}>
                 {connection.userName || 'Anonymous'}
@@ -208,6 +236,35 @@ const ConnectionItem: React.FC<ConnectionItemProps> = React.memo(
           >
             {connection.description}
           </Text>
+
+          {/* Images */}
+          {(() => {
+            console.log('Connection images:', connection.id, connection.images);
+            return connection.images && connection.images.length > 0;
+          })() && (
+            <View style={styles.postImagesContainer}>
+              {connection.images.slice(0, 3).map((imageUri, index) => (
+                <TouchableOpacity
+                  key={index}
+                  onPress={() => onViewImages(connection.images || [], index)}
+                  activeOpacity={0.8}
+                >
+                  <Image source={{ uri: imageUri }} style={styles.postImage} />
+                </TouchableOpacity>
+              ))}
+              {connection.images.length > 3 && (
+                <TouchableOpacity
+                  style={[styles.postImage, styles.moreImagesOverlay]}
+                  onPress={() => onViewImages(connection.images || [], 0)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.moreImagesText}>
+                    +{connection.images.length - 3}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
 
           {/* Actions */}
           <View style={styles.actions}>
@@ -393,17 +450,28 @@ export default function ConnectionsScreen() {
     category: 'restaurant',
     timeOccurred: new Date(),
     isAnonymous: false,
+    tags: [] as string[],
+    images: [] as string[],
+    currentTag: '',
   });
   const [createForm, setCreateForm] = useState({
     description: '',
     category: 'restaurant',
     timeOccurred: new Date(),
     isAnonymous: false,
+    tags: [] as string[],
+    images: [] as string[],
+    currentTag: '',
   });
   const [currentLocation, setCurrentLocation] = useState<{
     coordinates: { latitude: number; longitude: number };
     address: string | null;
   } | null>(null);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [showFullScreenImage, setShowFullScreenImage] = useState(false);
+  const [fullScreenImages, setFullScreenImages] = useState<string[]>([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   // Helper function to get location with address
   const getCurrentLocationWithAddress = async () => {
@@ -650,6 +718,8 @@ export default function ConnectionsScreen() {
         description: createForm.description,
         timeOccurred: createForm.timeOccurred,
         isAnonymous: createForm.isAnonymous,
+        tags: createForm.tags,
+        images: createForm.images,
       });
 
       if (result.success) {
@@ -664,6 +734,9 @@ export default function ConnectionsScreen() {
           category: 'restaurant',
           timeOccurred: new Date(),
           isAnonymous: false,
+          tags: [],
+          images: [],
+          currentTag: '',
         });
         // Real-time listeners will update the list automatically
       } else {
@@ -691,6 +764,8 @@ export default function ConnectionsScreen() {
           timeOccurred: editForm.timeOccurred,
           isAnonymous: editForm.isAnonymous,
           category: editForm.category,
+          tags: editForm.tags,
+          images: editForm.images,
         }
       );
 
@@ -754,6 +829,62 @@ export default function ConnectionsScreen() {
     [user?.id, conversations]
   );
 
+  const handleViewProfile = useCallback(async (userId: string) => {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const profileUser = {
+          id: userDoc.id,
+          name: userData.name || 'Unknown',
+          age: userData.age || 0,
+          zodiacSign: userData.zodiacSign,
+          distance: userData.distance,
+          image: userData.image || userData.images?.[0] || '',
+          images: userData.images,
+          bio: userData.bio,
+          interests: userData.interests,
+          location: userData.location,
+          height: userData.height,
+        };
+        setSelectedUser(profileUser);
+        setShowProfileModal(true);
+      } else {
+        toastService.error('Error', 'User profile not found');
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      toastService.error('Error', 'Failed to load user profile');
+    }
+  }, []);
+
+  const handleViewImages = useCallback(
+    (images: string[], startIndex: number = 0) => {
+      setFullScreenImages(images);
+      setCurrentImageIndex(startIndex);
+      setShowFullScreenImage(true);
+    },
+    []
+  );
+
+  const handleCloseFullScreenImage = useCallback(() => {
+    setShowFullScreenImage(false);
+    setFullScreenImages([]);
+    setCurrentImageIndex(0);
+  }, []);
+
+  const handlePrevImage = useCallback(() => {
+    setCurrentImageIndex((prev) =>
+      prev > 0 ? prev - 1 : fullScreenImages.length - 1
+    );
+  }, [fullScreenImages.length]);
+
+  const handleNextImage = useCallback(() => {
+    setCurrentImageIndex((prev) =>
+      prev < fullScreenImages.length - 1 ? prev + 1 : 0
+    );
+  }, [fullScreenImages.length]);
+
   const renderItem = useCallback(
     ({
       item: connection,
@@ -810,6 +941,9 @@ export default function ConnectionsScreen() {
                 category: latestConnection.location.category || 'restaurant',
                 timeOccurred: latestConnection.timeOccurred,
                 isAnonymous: latestConnection.isAnonymous || false,
+                tags: latestConnection.tags || [],
+                images: latestConnection.images || [],
+                currentTag: '',
               });
               setShowCreateModal(true);
             }
@@ -836,6 +970,10 @@ export default function ConnectionsScreen() {
           isSaved={connection.savedBy?.includes(user?.id || '') || false}
           currentUserId={user?.id}
           hasExistingConversation={hasExistingConversation}
+          onViewProfile={() => handleViewProfile(connection.userId)}
+          onViewImages={(images, startIndex) =>
+            handleViewImages(images, startIndex)
+          }
         />
       );
     },
@@ -1163,6 +1301,296 @@ export default function ConnectionsScreen() {
                   />
                 </View>
 
+                {/* Tags Section */}
+                <View style={styles.formSection}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                      Tags (optional)
+                    </Text>
+                  </View>
+
+                  {/* Current Tags Display */}
+                  {(editingConnection ? editForm.tags : createForm.tags)
+                    .length > 0 && (
+                    <View style={styles.tagsContainer}>
+                      {(editingConnection
+                        ? editForm.tags
+                        : createForm.tags
+                      ).map((tag, index) => (
+                        <View
+                          key={index}
+                          style={[
+                            styles.tagChip,
+                            { backgroundColor: `${theme.primary}20` },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.tagChipText,
+                              { color: theme.primary },
+                            ]}
+                          >
+                            #{tag}
+                          </Text>
+                          <TouchableOpacity
+                            onPress={() => {
+                              const currentTags = editingConnection
+                                ? editForm.tags
+                                : createForm.tags;
+                              const newTags = currentTags.filter(
+                                (_, i) => i !== index
+                              );
+                              editingConnection
+                                ? setEditForm((prev) => ({
+                                    ...prev,
+                                    tags: newTags,
+                                  }))
+                                : setCreateForm((prev) => ({
+                                    ...prev,
+                                    tags: newTags,
+                                  }));
+                            }}
+                            style={styles.tagRemoveButton}
+                          >
+                            <X size={14} color={theme.primary} />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Tag Input */}
+                  {(editingConnection ? editForm.tags : createForm.tags)
+                    .length < 5 && (
+                    <View style={styles.tagInputContainer}>
+                      <TextInput
+                        style={[
+                          styles.tagInput,
+                          {
+                            backgroundColor: theme.surface,
+                            color: theme.text,
+                            borderColor: theme.border,
+                          },
+                        ]}
+                        placeholder="Type a tag and press Add"
+                        placeholderTextColor={theme.textSecondary}
+                        value={
+                          editingConnection
+                            ? editForm.currentTag || ''
+                            : createForm.currentTag || ''
+                        }
+                        onChangeText={(text) => {
+                          editingConnection
+                            ? setEditForm((prev) => ({
+                                ...prev,
+                                currentTag: text,
+                              }))
+                            : setCreateForm((prev) => ({
+                                ...prev,
+                                currentTag: text,
+                              }));
+                        }}
+                        onSubmitEditing={() => {
+                          const currentTag = editingConnection
+                            ? editForm.currentTag
+                            : createForm.currentTag;
+                          if (currentTag && currentTag.trim()) {
+                            const trimmedTag = currentTag.trim().toLowerCase();
+                            const currentTags = editingConnection
+                              ? editForm.tags
+                              : createForm.tags;
+
+                            if (!currentTags.includes(trimmedTag)) {
+                              const newTags = [...currentTags, trimmedTag];
+                              editingConnection
+                                ? setEditForm((prev) => ({
+                                    ...prev,
+                                    tags: newTags,
+                                    currentTag: '',
+                                  }))
+                                : setCreateForm((prev) => ({
+                                    ...prev,
+                                    tags: newTags,
+                                    currentTag: '',
+                                  }));
+                            } else {
+                              editingConnection
+                                ? setEditForm((prev) => ({
+                                    ...prev,
+                                    currentTag: '',
+                                  }))
+                                : setCreateForm((prev) => ({
+                                    ...prev,
+                                    currentTag: '',
+                                  }));
+                            }
+                          }
+                        }}
+                        returnKeyType="done"
+                        maxLength={20}
+                      />
+                      <TouchableOpacity
+                        style={[
+                          styles.addTagButton,
+                          { backgroundColor: theme.primary },
+                        ]}
+                        onPress={() => {
+                          const currentTag = editingConnection
+                            ? editForm.currentTag
+                            : createForm.currentTag;
+                          if (currentTag && currentTag.trim()) {
+                            const trimmedTag = currentTag.trim().toLowerCase();
+                            const currentTags = editingConnection
+                              ? editForm.tags
+                              : createForm.tags;
+
+                            if (!currentTags.includes(trimmedTag)) {
+                              const newTags = [...currentTags, trimmedTag];
+                              editingConnection
+                                ? setEditForm((prev) => ({
+                                    ...prev,
+                                    tags: newTags,
+                                    currentTag: '',
+                                  }))
+                                : setCreateForm((prev) => ({
+                                    ...prev,
+                                    tags: newTags,
+                                    currentTag: '',
+                                  }));
+                            } else {
+                              editingConnection
+                                ? setEditForm((prev) => ({
+                                    ...prev,
+                                    currentTag: '',
+                                  }))
+                                : setCreateForm((prev) => ({
+                                    ...prev,
+                                    currentTag: '',
+                                  }));
+                            }
+                          }
+                        }}
+                      >
+                        <Text style={styles.addTagButtonText}>Add</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  <Text
+                    style={[styles.helperText, { color: theme.textSecondary }]}
+                  >
+                    Tags help others find your post. Max 5 tags.
+                  </Text>
+                </View>
+
+                {/* Images Section */}
+                <View style={styles.formSection}>
+                  <View style={styles.sectionHeader}>
+                    <ImageIcon size={20} color={theme.primary} />
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                      Photos (optional)
+                    </Text>
+                  </View>
+                  <View style={styles.imagesContainer}>
+                    {(editingConnection
+                      ? editForm.images
+                      : createForm.images
+                    ).map((imageUri, index) => (
+                      <View key={index} style={styles.imageWrapper}>
+                        <Image
+                          source={{ uri: imageUri }}
+                          style={styles.imagePreview}
+                        />
+                        <TouchableOpacity
+                          style={styles.removeImageButton}
+                          onPress={() => {
+                            const currentImages = editingConnection
+                              ? editForm.images
+                              : createForm.images;
+                            const newImages = currentImages.filter(
+                              (_, i) => i !== index
+                            );
+                            editingConnection
+                              ? setEditForm((prev) => ({
+                                  ...prev,
+                                  images: newImages,
+                                }))
+                              : setCreateForm((prev) => ({
+                                  ...prev,
+                                  images: newImages,
+                                }));
+                          }}
+                        >
+                          <X size={16} color="#FFF" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                    {(editingConnection ? editForm.images : createForm.images)
+                      .length < 3 && (
+                      <TouchableOpacity
+                        style={[
+                          styles.addImageButton,
+                          { borderColor: theme.border },
+                        ]}
+                        onPress={async () => {
+                          const permissionResult =
+                            await ImagePicker.requestMediaLibraryPermissionsAsync();
+                          if (permissionResult.granted === false) {
+                            toastService.error(
+                              'Permission required',
+                              'Camera roll permissions are required to add photos'
+                            );
+                            return;
+                          }
+
+                          const result =
+                            await ImagePicker.launchImageLibraryAsync({
+                              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                              allowsEditing: true,
+                              aspect: [4, 3],
+                              quality: 0.8,
+                            });
+
+                          if (!result.canceled) {
+                            const currentImages = editingConnection
+                              ? editForm.images
+                              : createForm.images;
+                            const newImages = [
+                              ...currentImages,
+                              result.assets[0].uri,
+                            ];
+                            editingConnection
+                              ? setEditForm((prev) => ({
+                                  ...prev,
+                                  images: newImages,
+                                }))
+                              : setCreateForm((prev) => ({
+                                  ...prev,
+                                  images: newImages,
+                                }));
+                          }
+                        }}
+                      >
+                        <Camera size={24} color={theme.primary} />
+                        <Text
+                          style={[
+                            styles.addImageText,
+                            { color: theme.primary },
+                          ]}
+                        >
+                          Add Photo
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  <Text
+                    style={[styles.helperText, { color: theme.textSecondary }]}
+                  >
+                    Add up to 3 photos to help others recognize the person. Max
+                    3 photos.
+                  </Text>
+                </View>
+
                 {/* Time Section */}
                 <View style={styles.formSection}>
                   <View style={styles.sectionHeader}>
@@ -1294,6 +1722,77 @@ export default function ConnectionsScreen() {
             </View>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Profile Detail Modal */}
+      {selectedUser && (
+        <Modal
+          visible={showProfileModal}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowProfileModal(false)}
+        >
+          <ProfileDetail
+            user={selectedUser}
+            onClose={() => setShowProfileModal(false)}
+            onLike={() => {}}
+            onDislike={() => {}}
+            isMissedConnection={true}
+          />
+        </Modal>
+      )}
+
+      {/* Full Screen Image Modal */}
+      <Modal
+        visible={showFullScreenImage}
+        animationType="fade"
+        presentationStyle="fullScreen"
+        onRequestClose={handleCloseFullScreenImage}
+      >
+        <View style={styles.fullScreenContainer}>
+          {/* Header */}
+          <View style={styles.fullScreenHeader}>
+            <TouchableOpacity
+              style={styles.fullScreenCloseButton}
+              onPress={handleCloseFullScreenImage}
+            >
+              <X size={24} color="white" />
+            </TouchableOpacity>
+            {fullScreenImages.length > 1 && (
+              <Text style={styles.imageCounter}>
+                {currentImageIndex + 1} / {fullScreenImages.length}
+              </Text>
+            )}
+            <View style={{ width: 40 }} />
+          </View>
+
+          {/* Image */}
+          <View style={styles.fullScreenImageContainer}>
+            <Image
+              source={{ uri: fullScreenImages[currentImageIndex] }}
+              style={styles.fullScreenImage}
+              resizeMode="contain"
+            />
+          </View>
+
+          {/* Navigation Controls */}
+          {fullScreenImages.length > 1 && (
+            <>
+              <TouchableOpacity
+                style={[styles.navButton, styles.prevButton]}
+                onPress={handlePrevImage}
+              >
+                <Text style={styles.navButtonText}>‹</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.navButton, styles.nextButton]}
+                onPress={handleNextImage}
+              >
+                <Text style={styles.navButtonText}>›</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
       </Modal>
     </View>
   );
@@ -1479,6 +1978,12 @@ const styles = StyleSheet.create({
     height: 120,
     textAlignVertical: 'top',
   },
+  textInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+  },
   timeSelector: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1601,5 +2106,160 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     lineHeight: 24,
+  },
+  imagesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  imageWrapper: {
+    position: 'relative',
+  },
+  imagePreview: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#FF4444',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addImageButton: {
+    width: 80,
+    height: 80,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  addImageText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  postImagesContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+  },
+  postImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+  },
+  moreImagesOverlay: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moreImagesText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  tagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  tagChipText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  tagRemoveButton: {
+    padding: 2,
+  },
+  tagInputContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  tagInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 16,
+  },
+  addTagButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addTagButtonText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  fullScreenContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  fullScreenHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  fullScreenCloseButton: {
+    padding: 10,
+  },
+  imageCounter: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  fullScreenImageContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullScreenImage: {
+    width: '100%',
+    height: '100%',
+  },
+  navButton: {
+    position: 'absolute',
+    top: '50%',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  prevButton: {
+    left: 20,
+  },
+  nextButton: {
+    right: 20,
+  },
+  navButtonText: {
+    color: '#FFF',
+    fontSize: 24,
+    fontWeight: 'bold',
   },
 });
