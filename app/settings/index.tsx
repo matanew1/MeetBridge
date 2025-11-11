@@ -200,7 +200,10 @@ const Settings: React.FC = () => {
       return;
     }
 
-    console.log(`📋 Loading profiles for ${user.blockedUsers.length} blocked users:`, user.blockedUsers);
+    console.log(
+      `📋 Loading profiles for ${user.blockedUsers.length} blocked users:`,
+      user.blockedUsers
+    );
 
     setLoadingBlockedUsers(true);
     try {
@@ -213,13 +216,19 @@ const Settings: React.FC = () => {
         const userDoc = await getDoc(doc(db, 'users', blockedUserId));
         if (userDoc.exists()) {
           const profileData = userDoc.data();
-          console.log(`✅ Found profile for ${blockedUserId}: ${profileData?.displayName || profileData?.name || 'Unknown'}`);
+          console.log(
+            `✅ Found profile for ${blockedUserId}: ${
+              profileData?.displayName || profileData?.name || 'Unknown'
+            }`
+          );
           profiles.push({
             id: userDoc.id,
             ...profileData,
           } as UserType);
         } else {
-          console.log(`❌ Profile not found for blocked user: ${blockedUserId}`);
+          console.log(
+            `❌ Profile not found for blocked user: ${blockedUserId}`
+          );
         }
       }
       console.log(`📊 Loaded ${profiles.length} blocked user profiles`);
@@ -270,8 +279,14 @@ const Settings: React.FC = () => {
     }
   };
 
-  const handleEditProfile = () => {
-    setShowEditProfile(true);
+  const handleBackPress = () => {
+    // Check if there's a screen to go back to
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      // If no screen to go back to, navigate to the main tabs
+      router.replace('/(tabs)/search');
+    }
   };
 
   const handleUnblockUser = async (
@@ -361,7 +376,7 @@ const Settings: React.FC = () => {
         <View style={styles.header}>
           <TouchableOpacity
             style={[styles.backButton, { backgroundColor: theme.surface }]}
-            onPress={() => router.back()}
+            onPress={handleBackPress}
           >
             <ChevronLeft size={scale(24)} color={theme.text} />
           </TouchableOpacity>
