@@ -314,6 +314,10 @@ const Settings: React.FC = () => {
     }
   };
 
+  const handleEditProfile = () => {
+    setShowEditProfile(true);
+  };
+
   const handleSaveProfile = async (updatedData: Partial<User>) => {
     try {
       // If updateProfile exists in AuthContext, use it
