@@ -17,6 +17,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from './firebase/config';
 import toastService from './toastService';
+import { services } from './index';
 
 export interface BlockedUser {
   userId: string;
@@ -84,6 +85,37 @@ class BlockReportService {
 
       if (currentUser.uid === blockedUserId) {
         return { success: false, message: 'Cannot block yourself' };
+      }
+
+      // Check if users are matched and perform unmatch operation if needed
+      const [sortedUser1, sortedUser2] = [
+        currentUser.uid,
+        blockedUserId,
+      ].sort();
+      const matchQuery = query(
+        collection(db, 'matches'),
+        where('user1', '==', sortedUser1),
+        where('user2', '==', sortedUser2),
+        where('unmatched', '==', false)
+      );
+      const matchSnapshot = await getDocs(matchQuery);
+
+      if (!matchSnapshot.empty) {
+        console.log(
+          '🔄 Users are matched - performing unmatch operation before blocking'
+        );
+        const unmatchResult = await services.matching.unmatchProfile(
+          currentUser.uid,
+          blockedUserId
+        );
+        if (!unmatchResult.success) {
+          console.warn(
+            '⚠️ Unmatch operation failed, but continuing with block:',
+            unmatchResult.message
+          );
+        } else {
+          console.log('✅ Unmatch operation completed successfully');
+        }
       }
 
       // Create block document
