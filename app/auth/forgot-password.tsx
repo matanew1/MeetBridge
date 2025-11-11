@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { ArrowLeft, Mail, CheckCircle } from 'lucide-react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -76,6 +77,7 @@ const ForgotPasswordScreen = () => {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
+      <StatusBar style="light" />
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

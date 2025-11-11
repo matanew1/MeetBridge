@@ -14,6 +14,7 @@ import {
   updatePassword,
   EmailAuthProvider,
   reauthenticateWithCredential,
+  signOut,
 } from 'firebase/auth';
 import { auth, db } from '../services/firebase/config';
 import errorHandler from '../utils/errorHandler';
@@ -323,33 +324,79 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             }
           } else {
             // User exists in Firebase Auth but not in Firestore
-            // This should ONLY happen in rare cases - clean up the orphaned auth record
-            console.error(
-              '❌ CRITICAL: User exists in Firebase Auth but not in Firestore:',
+            // This can happen if registration was interrupted - create minimal profile
+            console.warn(
+              '⚠️ User exists in Firebase Auth but not in Firestore:',
               firebaseUser.uid
             );
-            console.error('📍 Document path attempted:', userDocRef.path);
-            console.error(
-              '🧹 Attempting to clean up orphaned authentication record...'
+            console.log(
+              '� Creating minimal user profile for orphaned auth user...'
             );
 
             try {
-              // Use the cleanup service to properly handle orphaned auth records
-              const cleanupResult = await services.auth.cleanupOrphanedAuth(firebaseUser);
-              console.log('🧹 Cleanup result:', cleanupResult);
-              
-              if (cleanupResult.success) {
-                console.log('✅ Orphaned auth record cleaned up successfully');
-              } else {
-                console.error('❌ Failed to clean up orphaned auth record:', cleanupResult.message);
-              }
-            } catch (cleanupError) {
-              console.error('❌ Error during orphaned auth cleanup:', cleanupError);
-            }
+              // Create a minimal user document with default values
+              const minimalUser: User = {
+                id: firebaseUser.uid,
+                name:
+                  firebaseUser.displayName ||
+                  firebaseUser.email?.split('@')[0] ||
+                  'User',
+                age: 25,
+                dateOfBirth: new Date().toISOString(),
+                image: '',
+                gender: 'other',
+                height: 170,
+                bio: '',
+                interests: [],
+                location: '',
+                preferences: {
+                  ageRange: [18, 99] as [number, number],
+                  maxDistance: 500,
+                  interestedIn: 'female' as const,
+                },
+                email: firebaseUser.email || '',
+                createdAt: new Date(),
+                lastSeen: new Date(),
+                isOnline: true,
+                isProfileComplete: false,
+                hasSeenTutorial: false,
+              };
 
-            // Clear user state regardless of cleanup success
-            setUser(null);
-            setFirebaseUser(null);
+              // Create the Firestore document
+              await setDoc(userDocRef, {
+                ...minimalUser,
+                createdAt: serverTimestamp(),
+                lastSeen: serverTimestamp(),
+              });
+
+              console.log(
+                '✅ Created minimal user profile for orphaned auth user'
+              );
+
+              // Set the user state
+              setUser(minimalUser);
+
+              // Redirect to complete profile if not already there
+              // This will be handled by the useEffect that checks isProfileComplete
+            } catch (createError) {
+              console.error(
+                '❌ Failed to create minimal user profile:',
+                createError
+              );
+
+              // Fallback: sign out the user
+              try {
+                await signOut(auth);
+                console.log(
+                  '🧹 Signed out orphaned auth user due to creation failure'
+                );
+              } catch (signOutError) {
+                console.error('❌ Failed to sign out:', signOutError);
+              }
+
+              setUser(null);
+              setFirebaseUser(null);
+            }
           }
         } catch (error) {
           console.error('Error loading user profile:', error);

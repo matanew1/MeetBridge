@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { THEME } from '../../constants/theme';
 
 // This component handles OAuth redirects for web
@@ -30,6 +31,7 @@ export default function AuthRedirectHandler() {
 
   return (
     <View style={styles.container}>
+      <StatusBar style="light" />
       <ActivityIndicator size="large" color={THEME.colors.primary} />
       <Text style={styles.text}>Processing authentication...</Text>
     </View>

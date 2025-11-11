@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
@@ -83,6 +84,7 @@ export default function CompleteProfileScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
+      <StatusBar style="light" />
       <LinearGradient
         colors={[theme.primary, theme.secondary]}
         style={styles.gradient}

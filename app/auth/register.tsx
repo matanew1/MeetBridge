@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,11 +13,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import toastService from '../../services/toastService';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../../services/firebase/config';
 
 // Platform check helper
 const isWeb = Platform.OS === 'web';
@@ -39,6 +42,20 @@ const RegisterScreen = () => {
   const theme = isDarkMode ? darkTheme : lightTheme;
 
   const { register } = useAuth();
+
+  // Listen for authentication state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // User is already authenticated, redirect to main app
+        console.log('🔄 User already authenticated, redirecting to main app');
+        router.replace('/(tabs)/search');
+      }
+    });
+
+    // Cleanup subscription on unmount
+    return () => unsubscribe();
+  }, []);
 
   const validateForm = () => {
     if (!formData.email.trim()) {
@@ -118,6 +135,7 @@ const RegisterScreen = () => {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
+      <StatusBar style="light" />
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
