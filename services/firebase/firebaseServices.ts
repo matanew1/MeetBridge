@@ -1090,6 +1090,18 @@ export class FirebaseMatchingService implements IMatchingService {
     try {
       const pageSize = 20;
 
+      // Get current user's blocked users
+      const currentUserDoc = await getDoc(doc(db, 'users', userId));
+      if (!currentUserDoc.exists()) {
+        return {
+          data: [],
+          success: false,
+          message: 'User not found',
+        };
+      }
+      const currentUserData = currentUserDoc.data();
+      const blockedUsers = new Set(currentUserData.blockedUsers || []);
+
       const matchesQuery1 = query(
         collection(db, 'matches'),
         where('user1', '==', userId),
@@ -1121,7 +1133,7 @@ export class FirebaseMatchingService implements IMatchingService {
         const otherUserId =
           matchData.user1 === userId ? matchData.user2 : matchData.user1;
 
-        if (!seenUserIds.has(otherUserId)) {
+        if (!seenUserIds.has(otherUserId) && !blockedUsers.has(otherUserId)) {
           seenUserIds.add(otherUserId);
 
           const userDoc = await getDoc(doc(db, 'users', otherUserId));
@@ -1160,6 +1172,18 @@ export class FirebaseMatchingService implements IMatchingService {
     try {
       const pageSize = 20;
 
+      // Get current user's blocked users
+      const currentUserDoc = await getDoc(doc(db, 'users', userId));
+      if (!currentUserDoc.exists()) {
+        return {
+          data: [],
+          success: false,
+          message: 'User not found',
+        };
+      }
+      const currentUserData = currentUserDoc.data();
+      const blockedUsers = new Set(currentUserData.blockedUsers || []);
+
       const interactionsQuery = query(
         collection(db, 'interactions'),
         where('userId', '==', userId),
@@ -1177,7 +1201,8 @@ export class FirebaseMatchingService implements IMatchingService {
         const interactionData = interactionDoc.data();
         const targetUserId = interactionData.targetUserId;
 
-        if (matchedUserIds.has(targetUserId)) continue;
+        if (matchedUserIds.has(targetUserId) || blockedUsers.has(targetUserId))
+          continue;
 
         const userDoc = await getDoc(doc(db, 'users', targetUserId));
 

@@ -273,6 +273,27 @@ class MissedConnectionsService {
     limitCount?: number;
   }): Promise<{ success: boolean; data: MissedConnection[]; message: string }> {
     try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        return {
+          success: false,
+          data: [],
+          message: 'User not authenticated',
+        };
+      }
+
+      // Get current user's blocked users
+      const currentUserDoc = await getDoc(doc(db, 'users', currentUser.uid));
+      if (!currentUserDoc.exists()) {
+        return {
+          success: false,
+          data: [],
+          message: 'User profile not found',
+        };
+      }
+      const currentUserData = currentUserDoc.data();
+      const blockedUsers = new Set(currentUserData.blockedUsers || []);
+
       let q = query(
         collection(db, 'missed_connections'),
         orderBy('createdAt', 'desc')
@@ -357,6 +378,32 @@ class MissedConnectionsService {
           return distance <= filters.nearLocation!.radiusMeters;
         });
       }
+
+      // Apply block filter - remove posts from blocked users and users who blocked current user
+      connections = await Promise.all(
+        connections.map(async (conn) => {
+          // Check if current user blocked this post owner
+          if (blockedUsers.has(conn.userId)) {
+            return null;
+          }
+
+          // Check if post owner blocked current user
+          const blockQuery = query(
+            collection(db, 'blocks'),
+            where('userId', '==', conn.userId),
+            where('blockedUserId', '==', currentUser.uid)
+          );
+          const blockSnapshot = await getDocs(blockQuery);
+          if (!blockSnapshot.empty) {
+            return null;
+          }
+
+          return conn;
+        })
+      ).then(
+        (results) =>
+          results.filter((conn) => conn !== null) as MissedConnection[]
+      );
 
       return {
         success: true,
@@ -481,6 +528,33 @@ class MissedConnectionsService {
 
       const connectionData = connectionDoc.data();
       const postOwnerId = connectionData.userId;
+
+      // Check if current user blocked the post owner
+      const currentUserDoc = await getDoc(doc(db, 'users', user.uid));
+      if (currentUserDoc.exists()) {
+        const currentUserData = currentUserDoc.data();
+        const blockedUsers = currentUserData.blockedUsers || [];
+        if (blockedUsers.includes(postOwnerId)) {
+          return {
+            success: false,
+            message: 'You cannot claim posts from users you have blocked',
+          };
+        }
+      }
+
+      // Check if post owner blocked current user
+      const blockQuery = query(
+        collection(db, 'blocks'),
+        where('userId', '==', postOwnerId),
+        where('blockedUserId', '==', user.uid)
+      );
+      const blockSnapshot = await getDocs(blockQuery);
+      if (!blockSnapshot.empty) {
+        return {
+          success: false,
+          message: 'You cannot claim posts from users who have blocked you',
+        };
+      }
 
       // Check if a conversation already exists between these users
       const conversationsQuery = query(
