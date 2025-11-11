@@ -33,6 +33,7 @@ export interface User {
   isProfileComplete?: boolean; // Track if user has completed initial profile setup
   hasSeenTutorial?: boolean; // Track if user has seen the onboarding tutorial
   isMissedConnection?: boolean; // Flag to identify if this match is from missed connections
+  blockedUsers?: string[]; // Array of user IDs that this user has blocked
 }
 
 // Removed: UserProfile alias (use User directly)

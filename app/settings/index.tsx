@@ -21,6 +21,7 @@ import {
   Lock,
   Bell,
   Shield,
+  Ban,
   Globe,
   Moon,
   Sun,
@@ -179,29 +180,49 @@ const Settings: React.FC = () => {
   const [loadingBlockedUsers, setLoadingBlockedUsers] = useState(false);
 
   useEffect(() => {
-    if (showBlockedUsers && user?.blockedUsers?.length) {
+    if (showBlockedUsers) {
       loadBlockedUsersProfiles();
     }
-  }, [showBlockedUsers, user?.blockedUsers]);
+  }, [showBlockedUsers]);
 
   const loadBlockedUsersProfiles = async () => {
-    if (!user?.blockedUsers?.length) return;
+    // First refresh the user profile to get the latest blockedUsers
+    if (refreshUserProfile) {
+      console.log('🔄 Refreshing user profile before loading blocked users...');
+      await refreshUserProfile();
+    }
+
+    console.log('🚫 Current user blockedUsers:', user?.blockedUsers);
+
+    if (!user?.blockedUsers?.length) {
+      console.log('❌ No blocked users found in user profile');
+      setBlockedUsersProfiles([]);
+      return;
+    }
+
+    console.log(`📋 Loading profiles for ${user.blockedUsers.length} blocked users:`, user.blockedUsers);
 
     setLoadingBlockedUsers(true);
     try {
       const profiles: UserType[] = [];
       for (const blockedUserId of user.blockedUsers) {
+        console.log(`🔍 Fetching profile for blocked user: ${blockedUserId}`);
         // Fetch each blocked user's profile
         const { getDoc, doc } = await import('firebase/firestore');
         const { db } = await import('../../services/firebase/config');
         const userDoc = await getDoc(doc(db, 'users', blockedUserId));
         if (userDoc.exists()) {
+          const profileData = userDoc.data();
+          console.log(`✅ Found profile for ${blockedUserId}: ${profileData?.displayName || profileData?.name || 'Unknown'}`);
           profiles.push({
             id: userDoc.id,
-            ...userDoc.data(),
+            ...profileData,
           } as UserType);
+        } else {
+          console.log(`❌ Profile not found for blocked user: ${blockedUserId}`);
         }
       }
+      console.log(`📊 Loaded ${profiles.length} blocked user profiles`);
       setBlockedUsersProfiles(profiles);
     } catch (error) {
       console.error('Error loading blocked users:', error);
