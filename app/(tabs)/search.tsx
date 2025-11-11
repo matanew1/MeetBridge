@@ -282,6 +282,24 @@ const ProfileCard = memo(
 // Create discovery service instance outside component to avoid recreating
 const discoveryService = new FirebaseDiscoveryService();
 
+// Temporary debug function - call window.clearInteractionCache() in console
+if (typeof window !== 'undefined') {
+  (window as any).clearInteractionCache = async () => {
+    try {
+      const currentUser = useUserStore.getState().user;
+      if (currentUser?.id) {
+        console.log('🗑️ Clearing interaction cache for user:', currentUser.id);
+        await discoveryService.clearInteractionCache(currentUser.id);
+        console.log('✅ Interaction cache cleared! Try refreshing discovery.');
+      } else {
+        console.log('❌ No current user found');
+      }
+    } catch (error) {
+      console.error('❌ Error clearing cache:', error);
+    }
+  };
+}
+
 export default function SearchScreen() {
   const { t } = useTranslation();
   const { isDarkMode } = useTheme();

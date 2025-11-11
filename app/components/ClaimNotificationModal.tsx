@@ -25,6 +25,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   MissedConnectionClaim,
   MissedConnection,
+  NotificationItem,
 } from '../../services/firebase/missedConnectionsService';
 import missedConnectionsService from '../../services/firebase/missedConnectionsService';
 import toastService from '../../services/toastService';
@@ -46,8 +47,10 @@ interface ClaimNotificationModalProps {
   onClose: () => void;
   claims: Array<MissedConnectionClaim & { connection?: MissedConnection }>;
   chatRequests: any[];
+  notifications: NotificationItem[];
   onClaimProcessed: () => void;
   onChatRequestClick: (request: any) => void;
+  onNotificationProcessed: () => void;
 }
 
 export default function ClaimNotificationModal({
@@ -55,8 +58,10 @@ export default function ClaimNotificationModal({
   onClose,
   claims,
   chatRequests,
+  notifications,
   onClaimProcessed,
   onChatRequestClick,
+  onNotificationProcessed,
 }: ClaimNotificationModalProps) {
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
@@ -67,6 +72,9 @@ export default function ClaimNotificationModal({
   const [showTempMatchModal, setShowTempMatchModal] = useState(false);
   const [currentTempMatch, setCurrentTempMatch] = useState<any>(null);
   const [otherUser, setOtherUser] = useState<any>(null);
+  const [processingNotificationId, setProcessingNotificationId] = useState<
+    string | null
+  >(null);
 
   const handleAccept = async (
     claim: MissedConnectionClaim & { connection?: MissedConnection }
@@ -117,6 +125,58 @@ export default function ClaimNotificationModal({
     }
   };
 
+  const handleMarkNotificationAsRead = async (notificationId: string) => {
+    setProcessingNotificationId(notificationId);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    try {
+      const result = await missedConnectionsService.markNotificationAsRead(
+        notificationId
+      );
+      if (result.success) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        onNotificationProcessed();
+      } else {
+        toastService.error(
+          'Error',
+          result.message || 'Failed to mark notification as read'
+        );
+      }
+    } catch (error) {
+      toastService.error('Error', 'An unexpected error occurred');
+    } finally {
+      setProcessingNotificationId(null);
+    }
+  };
+
+  const handleDeleteNotification = async (notificationId: string) => {
+    setProcessingNotificationId(notificationId);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    try {
+      const result = await missedConnectionsService.deleteNotification(
+        notificationId
+      );
+      if (result.success) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        toastService.info(
+          'Notification Deleted',
+          'The notification has been removed'
+        );
+        onNotificationProcessed();
+      } else {
+        toastService.error(
+          'Error',
+          result.message || 'Failed to delete notification'
+        );
+      }
+    } catch (error) {
+      toastService.error('Error', 'An unexpected error occurred');
+    } finally {
+      setProcessingNotificationId(null);
+    }
+  };
+
   const formatDate = (date: Date) => {
     const now = new Date();
     const diff = now.getTime() - date.getTime();
@@ -160,7 +220,8 @@ export default function ClaimNotificationModal({
             <View style={styles.headerLeft}>
               <AlertCircle size={scale(24)} color={theme.primary} />
               <Text style={[styles.modalTitle, { color: theme.text }]}>
-                Notifications ({claims.length + chatRequests.length})
+                Notifications (
+                {claims.length + chatRequests.length + notifications.length})
               </Text>
             </View>
             <TouchableOpacity
@@ -228,6 +289,156 @@ export default function ClaimNotificationModal({
               </>
             )}
 
+            {/* Notifications Section */}
+            {notifications.length > 0 && (
+              <>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                  Notifications ({notifications.length})
+                </Text>
+                {notifications.map((notification) => (
+                  <View
+                    key={notification.id}
+                    style={[
+                      styles.notificationCard,
+                      {
+                        backgroundColor: notification.read
+                          ? theme.cardBackground
+                          : isDarkMode
+                          ? 'rgba(124, 58, 237, 0.1)'
+                          : 'rgba(124, 58, 237, 0.05)',
+                        borderColor: notification.read
+                          ? theme.border
+                          : theme.primary,
+                        borderWidth: notification.read ? 1 : 2,
+                      },
+                    ]}
+                  >
+                    {/* Notification Header */}
+                    <View style={styles.notificationHeader}>
+                      <View style={styles.notificationTypeContainer}>
+                        <Text
+                          style={[
+                            styles.notificationType,
+                            { color: theme.primary },
+                          ]}
+                        >
+                          {notification.type === 'match' && '🎉'}
+                          {notification.type === 'chat_request' && '💬'}
+                          {notification.type === 'claim_accepted' && '✅'}
+                          {notification.type === 'general' && '📢'}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.notificationTitle,
+                            { color: theme.text },
+                          ]}
+                        >
+                          {notification.title}
+                        </Text>
+                      </View>
+                      {!notification.read && (
+                        <View
+                          style={[
+                            styles.unreadDot,
+                            { backgroundColor: theme.primary },
+                          ]}
+                        />
+                      )}
+                    </View>
+
+                    {/* Notification Message */}
+                    <Text
+                      style={[
+                        styles.notificationMessage,
+                        { color: theme.textSecondary },
+                      ]}
+                    >
+                      {notification.message}
+                    </Text>
+
+                    {/* Notification Time */}
+                    <Text
+                      style={[
+                        styles.notificationTime,
+                        { color: theme.textSecondary },
+                      ]}
+                    >
+                      {formatDate(notification.createdAt)}
+                    </Text>
+
+                    {/* Action Buttons */}
+                    <View style={styles.notificationActions}>
+                      {!notification.read && (
+                        <TouchableOpacity
+                          style={[
+                            styles.markReadButton,
+                            { borderColor: theme.primary },
+                            processingNotificationId === notification.id &&
+                              styles.disabledButton,
+                          ]}
+                          onPress={() =>
+                            handleMarkNotificationAsRead(notification.id)
+                          }
+                          disabled={processingNotificationId !== null}
+                        >
+                          {processingNotificationId === notification.id ? (
+                            <ActivityIndicator
+                              size="small"
+                              color={theme.primary}
+                            />
+                          ) : (
+                            <>
+                              <Check size={scale(16)} color={theme.primary} />
+                              <Text
+                                style={[
+                                  styles.markReadText,
+                                  { color: theme.primary },
+                                ]}
+                              >
+                                Mark Read
+                              </Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      )}
+
+                      <TouchableOpacity
+                        style={[
+                          styles.deleteButton,
+                          {
+                            backgroundColor: theme.error + '15',
+                            borderColor: theme.error + '30',
+                          },
+                          processingNotificationId === notification.id &&
+                            styles.disabledButton,
+                        ]}
+                        onPress={() =>
+                          handleDeleteNotification(notification.id)
+                        }
+                        disabled={processingNotificationId !== null}
+                      >
+                        {processingNotificationId === notification.id ? (
+                          <ActivityIndicator size="small" color={theme.error} />
+                        ) : (
+                          <>
+                            <X size={scale(16)} color={theme.error} />
+                            <Text
+                              style={[
+                                styles.deleteText,
+                                { color: theme.error },
+                              ]}
+                            >
+                              Delete
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+              </>
+            )}
+
             {/* Claims Section */}
             {claims.length > 0 && (
               <>
@@ -237,7 +448,9 @@ export default function ClaimNotificationModal({
               </>
             )}
 
-            {claims.length === 0 && chatRequests.length === 0 ? (
+            {claims.length === 0 &&
+            chatRequests.length === 0 &&
+            notifications.length === 0 ? (
               <View style={styles.emptyState}>
                 <AlertCircle size={scale(48)} color={theme.textSecondary} />
                 <Text
@@ -598,5 +811,87 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.5,
+  },
+  notificationCard: {
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  notificationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  notificationTypeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flex: 1,
+  },
+  notificationType: {
+    fontSize: moderateScale(16),
+  },
+  notificationTitle: {
+    fontSize: moderateScale(16),
+    fontWeight: '700',
+    flex: 1,
+  },
+  unreadDot: {
+    width: scale(8),
+    height: scale(8),
+    borderRadius: scale(4),
+  },
+  notificationMessage: {
+    fontSize: moderateScale(14),
+    lineHeight: moderateScale(20),
+    marginBottom: spacing.sm,
+  },
+  notificationTime: {
+    fontSize: moderateScale(12),
+    marginBottom: spacing.md,
+  },
+  notificationActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  markReadButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.lg,
+    gap: spacing.xs,
+    borderWidth: 1,
+  },
+  deleteButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.lg,
+    gap: spacing.xs,
+    borderWidth: 1,
+  },
+  markReadText: {
+    fontSize: moderateScale(14),
+    fontWeight: '600',
+  },
+  deleteText: {
+    fontSize: moderateScale(14),
+    fontWeight: '600',
   },
 });

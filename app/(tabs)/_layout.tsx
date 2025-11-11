@@ -33,6 +33,7 @@ import toastService from '../../services/toastService';
 import missedConnectionsService, {
   MissedConnectionClaim,
   MissedConnection,
+  NotificationItem,
 } from '../../services/firebase/missedConnectionsService';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase/config';
@@ -60,6 +61,7 @@ export default function TabLayout() {
     Array<MissedConnectionClaim & { connection?: MissedConnection }>
   >([]);
   const [pendingChatRequests, setPendingChatRequests] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [currentTempMatch, setCurrentTempMatch] = useState<any>(null);
   const [otherUser, setOtherUser] = useState<any>(null);
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -141,6 +143,25 @@ export default function TabLayout() {
     return () => unsubscribe();
   }, [user?.id, pendingChatRequests.length]);
 
+  // Subscribe to notifications
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const loadNotifications = async () => {
+      const result = await missedConnectionsService.getUserNotifications(
+        user.id
+      );
+      if (result.success) {
+        setNotifications(result.data);
+      }
+    };
+
+    loadNotifications();
+
+    // For now, we'll just load notifications once. In a production app,
+    // you might want to set up real-time listeners for notifications
+  }, [user?.id]);
+
   const handleProfilePress = () => {
     Animated.sequence([
       Animated.timing(scaleAnim, {
@@ -179,6 +200,17 @@ export default function TabLayout() {
             setPendingClaims(result.data);
           }
         });
+    }
+  };
+
+  const handleNotificationProcessed = () => {
+    // Refresh notifications list
+    if (user?.id) {
+      missedConnectionsService.getUserNotifications(user.id).then((result) => {
+        if (result.success) {
+          setNotifications(result.data);
+        }
+      });
     }
   };
 
@@ -274,7 +306,10 @@ export default function TabLayout() {
                   styles.bellButton,
                   {
                     backgroundColor:
-                      pendingClaims.length + pendingChatRequests.length > 0
+                      pendingClaims.length +
+                        pendingChatRequests.length +
+                        notifications.length >
+                      0
                         ? theme.primary + '20'
                         : theme.primaryVariant,
                     width: isTablet ? scale(48) : scale(44),
@@ -288,29 +323,46 @@ export default function TabLayout() {
                 <Bell
                   size={isTablet ? scale(20) : scale(18)}
                   color={
-                    pendingClaims.length + pendingChatRequests.length > 0
+                    pendingClaims.length +
+                      pendingChatRequests.length +
+                      notifications.length >
+                    0
                       ? theme.primary
                       : theme.textSecondary
                   }
                   fill={
-                    pendingClaims.length + pendingChatRequests.length > 0
+                    pendingClaims.length +
+                      pendingChatRequests.length +
+                      notifications.length >
+                    0
                       ? theme.primary
                       : 'none'
                   }
                   strokeWidth={
-                    pendingClaims.length + pendingChatRequests.length > 0
+                    pendingClaims.length +
+                      pendingChatRequests.length +
+                      notifications.length >
+                    0
                       ? 2.5
                       : 2
                   }
                 />
-                {pendingClaims.length + pendingChatRequests.length > 0 && (
+                {pendingClaims.length +
+                  pendingChatRequests.length +
+                  notifications.length >
+                  0 && (
                   <View
                     style={[styles.badge, { backgroundColor: theme.error }]}
                   >
                     <Text style={styles.badgeText}>
-                      {pendingClaims.length + pendingChatRequests.length > 9
+                      {pendingClaims.length +
+                        pendingChatRequests.length +
+                        notifications.length >
+                      9
                         ? '9+'
-                        : pendingClaims.length + pendingChatRequests.length}
+                        : pendingClaims.length +
+                          pendingChatRequests.length +
+                          notifications.length}
                     </Text>
                   </View>
                 )}
@@ -543,6 +595,7 @@ export default function TabLayout() {
         onClose={handleClaimsClose}
         claims={pendingClaims}
         chatRequests={pendingChatRequests}
+        notifications={notifications}
         onClaimProcessed={handleClaimProcessed}
         onChatRequestClick={async (request) => {
           // Get other user's data
@@ -562,6 +615,7 @@ export default function TabLayout() {
             }
           }
         }}
+        onNotificationProcessed={handleNotificationProcessed}
       />
 
       {/* Temporary Match Modal */}

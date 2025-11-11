@@ -45,6 +45,7 @@ interface UserState {
   matchedProfilesData: User[]; // Array of actual User objects that were matched
   hasMoreProfiles: boolean;
   currentPage: number;
+  preloadedNextPage: User[] | null; // Pre-loaded next page for instant UX
 
   // Chat and conversations
   conversations: Conversation[];
@@ -138,6 +139,7 @@ export const useUserStore = create<UserState>((set, get) => ({
   matchedProfilesData: [],
   hasMoreProfiles: true,
   currentPage: 1,
+  preloadedNextPage: null,
   conversations: [],
   isLoadingConversations: false,
   error: null,
@@ -240,6 +242,7 @@ export const useUserStore = create<UserState>((set, get) => ({
     cacheService.invalidateByPrefix('discoverProfiles_');
     set((state) => ({
       searchFilters: { ...state.searchFilters, ...filters },
+      preloadedNextPage: null, // Clear preloaded data when filters change
     }));
   },
 
@@ -372,7 +375,11 @@ export const useUserStore = create<UserState>((set, get) => ({
     set({
       isLoadingDiscover: true,
       error: null,
-      ...(refresh && { currentPage: 1, hasMoreProfiles: true }),
+      ...(refresh && {
+        currentPage: 1,
+        hasMoreProfiles: true,
+        preloadedNextPage: null,
+      }),
     });
 
     try {
@@ -383,7 +390,8 @@ export const useUserStore = create<UserState>((set, get) => ({
 
       const response = await discoveryService.getDiscoverProfiles(
         searchFilters,
-        page
+        page,
+        refresh
       );
 
       if (response.success) {
@@ -410,6 +418,7 @@ export const useUserStore = create<UserState>((set, get) => ({
             discoverProfiles: updatedProfiles,
             hasMoreProfiles: response.pagination?.hasMore || false,
             currentPage: page,
+            preloadedNextPage: (response as any)._preloadedNextPage || null,
           };
         });
       } else {
@@ -425,10 +434,34 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   loadMoreProfiles: async () => {
-    const { hasMoreProfiles, isLoadingDiscover, currentPage } = get();
+    const {
+      hasMoreProfiles,
+      isLoadingDiscover,
+      currentPage,
+      preloadedNextPage,
+      discoverProfiles,
+    } = get();
 
     if (!hasMoreProfiles || isLoadingDiscover) return;
 
+    // 🚀 UX OPTIMIZATION: Use preloaded data if available for instant loading
+    if (preloadedNextPage && preloadedNextPage.length > 0) {
+      console.log(
+        `⚡ Using preloaded ${
+          preloadedNextPage.length
+        } profiles for instant page ${currentPage + 1}`
+      );
+
+      set((state) => ({
+        discoverProfiles: [...state.discoverProfiles, ...preloadedNextPage],
+        currentPage: currentPage + 1,
+        preloadedNextPage: null, // Clear preloaded data after use
+      }));
+
+      return;
+    }
+
+    // Fallback to API call if no preloaded data
     set({ currentPage: currentPage + 1 });
     await get().loadDiscoverProfiles();
   },

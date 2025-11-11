@@ -67,6 +67,8 @@ import {
   sanitizeSearchQuery,
   checkRateLimit,
 } from '../../utils/inputSanitizer';
+import cacheService from '../cacheService';
+import performanceMonitor from '../performanceMonitor';
 
 // ============================================
 // Utility Functions
@@ -359,10 +361,12 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
    */
   async getDiscoverProfiles(
     filters: SearchFilters,
-    page: number = 1
+    page: number = 1,
+    refresh: boolean = false
   ): Promise<ApiResponse<User[]>> {
+    const startTime = Date.now();
+
     try {
-      console.log('🔥 FETCHING FRESH DATA FROM FIREBASE - NO CACHE');
       const pageSize = 20;
       const currentUserId = auth.currentUser?.uid;
 
@@ -375,16 +379,44 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         throw new Error('Current user not found');
       }
 
-      const currentUserData = { ...currentUserDoc.data(), id: currentUserId };
+      const currentUserData = {
+        ...currentUserDoc.data(),
+        id: currentUserId,
+      } as User;
       const userLocation = currentUserData?.coordinates;
 
-      console.log(
-        `🔍 Discovery: ${currentUserData.name} (${currentUserData.gender}) looking for ${filters.gender}`
-      );
+      console.log('🔍 Discovery: Checking cache first');
       console.log('📍 Current user location:', userLocation);
       console.log('👤 Current user preferences:', currentUserData.preferences);
       console.log('✅ Is profile complete?', currentUserData.isProfileComplete);
       console.log('🎯 Search filters:', filters);
+
+      if (!userLocation?.latitude || !userLocation?.longitude) {
+        console.warn('User location not set');
+        return {
+          data: [],
+          success: true,
+          message: 'Location not available',
+        };
+      }
+
+      // Create cache key based on location, filters, and user
+      const locationGeohash = geohashService.encode(
+        userLocation.latitude,
+        userLocation.longitude
+      );
+      const cacheKey = `${currentUserId}:${locationGeohash}:${JSON.stringify(
+        filters
+      )}`;
+
+      // 🔥 REAL-TIME APP: Skip cache entirely for discovery to ensure fresh data
+      // Cache causes stale data issues in real-time apps where profiles change frequently
+      console.log('🔥 REAL-TIME: Skipping cache for fresh discovery data');
+
+      console.log(
+        '🔥 FETCHING FRESH DATA FROM FIREBASE',
+        refresh ? '(forced refresh)' : '(no cache)'
+      );
 
       if (!userLocation?.latitude || !userLocation?.longitude) {
         console.warn('User location not set');
@@ -438,91 +470,116 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         excluded: 0,
       };
 
-      // Query users
-      for (const bound of bounds) {
-        const q = query(
-          collection(db, 'users'),
-          where('geohash', '>=', bound.lower),
-          where('geohash', '<=', bound.upper),
-          limit(100)
-        );
+      // 🚀 OPTIMIZED: Single efficient query instead of multiple parallel queries
+      // Use the first (primary) bound and limit results to reduce data transfer
+      const primaryBound = bounds[0]; // Use the main bound that covers most of the area
+      const maxUsersToFetch = Math.min(100, pageSize * 5); // Increased limit since we'll filter age client-side
 
-        const snapshot = await getDocs(q);
-        totalCandidates += snapshot.size;
+      let q = query(
+        collection(db, 'users'),
+        where('geohash', '>=', primaryBound.lower),
+        where('geohash', '<=', primaryBound.upper),
+        where('isProfileComplete', '==', true), // Server-side filter for complete profiles
+        limit(maxUsersToFetch)
+      );
 
-        snapshot.forEach((docSnapshot) => {
-          const userId = docSnapshot.id;
-          const data = { ...docSnapshot.data(), id: userId };
-
-          console.log(`👤 Found candidate: ${data.name || userId} (${userId})`);
-
-          if (
-            seenIds.has(userId) ||
-            interactedIds.has(userId) ||
-            matchedIds.has(userId)
-          ) {
-            console.log(`🚫 Excluding user ${userId}:`, {
-              alreadySeen: seenIds.has(userId),
-              inInteracted: interactedIds.has(userId),
-              inMatched: matchedIds.has(userId),
-            });
-            filteredOutStats.excluded++;
-            return;
-          }
-          seenIds.add(userId);
-
-          if (!this.validateUserData(data)) {
-            filteredOutStats.validation++;
-            return;
-          }
-          if (!this.matchesGenderFilter(currentUserData, data, filters)) {
-            filteredOutStats.gender++;
-            return;
-          }
-          if (!this.matchesAgeFilter(data, filters)) {
-            filteredOutStats.age++;
-            return;
-          }
-
-          if (data.coordinates?.latitude && data.coordinates?.longitude) {
-            const distance = geohashService.calculateDistance(
-              {
-                latitude: userLocation.latitude,
-                longitude: userLocation.longitude,
-                timestamp: Date.now(),
-              },
-              {
-                latitude: data.coordinates.latitude,
-                longitude: data.coordinates.longitude,
-                timestamp: Date.now(),
-              }
-            );
-
-            console.log(`📏 Distance check for ${data.name || userId}:`, {
-              distance: distance.toFixed(1) + 'm',
-              maxDistance: filters.maxDistance + 'm',
-              willInclude: distance <= filters.maxDistance,
-            });
-
-            if (distance > filters.maxDistance) {
-              console.log(
-                `🚫 Filtered by distance: ${
-                  data.name || userId
-                } (${distance.toFixed(1)}m > ${filters.maxDistance}m)`
-              );
-              filteredOutStats.distance++;
-              return;
-            }
-
-            profiles.push({
-              id: userId,
-              ...data,
-              distance,
-              lastSeen: convertTimestamp(data.lastSeen),
-            } as User);
-          }
-        });
+      // Add gender filter server-side if specified
+      if (filters.gender) {
+        q = query(q, where('gender', '==', filters.gender));
       }
+
+      // 🔥 OPTIMIZATION: Moved age filtering to client-side to avoid compound query limitations
+      // This allows the query to use indexes efficiently without requiring complex composite indexes
+
+      console.log(
+        '🔥 Executing optimized single query with server-side geohash/gender filters (age filtered client-side)'
+      );
+
+      // Execute single optimized query
+      const snapshot = await getDocs(q);
+      totalCandidates = snapshot.size;
+
+      console.log(
+        `📊 Query returned ${totalCandidates} candidates (server-side filtered)`
+      );
+
+      // Process results (simplified since most filtering is now server-side)
+      snapshot.forEach((docSnapshot) => {
+        const userId = docSnapshot.id;
+        const data = { ...docSnapshot.data(), id: userId } as User;
+
+        console.log(`👤 Found candidate: ${data.name || userId} (${userId})`);
+
+        if (
+          seenIds.has(userId) ||
+          interactedIds.has(userId) ||
+          matchedIds.has(userId)
+        ) {
+          console.log(`🚫 Excluding user ${userId}:`, {
+            alreadySeen: seenIds.has(userId),
+            inInteracted: interactedIds.has(userId),
+            inMatched: matchedIds.has(userId),
+          });
+          filteredOutStats.excluded++;
+          return;
+        }
+        seenIds.add(userId);
+
+        // Basic validation (most filtering now done server-side)
+        if (!data.coordinates?.latitude || !data.coordinates?.longitude) {
+          filteredOutStats.validation++;
+          return;
+        }
+
+        // 🔥 OPTIMIZATION: Client-side age filtering to avoid compound query issues
+        if (data.age < filters.ageRange[0] || data.age > filters.ageRange[1]) {
+          console.log(
+            `🚫 Filtered by age: ${data.name || userId} (age ${
+              data.age
+            } not in ${filters.ageRange[0]}-${filters.ageRange[1]})`
+          );
+          filteredOutStats.age++;
+          return;
+        }
+
+        if (data.coordinates?.latitude && data.coordinates?.longitude) {
+          const distance = geohashService.calculateDistance(
+            {
+              latitude: userLocation.latitude,
+              longitude: userLocation.longitude,
+              timestamp: Date.now(),
+            },
+            {
+              latitude: data.coordinates.latitude,
+              longitude: data.coordinates.longitude,
+              timestamp: Date.now(),
+            }
+          );
+
+          console.log(`📏 Distance check for ${data.name || userId}:`, {
+            distance: distance.toFixed(1) + 'm',
+            maxDistance: filters.maxDistance + 'm',
+            willInclude: distance <= filters.maxDistance,
+          });
+
+          if (distance > filters.maxDistance) {
+            console.log(
+              `🚫 Filtered by distance: ${
+                data.name || userId
+              } (${distance.toFixed(1)}m > ${filters.maxDistance}m)`
+            );
+            filteredOutStats.distance++;
+            return;
+          }
+
+          profiles.push({
+            id: userId,
+            ...data,
+            distance,
+            lastSeen: convertTimestamp(data.lastSeen),
+          } as User);
+        }
+      });
 
       console.log(`📊 Discovery Stats:
         - Total candidates found: ${totalCandidates}
@@ -537,6 +594,33 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         return distA - distB;
       });
 
+      const queryTime = Date.now() - startTime;
+
+      // 🔥 REAL-TIME APP: No caching - always fresh data from Firebase
+
+      // Track performance metrics
+      await performanceMonitor.trackDiscoveryPerformance({
+        queryTime,
+        resultCount: sortedProfiles.length,
+        cacheHit: false, // Always fresh data in real-time app
+        boundsCount: bounds.length,
+        userId: currentUserId,
+        filters,
+      });
+
+      // 🚀 UX OPTIMIZATION: Pre-load next page for instant scrolling
+      let preloadedNextPage: User[] | null = null;
+      if (page === 1 && sortedProfiles.length > pageSize) {
+        // Pre-load page 2 in background for instant UX
+        const nextPageStart = pageSize;
+        const nextPageEnd = pageSize * 2;
+        preloadedNextPage = sortedProfiles.slice(nextPageStart, nextPageEnd);
+
+        console.log(
+          `⚡ Pre-loaded ${preloadedNextPage.length} profiles for page 2`
+        );
+      }
+
       return {
         data: sortedProfiles.slice(0, pageSize),
         success: true,
@@ -547,6 +631,8 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
           total: sortedProfiles.length,
           hasMore: sortedProfiles.length > pageSize,
         },
+        // Include pre-loaded next page for instant UX
+        _preloadedNextPage: preloadedNextPage,
       };
     } catch (error) {
       console.error('Error getting discover profiles:', error);
@@ -616,11 +702,33 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
   }
 
   private async getInteractedUserIds(userId: string): Promise<Set<string>> {
+    // Try to get from cache first
+    const cacheKey = `interactions:${userId}`;
+    const cachedInteractions = await cacheService.getUserInteractions(userId);
+
+    if (cachedInteractions) {
+      console.log(
+        `✅ Using cached interactions for user ${userId}: ${cachedInteractions.length} interactions`
+      );
+      console.log(
+        `📋 Cached interaction IDs: ${JSON.stringify(cachedInteractions)}`
+      );
+      return new Set(cachedInteractions);
+    }
+
+    console.log(
+      `🔄 Fetching fresh interactions for user ${userId} from Firestore`
+    );
+
     const interactionsQuery = query(
       collection(db, 'interactions'),
       where('userId', '==', userId)
     );
     const snapshot = await getDocs(interactionsQuery);
+
+    console.log(
+      `📊 Found ${snapshot.size} interaction documents in Firestore for user ${userId}`
+    );
 
     const now = new Date();
     const interactedIds = new Set<string>();
@@ -629,6 +737,10 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
     snapshot.docs.forEach((doc) => {
       const data = doc.data();
       const targetUserId = data.targetUserId;
+
+      console.log(
+        `🔍 Interaction doc ${doc.id}: userId=${data.userId}, targetUserId=${targetUserId}, type=${data.type}`
+      );
 
       if (data.type === 'dislike' && data.expiresAt) {
         const expiresAt = data.expiresAt.toDate
@@ -655,7 +767,30 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
       await batch.commit();
     }
 
+    // Cache the result for 5 minutes (300 seconds) - shorter TTL for real-time app
+    const interactionsArray = Array.from(interactedIds);
+    await cacheService.cacheUserInteractions(userId, interactionsArray, 300);
+
+    console.log(
+      `✅ Cached ${interactionsArray.length} interactions for user ${userId}`
+    );
+
     return interactedIds;
+  }
+
+  /**
+   * Clear interaction cache for a user (useful for debugging real-time sync issues)
+   */
+  async clearInteractionCache(userId: string): Promise<void> {
+    console.log(
+      `🗑️ Clearing interaction cache for user ${userId} (real-time app)`
+    );
+    // Clear both interaction cache and discovery cache since they are related
+    await cacheService.invalidateByPrefix(`interactions:${userId}`);
+    await cacheService.invalidateByPrefix(`discovery:`);
+    console.log(
+      `✅ Cleared interaction and discovery caches for real-time sync`
+    );
   }
 
   private async getMatchedUserIds(userId: string): Promise<Set<string>> {
@@ -804,6 +939,9 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         message:
           error instanceof Error ? error.message : 'Failed to like profile',
       };
+    } finally {
+      // Invalidate interaction cache for this user
+      await cacheService.delete(`interactions:${userId}`);
     }
   }
 
@@ -847,6 +985,9 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         message:
           error instanceof Error ? error.message : 'Failed to dislike profile',
       };
+    } finally {
+      // Invalidate interaction cache for this user
+      await cacheService.delete(`interactions:${userId}`);
     }
   }
 

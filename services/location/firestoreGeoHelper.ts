@@ -30,6 +30,7 @@ import {
   GeohashBounds,
 } from './types';
 import geohashService from './geohashService';
+import performanceMonitor from '../performanceMonitor';
 
 export interface FirestoreGeoDocument {
   id: string;
@@ -69,6 +70,7 @@ class FirestoreGeoHelper {
   async findNearby<T extends FirestoreGeoDocument>(
     options: NearbySearchOptions
   ): Promise<ProximityResult<T>> {
+    const startTime = Date.now();
     const {
       center,
       radiusInMeters,
@@ -99,22 +101,42 @@ class FirestoreGeoHelper {
       boundsCount: bounds.length,
     });
 
-    // Execute queries for each bound in parallel
-    const queryPromises = bounds.map((bound) =>
-      this.queryGeohashRange(collectionName, bound, whereConditions)
-    );
-
-    const results = await Promise.all(queryPromises);
-
-    // Flatten results and remove duplicates
+    // Execute queries in batches to prevent overwhelming Firestore
+    const BATCH_SIZE = 3; // Process 3 queries at a time
     const allDocs = new Map<string, T>();
-    results.forEach((docs) => {
-      docs.forEach((doc) => {
-        if (!allDocs.has(doc.id)) {
-          allDocs.set(doc.id, doc as T);
-        }
+
+    for (let i = 0; i < bounds.length; i += BATCH_SIZE) {
+      const batch = bounds.slice(i, i + BATCH_SIZE);
+      console.log(
+        `🔄 Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(
+          bounds.length / BATCH_SIZE
+        )} (${batch.length} queries)`
+      );
+
+      const batchPromises = batch.map((bound) =>
+        this.queryGeohashRange(collectionName, bound, whereConditions)
+      );
+
+      const batchResults = await Promise.all(batchPromises);
+
+      // Process batch results
+      batchResults.forEach((docs) => {
+        docs.forEach((doc) => {
+          if (!allDocs.has(doc.id)) {
+            allDocs.set(doc.id, doc as T);
+          }
+        });
       });
-    });
+
+      // Small delay between batches to reduce load
+      if (i + BATCH_SIZE < bounds.length) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    }
+
+    console.log(
+      `✅ Processed ${bounds.length} geohash bounds, found ${allDocs.size} potential matches`
+    );
 
     // Filter by actual distance and add distance property
     const items: T[] = [];
@@ -143,10 +165,21 @@ class FirestoreGeoHelper {
     // Apply limit if specified
     const limitedItems = limit ? items.slice(0, limit) : items;
 
-    console.log('✅ Found nearby:', {
-      total: limitedItems.length,
-      queriesExecuted: bounds.length,
+    const queryTime = Date.now() - startTime;
+
+    // Track performance metrics
+    await performanceMonitor.trackDiscoveryPerformance({
+      queryTime,
+      resultCount: limitedItems.length,
+      cacheHit: false, // This is proximity search, not cached discovery
+      boundsCount: bounds.length,
+      userId: 'system', // System-level query
+      filters: { collectionName, whereConditions, radiusInMeters },
     });
+
+    console.log(
+      `⏱️ Proximity search completed in ${queryTime}ms, returned ${limitedItems.length} results`
+    );
 
     return {
       items: limitedItems,

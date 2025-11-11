@@ -296,57 +296,11 @@ export default function DiscoveryAnimation({
 
   return (
     <View style={styles.overlay}>
-      <StatusBar style="light" />
-      <BlurView intensity={80} style={StyleSheet.absoluteFill} />
-
-      {/* Animated particles */}
-      <Animated.View
-        style={[
-          styles.particle,
-          styles.particle1,
-          {
-            transform: [
-              { scale: particle1Scale },
-              { translateX: particle1TranslateX },
-              { translateY: particle1TranslateY },
-            ],
-          },
-        ]}
-      >
-        <Sparkles size={isSmallDevice ? 18 : 22} color={theme.primary} />
-      </Animated.View>
-
-      <Animated.View
-        style={[
-          styles.particle,
-          styles.particle2,
-          {
-            transform: [
-              { scale: particle2Scale },
-              { translateX: particle2TranslateX },
-              { translateY: particle2TranslateY },
-            ],
-          },
-        ]}
-      >
-        <Star size={isSmallDevice ? 14 : 18} color="#FFD700" fill="#FFD700" />
-      </Animated.View>
-
-      <Animated.View
-        style={[
-          styles.particle,
-          styles.particle3,
-          {
-            transform: [
-              { scale: particle3Scale },
-              { translateX: particle3TranslateX },
-              { translateY: particle3TranslateY },
-            ],
-          },
-        ]}
-      >
-        <Users size={isSmallDevice ? 12 : 16} color="#FF69B4" />
-      </Animated.View>
+      <StatusBar style={theme.isDark ? 'light' : 'dark'} />
+      <BlurView
+        intensity={theme.isDark ? 80 : 60}
+        style={StyleSheet.absoluteFill}
+      />
 
       <View style={styles.container}>
         <Animated.Text
@@ -415,7 +369,14 @@ export default function DiscoveryAnimation({
                 `${theme.primary}20`,
                 `${theme.primary}40`,
               ]}
-              style={styles.ringGradient}
+              style={[
+                styles.ringGradient,
+                {
+                  borderColor: theme.isDark
+                    ? 'rgba(255,255,255,0.3)'
+                    : 'rgba(0,0,0,0.2)',
+                },
+              ]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             />
@@ -449,8 +410,8 @@ export default function DiscoveryAnimation({
                 <Animated.View style={{ transform: [{ scale: heartScale }] }}>
                   <Heart
                     size={isSmallDevice ? 32 : 40}
-                    color="#FFF"
-                    fill="#FFF"
+                    color={theme.background}
+                    fill={theme.background}
                   />
                 </Animated.View>
               </LinearGradient>
@@ -559,7 +520,6 @@ const styles = StyleSheet.create({
       ? scale(150)
       : scale(140),
     borderWidth: isSmallDevice ? 2 : 3,
-    borderColor: 'rgba(255,255,255,0.3)',
   },
   sparkle: {
     position: 'absolute',

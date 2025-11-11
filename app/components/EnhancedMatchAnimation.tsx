@@ -80,6 +80,30 @@ export default function EnhancedMatchAnimation({
   // Pulsing glow effect
   const glowOpacity = useRef(new Animated.Value(0.3)).current;
 
+  // Dynamic styles based on theme
+  const dynamicStyles = React.useMemo(
+    () => ({
+      profileCard: {
+        backgroundColor: theme.cardBackground,
+        borderColor: theme.isDark
+          ? 'rgba(255, 255, 255, 0.1)'
+          : 'rgba(255, 255, 255, 0.3)',
+      },
+      closeButton: {
+        backgroundColor: theme.isDark
+          ? 'rgba(255, 255, 255, 0.1)'
+          : 'rgba(255, 255, 255, 0.9)',
+        borderColor: theme.isDark
+          ? 'rgba(255, 255, 255, 0.2)'
+          : 'rgba(0, 0, 0, 0.1)',
+      },
+      closeButtonText: {
+        color: theme.text,
+      },
+    }),
+    [theme]
+  );
+
   // Handle orientation changes
   const [orientation, setOrientation] = useState(
     isLandscape ? 'landscape' : 'portrait'
@@ -341,58 +365,12 @@ export default function EnhancedMatchAnimation({
   });
 
   return (
-    <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
-      <StatusBar style="light" />
+    <Animated.View
+      style={[styles.overlay, { opacity: overlayOpacity }]}
+      pointerEvents="box-none"
+    >
+      <StatusBar style={theme.isDark ? 'light' : 'dark'} />
       <BlurView intensity={90} style={StyleSheet.absoluteFill} />
-
-      {/* Animated particles */}
-      <Animated.View
-        style={[
-          styles.particle,
-          styles.particle1,
-          {
-            transform: [
-              { scale: particle1Scale },
-              { translateX: particle1TranslateX },
-              { translateY: particle1TranslateY },
-            ],
-          },
-        ]}
-      >
-        <Sparkles size={isSmallDevice ? 20 : 24} color={theme.primary} />
-      </Animated.View>
-
-      <Animated.View
-        style={[
-          styles.particle,
-          styles.particle2,
-          {
-            transform: [
-              { scale: particle2Scale },
-              { translateX: particle2TranslateX },
-              { translateY: particle2TranslateY },
-            ],
-          },
-        ]}
-      >
-        <Star size={isSmallDevice ? 16 : 20} color="#FFD700" fill="#FFD700" />
-      </Animated.View>
-
-      <Animated.View
-        style={[
-          styles.particle,
-          styles.particle3,
-          {
-            transform: [
-              { scale: particle3Scale },
-              { translateX: particle3TranslateX },
-              { translateY: particle3TranslateY },
-            ],
-          },
-        ]}
-      >
-        <Heart size={isSmallDevice ? 14 : 18} color="#FF69B4" fill="#FF69B4" />
-      </Animated.View>
 
       {/* Main content */}
       <Animated.View
@@ -502,6 +480,7 @@ export default function EnhancedMatchAnimation({
           <View
             style={[
               styles.profileCard,
+              dynamicStyles.profileCard,
               {
                 width: isSmallDevice ? moderateScale(110) : moderateScale(130),
                 height: isSmallDevice ? verticalScale(145) : verticalScale(170),
@@ -559,6 +538,7 @@ export default function EnhancedMatchAnimation({
           <View
             style={[
               styles.profileCard,
+              dynamicStyles.profileCard,
               {
                 width: isSmallDevice ? moderateScale(110) : moderateScale(130),
                 height: isSmallDevice ? verticalScale(145) : verticalScale(170),
@@ -714,14 +694,12 @@ const styles = StyleSheet.create({
     height: verticalScale(170),
     borderRadius: borderRadius.xl,
     overflow: 'hidden',
-    backgroundColor: '#F8F9FA',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: verticalScale(12) },
     shadowOpacity: 0.4,
     shadowRadius: moderateScale(20),
     elevation: 15,
     borderWidth: moderateScale(3),
-    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   profileGradient: {
     width: '100%',
@@ -788,9 +766,7 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     height: verticalScale(50),
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderWidth: moderateScale(1),
-    borderColor: 'rgba(0, 0, 0, 0.1)',
   },
   buttonText: {
     color: '#FFF',
@@ -801,7 +777,6 @@ const styles = StyleSheet.create({
   closeButtonText: {
     fontSize: moderateScale(16),
     fontWeight: '600',
-    color: '#666',
   },
   // Particle styles
   particle: {

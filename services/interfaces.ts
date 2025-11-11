@@ -13,6 +13,8 @@ export interface ApiResponse<T> {
     total: number;
     hasMore: boolean;
   };
+  // Pre-loaded next page for instant UX (optional)
+  _preloadedNextPage?: T extends (infer U)[] ? U[] : never;
 }
 
 // User Profile Service
@@ -35,7 +37,8 @@ export interface MatchResult {
 export interface IDiscoveryService {
   getDiscoverProfiles(
     filters: SearchFilters,
-    page?: number
+    page?: number,
+    refresh?: boolean
   ): Promise<ApiResponse<User[]>>;
   likeProfile(
     userId: string,
@@ -50,6 +53,7 @@ export interface IDiscoveryService {
     targetUserId: string,
     reason: string
   ): Promise<ApiResponse<boolean>>;
+  clearInteractionCache(userId: string): Promise<void>;
 }
 
 // Matching Service

@@ -31,16 +31,6 @@ export interface Comment {
   isAnonymous?: boolean;
 }
 
-export interface Comment {
-  id: string;
-  userId: string;
-  userName: string;
-  userImage?: string;
-  text: string;
-  createdAt: Date;
-  isAnonymous?: boolean;
-}
-
 export interface MissedConnection {
   id: string;
   userId: string;
@@ -77,11 +67,34 @@ export interface MissedConnectionClaim {
   id: string;
   connectionId: string;
   claimerId: string;
-  claimerName?: string;
+  claimerName: string;
   claimerImage?: string;
   locationVerified: boolean;
   createdAt: Date;
   status: 'pending' | 'accepted' | 'rejected';
+}
+
+export interface ChatRequest {
+  id: string;
+  users: string[];
+  sender: string;
+  receiver: string;
+  claimId: string;
+  connectionId: string;
+  createdAt: Date;
+  status: 'pending' | 'accepted' | 'rejected';
+  acceptedBy: string[];
+}
+
+export interface NotificationItem {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: 'match' | 'chat_request' | 'claim_accepted' | 'general';
+  data?: any;
+  read: boolean;
+  createdAt: Date;
 }
 
 // Helper to convert Firestore timestamps
@@ -1182,554 +1195,6 @@ class MissedConnectionsService {
   }
 
   /**
-   * Add a comment to a connection
-   */
-  async addComment(
-    connectionId: string,
-    userId: string,
-    text: string,
-    isAnonymous: boolean = false
-  ): Promise<{ success: boolean; message: string }> {
-    try {
-      if (!auth.currentUser) {
-        return {
-          success: false,
-          message: 'User not authenticated',
-        };
-      }
-
-      // Get user data for the comment
-      const userDoc = await getDoc(doc(db, 'users', userId));
-      const userData = userDoc.data();
-
-      const commentData = {
-        userId,
-        userName: isAnonymous ? 'Anonymous' : userData?.name || 'Anonymous',
-        userImage: isAnonymous ? null : userData?.image || null,
-        text,
-        createdAt: serverTimestamp(),
-        isAnonymous,
-      };
-
-      // Add comment to subcollection
-      await addDoc(
-        collection(db, 'missed_connections', connectionId, 'comments'),
-        commentData
-      );
-
-      // Update comment count on the connection
-      await updateDoc(doc(db, 'missed_connections', connectionId), {
-        comments: increment(1),
-      });
-
-      console.log('✅ Comment added to connection:', connectionId);
-      return {
-        success: true,
-        message: 'Comment added successfully',
-      };
-    } catch (error) {
-      console.error('❌ Error adding comment:', error);
-      return {
-        success: false,
-        message:
-          error instanceof Error ? error.message : 'Failed to add comment',
-      };
-    }
-  }
-
-  /**
-   * Get comments for a connection
-   */
-  async getComments(
-    connectionId: string
-  ): Promise<{ success: boolean; data: Comment[]; message: string }> {
-    try {
-      const q = query(
-        collection(db, 'missed_connections', connectionId, 'comments'),
-        orderBy('createdAt', 'asc')
-      );
-
-      const querySnapshot = await getDocs(q);
-      const comments: Comment[] = [];
-
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        comments.push({
-          id: doc.id,
-          userId: data.userId,
-          userName: data.userName,
-          userImage: data.userImage,
-          text: data.text,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          isAnonymous: data.isAnonymous || false,
-        });
-      });
-
-      return {
-        success: true,
-        data: comments,
-        message: 'Comments retrieved successfully',
-      };
-    } catch (error) {
-      console.error('❌ Error getting comments:', error);
-      return {
-        success: false,
-        data: [],
-        message:
-          error instanceof Error ? error.message : 'Failed to get comments',
-      };
-    }
-  }
-
-  /**
-   * Subscribe to real-time comment updates
-   */
-  subscribeToComments(
-    connectionId: string,
-    callback: (comments: Comment[]) => void
-  ): Unsubscribe {
-    const q = query(
-      collection(db, 'missed_connections', connectionId, 'comments'),
-      orderBy('createdAt', 'asc')
-    );
-
-    return onSnapshot(q, (querySnapshot) => {
-      const comments: Comment[] = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        comments.push({
-          id: doc.id,
-          userId: data.userId,
-          userName: data.userName,
-          userImage: data.userImage,
-          text: data.text,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          isAnonymous: data.isAnonymous || false,
-        });
-      });
-      callback(comments);
-    });
-  }
-
-  /**
-   * Delete a connection (only by owner)
-   */
-  async deleteConnection(
-    connectionId: string
-  ): Promise<{ success: boolean; message: string }> {
-    try {
-      const user = auth.currentUser;
-      if (!user) {
-        return { success: false, message: 'User not authenticated' };
-      }
-
-      // Verify ownership
-      const connectionDoc = await getDoc(
-        doc(db, 'missed_connections', connectionId)
-      );
-      if (!connectionDoc.exists()) {
-        return { success: false, message: 'Connection not found' };
-      }
-
-      const connectionData = connectionDoc.data();
-      if (connectionData.userId !== user.uid) {
-        return {
-          success: false,
-          message: 'You can only delete your own connections',
-        };
-      }
-
-      await deleteDoc(doc(db, 'missed_connections', connectionId));
-
-      console.log('✅ Connection deleted:', connectionId);
-      return { success: true, message: 'Connection deleted successfully' };
-    } catch (error) {
-      console.error('❌ Error deleting connection:', error);
-      return {
-        success: false,
-        message:
-          error instanceof Error
-            ? error.message
-            : 'Failed to delete connection',
-      };
-    }
-  }
-
-  /**
-   * Real-time listener for user's own posts
-   */
-  subscribeToUserPosts(
-    userId: string,
-    callback: (connections: MissedConnection[]) => void,
-    limitCount: number = 1000
-  ): Unsubscribe {
-    const q = query(
-      collection(db, 'missed_connections'),
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc'),
-      limit(limitCount)
-    );
-
-    return onSnapshot(q, (snapshot) => {
-      const connections: MissedConnection[] = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          userId: data.userId,
-          userName: data.userName,
-          userImage: data.userImage,
-          location: data.location,
-          description: data.description,
-          tags: data.tags || [],
-          images: data.images || [],
-          timeOccurred: convertTimestamp(data.timeOccurred),
-          createdAt: convertTimestamp(data.createdAt),
-          likes: data.likes || 0,
-          likedBy: data.likedBy || [],
-          views: data.views || 0,
-          viewedBy: data.viewedBy || [],
-          claims: data.claims || 0,
-          comments: data.comments || 0,
-          claimed: data.claimed || false,
-          claimedBy: data.claimedBy,
-          verified: data.verified || false,
-          isAnonymous: data.isAnonymous || false,
-          isEdited: data.isEdited || false,
-          editedAt: data.editedAt ? convertTimestamp(data.editedAt) : undefined,
-          savedBy: data.savedBy || [],
-        };
-      });
-
-      callback(connections);
-    });
-  }
-
-  /**
-   * Real-time listener for saved posts
-   */
-  subscribeToSavedPosts(
-    userId: string,
-    callback: (connections: MissedConnection[]) => void,
-    limitCount: number = 1000
-  ): Unsubscribe {
-    const q = query(
-      collection(db, 'missed_connections'),
-      where('savedBy', 'array-contains', userId),
-      orderBy('createdAt', 'desc'),
-      limit(limitCount)
-    );
-
-    return onSnapshot(q, (snapshot) => {
-      const connections: MissedConnection[] = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          userId: data.userId,
-          userName: data.userName,
-          userImage: data.userImage,
-          location: data.location,
-          description: data.description,
-          tags: data.tags || [],
-          images: data.images || [],
-          timeOccurred: convertTimestamp(data.timeOccurred),
-          createdAt: convertTimestamp(data.createdAt),
-          likes: data.likes || 0,
-          likedBy: data.likedBy || [],
-          views: data.views || 0,
-          viewedBy: data.viewedBy || [],
-          claims: data.claims || 0,
-          comments: data.comments || 0,
-          claimed: data.claimed || false,
-          claimedBy: data.claimedBy,
-          verified: data.verified || false,
-          isAnonymous: data.isAnonymous || false,
-          isEdited: data.isEdited || false,
-          editedAt: data.editedAt ? convertTimestamp(data.editedAt) : undefined,
-          savedBy: data.savedBy || [],
-        };
-      });
-
-      callback(connections);
-    });
-  }
-
-  /**
-   * Get user's interactions (likes, saves, comments) on a connection
-   */
-  async getUserInteractions(
-    connectionId: string,
-    userId: string
-  ): Promise<{
-    success: boolean;
-    data?: {
-      liked: boolean;
-      saved: boolean;
-      commented: boolean;
-    };
-    message: string;
-  }> {
-    try {
-      const connectionDoc = await getDoc(
-        doc(db, 'missed_connections', connectionId)
-      );
-
-      if (!connectionDoc.exists()) {
-        return { success: false, message: 'Connection not found' };
-      }
-
-      const data = connectionDoc.data();
-      const liked = (data.likedBy || []).includes(userId);
-      const saved = (data.savedBy || []).includes(userId);
-
-      // Check if user has commented by looking up in the comments subcollection
-      const commentsQuery = query(
-        collection(db, 'missed_connections', connectionId, 'comments'),
-        where('userId', '==', userId),
-        limit(1)
-      );
-      const commentsSnapshot = await getDocs(commentsQuery);
-      const commented = !commentsSnapshot.empty;
-
-      return {
-        success: true,
-        data: {
-          liked,
-          saved,
-          commented,
-        },
-        message: 'User interactions retrieved successfully',
-      };
-    } catch (error) {
-      console.error('❌ Error getting user interactions:', error);
-      return {
-        success: false,
-        message:
-          error instanceof Error ? error.message : 'Failed to get interactions',
-      };
-    }
-  }
-
-  /**
-   * Get pending claims for the current user's posts
-   */
-  async getPendingClaimsForUser(userId: string): Promise<{
-    success: boolean;
-    data: Array<MissedConnectionClaim & { connection?: MissedConnection }>;
-    message: string;
-  }> {
-    try {
-      // First, get all user's connections
-      const userConnectionsQuery = query(
-        collection(db, 'missed_connections'),
-        where('userId', '==', userId)
-      );
-      const connectionsSnapshot = await getDocs(userConnectionsQuery);
-      const connectionIds = connectionsSnapshot.docs.map((doc) => doc.id);
-
-      if (connectionIds.length === 0) {
-        return {
-          success: true,
-          data: [],
-          message: 'No connections found',
-        };
-      }
-
-      // Get all pending claims for these connections
-      const allClaims: Array<
-        MissedConnectionClaim & { connection?: MissedConnection }
-      > = [];
-
-      for (const connectionId of connectionIds) {
-        const claimsQuery = query(
-          collection(db, 'missed_connection_claims'),
-          where('connectionId', '==', connectionId),
-          where('status', '==', 'pending'),
-          orderBy('createdAt', 'desc')
-        );
-
-        const claimsSnapshot = await getDocs(claimsQuery);
-
-        for (const claimDoc of claimsSnapshot.docs) {
-          const claimData = claimDoc.data();
-
-          // Get the claimer's fresh user data
-          const claimerDoc = await getDoc(
-            doc(db, 'users', claimData.claimerId)
-          );
-          const claimerData = claimerDoc.exists() ? claimerDoc.data() : null;
-
-          // Get the connection details
-          const connectionDoc = await getDoc(
-            doc(db, 'missed_connections', connectionId)
-          );
-          const connectionData = connectionDoc.exists()
-            ? connectionDoc.data()
-            : null;
-
-          allClaims.push({
-            id: claimDoc.id,
-            connectionId: claimData.connectionId,
-            claimerId: claimData.claimerId,
-            claimerName:
-              claimerData?.name || claimData.claimerName || 'Anonymous',
-            claimerImage: claimerData?.image || claimData.claimerImage || null,
-            locationVerified: claimData.locationVerified || false,
-            createdAt: convertTimestamp(claimData.createdAt),
-            status: claimData.status || 'pending',
-            connection: connectionData
-              ? {
-                  id: connectionId,
-                  userId: connectionData.userId,
-                  userName: connectionData.userName,
-                  userImage: connectionData.userImage,
-                  location: connectionData.location,
-                  description: connectionData.description,
-                  tags: connectionData.tags || [],
-                  timeOccurred: convertTimestamp(connectionData.timeOccurred),
-                  createdAt: convertTimestamp(connectionData.createdAt),
-                  likes: connectionData.likes || 0,
-                  likedBy: connectionData.likedBy || [],
-                  views: connectionData.views || 0,
-                  viewedBy: connectionData.viewedBy || [],
-                  claims: connectionData.claims || 0,
-                  comments: connectionData.comments || 0,
-                  claimed: connectionData.claimed || false,
-                  claimedBy: connectionData.claimedBy,
-                  verified: connectionData.verified || false,
-                  isAnonymous: connectionData.isAnonymous || false,
-                  isEdited: connectionData.isEdited || false,
-                  editedAt: connectionData.editedAt
-                    ? convertTimestamp(connectionData.editedAt)
-                    : undefined,
-                  savedBy: connectionData.savedBy || [],
-                }
-              : undefined,
-          });
-        }
-      }
-
-      return {
-        success: true,
-        data: allClaims,
-        message: 'Pending claims retrieved successfully',
-      };
-    } catch (error) {
-      console.error('❌ Error getting pending claims:', error);
-      return {
-        success: false,
-        data: [],
-        message:
-          error instanceof Error
-            ? error.message
-            : 'Failed to get pending claims',
-      };
-    }
-  }
-
-  /**
-   * Real-time listener for pending claims on user's posts
-   */
-  subscribeToClaimsForUser(
-    userId: string,
-    callback: (
-      claims: Array<MissedConnectionClaim & { connection?: MissedConnection }>
-    ) => void
-  ): Unsubscribe {
-    // First get user's connections
-    const userConnectionsQuery = query(
-      collection(db, 'missed_connections'),
-      where('userId', '==', userId)
-    );
-
-    return onSnapshot(userConnectionsQuery, async (connectionsSnapshot) => {
-      const connectionIds = connectionsSnapshot.docs.map((doc) => doc.id);
-
-      if (connectionIds.length === 0) {
-        callback([]);
-        return;
-      }
-
-      // Subscribe to all claims for these connections
-      const allClaims: Array<
-        MissedConnectionClaim & { connection?: MissedConnection }
-      > = [];
-
-      // Note: This is a simplified approach. For production, consider using a more efficient method
-      // such as a cloud function to aggregate claims or restructuring the data model
-      for (const connectionId of connectionIds) {
-        const claimsQuery = query(
-          collection(db, 'missed_connection_claims'),
-          where('connectionId', '==', connectionId),
-          where('status', '==', 'pending'),
-          orderBy('createdAt', 'desc')
-        );
-
-        const claimsSnapshot = await getDocs(claimsQuery);
-
-        for (const claimDoc of claimsSnapshot.docs) {
-          const claimData = claimDoc.data();
-
-          // Get the claimer's fresh user data
-          const claimerDoc = await getDoc(
-            doc(db, 'users', claimData.claimerId)
-          );
-          const claimerData = claimerDoc.exists() ? claimerDoc.data() : null;
-
-          // Get the connection details
-          const connectionDoc = await getDoc(
-            doc(db, 'missed_connections', connectionId)
-          );
-          const connectionData = connectionDoc.exists()
-            ? connectionDoc.data()
-            : null;
-
-          allClaims.push({
-            id: claimDoc.id,
-            connectionId: claimData.connectionId,
-            claimerId: claimData.claimerId,
-            claimerName:
-              claimerData?.name || claimData.claimerName || 'Anonymous',
-            claimerImage: claimerData?.image || claimData.claimerImage || null,
-            locationVerified: claimData.locationVerified || false,
-            createdAt: convertTimestamp(claimData.createdAt),
-            status: claimData.status || 'pending',
-            connection: connectionData
-              ? {
-                  id: connectionId,
-                  userId: connectionData.userId,
-                  userName: connectionData.userName,
-                  userImage: connectionData.userImage,
-                  location: connectionData.location,
-                  description: connectionData.description,
-                  tags: connectionData.tags || [],
-                  timeOccurred: convertTimestamp(connectionData.timeOccurred),
-                  createdAt: convertTimestamp(connectionData.createdAt),
-                  likes: connectionData.likes || 0,
-                  likedBy: connectionData.likedBy || [],
-                  views: connectionData.views || 0,
-                  viewedBy: connectionData.viewedBy || [],
-                  claims: connectionData.claims || 0,
-                  comments: connectionData.comments || 0,
-                  claimed: connectionData.claimed || false,
-                  claimedBy: connectionData.claimedBy,
-                  verified: connectionData.verified || false,
-                  isAnonymous: connectionData.isAnonymous || false,
-                  isEdited: connectionData.isEdited || false,
-                  editedAt: connectionData.editedAt
-                    ? convertTimestamp(connectionData.editedAt)
-                    : undefined,
-                  savedBy: connectionData.savedBy || [],
-                }
-              : undefined,
-          });
-        }
-      }
-
-      callback(allClaims);
-    });
-  }
-
-  /**
    * Accept a claim and create a chat request
    */
   async acceptClaim(
@@ -1837,6 +1302,19 @@ class MissedConnectionsService {
 
             const result = await response.json();
             console.log('📲 Push notification sent to receiver:', result);
+
+            // Store notification in database
+            await this.storeNotification(
+              claimData.claimerId,
+              'Chat Request 💬',
+              `${senderData.name || 'Someone'} wants to chat with you!`,
+              'chat_request',
+              {
+                chatRequestId: chatRequestRef.id,
+                senderId: user.uid,
+                connectionId: claimData.connectionId,
+              }
+            );
           }
         }
       } catch (notifError) {
@@ -2010,7 +1488,7 @@ class MissedConnectionsService {
           conversationId: conversationRef.id,
         });
 
-        // Send match notifications to both users
+        // Send match notifications to BOTH users
         try {
           const [user1Doc, user2Doc] = await Promise.all([
             getDoc(doc(db, 'users', chatRequestData.users[0])),
@@ -2021,32 +1499,38 @@ class MissedConnectionsService {
             const user1Data = user1Doc.data();
             const user2Data = user2Doc.data();
 
-            // Determine which user gets notification (the one who accepted first)
-            // user.uid is the second user to accept (matchInitiator)
-            const otherUserId = chatRequestData.users.find(
-              (id: string) => id !== user.uid
-            );
+            // Send notification to BOTH users
+            const notifications = [
+              {
+                userData: user1Data,
+                otherUserData: user2Data,
+                userId: chatRequestData.users[0],
+              },
+              {
+                userData: user2Data,
+                otherUserData: user1Data,
+                userId: chatRequestData.users[1],
+              },
+            ];
 
-            // Send notification only to the OTHER user (first one who accepted)
-            if (otherUserId === chatRequestData.users[0]) {
-              // Send to user 1
+            for (const { userData, otherUserData, userId } of notifications) {
               if (
-                user1Data.pushToken &&
-                user1Data.notificationsEnabled !== false
+                userData.pushToken &&
+                userData.notificationsEnabled !== false
               ) {
                 const message = {
-                  to: user1Data.pushToken,
+                  to: userData.pushToken,
                   sound: 'default',
                   title: "It's a Missed Match! 🎉",
                   body: `You and ${
-                    user2Data.name || 'someone'
+                    otherUserData.name || 'someone'
                   } matched! Conversation created - start chatting now!`,
                   data: {
                     type: 'missed_match',
                     matchId: matchRef.id,
                     conversationId: conversationRef.id,
                     isMissedConnection: true,
-                    showAnimation: false, // This user gets notification, not animation
+                    showAnimation: userId === user.uid, // Show animation for the user who just accepted
                   },
                   priority: 'high',
                 };
@@ -2060,39 +1544,22 @@ class MissedConnectionsService {
                   },
                   body: JSON.stringify(message),
                 }).catch((e) => console.error('Push notification error:', e));
-              }
-            } else {
-              // Send to user 2
-              if (
-                user2Data.pushToken &&
-                user2Data.notificationsEnabled !== false
-              ) {
-                const message = {
-                  to: user2Data.pushToken,
-                  sound: 'default',
-                  title: "It's a Missed Match! 🎉",
-                  body: `You and ${
-                    user1Data.name || 'someone'
+
+                // Store notification in database
+                await this.storeNotification(
+                  userId,
+                  "It's a Missed Match! 🎉",
+                  `You and ${
+                    otherUserData.name || 'someone'
                   } matched! Conversation created - start chatting now!`,
-                  data: {
-                    type: 'missed_match',
+                  'match',
+                  {
                     matchId: matchRef.id,
                     conversationId: conversationRef.id,
                     isMissedConnection: true,
-                    showAnimation: false, // This user gets notification, not animation
-                  },
-                  priority: 'high',
-                };
-
-                fetch('https://exp.host/--/api/v2/push/send', {
-                  method: 'POST',
-                  headers: {
-                    Accept: 'application/json',
-                    'Accept-encoding': 'gzip, deflate',
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify(message),
-                }).catch((e) => console.error('Push notification error:', e));
+                    showAnimation: userId === user.uid,
+                  }
+                );
               }
             }
           }
@@ -2167,125 +1634,358 @@ class MissedConnectionsService {
   }
 
   /**
-   * Get chat requests for current user
+   * Store a notification for a user
    */
-  async getUserChatRequests(userId: string): Promise<{
-    success: boolean;
-    data: any[];
-    message: string;
-  }> {
+  async storeNotification(
+    userId: string,
+    title: string,
+    message: string,
+    type: 'match' | 'chat_request' | 'claim_accepted' | 'general' = 'general',
+    data?: any
+  ): Promise<{ success: boolean; notificationId?: string; message: string }> {
+    try {
+      if (!auth.currentUser) {
+        return {
+          success: false,
+          message: 'User not authenticated',
+        };
+      }
+
+      const notificationData = {
+        userId,
+        title,
+        message,
+        type,
+        data: data || null,
+        read: false,
+        createdAt: serverTimestamp(),
+      };
+
+      const notificationRef = await addDoc(
+        collection(db, 'notifications'),
+        notificationData
+      );
+
+      console.log('✅ Notification stored:', notificationRef.id);
+      return {
+        success: true,
+        notificationId: notificationRef.id,
+        message: 'Notification stored successfully',
+      };
+    } catch (error) {
+      console.error('❌ Error storing notification:', error);
+      return {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Failed to store notification',
+      };
+    }
+  }
+
+  /**
+   * Get notifications for a user
+   */
+  async getUserNotifications(
+    userId: string,
+    limitCount: number = 50
+  ): Promise<{ success: boolean; data: NotificationItem[]; message: string }> {
     try {
       const q = query(
-        collection(db, 'chat_requests'),
-        where('users', 'array-contains', userId),
-        where('status', '==', 'pending'),
-        orderBy('createdAt', 'desc')
+        collection(db, 'notifications'),
+        where('userId', '==', userId),
+        orderBy('createdAt', 'desc'),
+        limit(limitCount)
       );
 
       const snapshot = await getDocs(q);
-      const requests = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: convertTimestamp(doc.data().createdAt),
-      }));
+      const notifications: NotificationItem[] = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          userId: data.userId,
+          title: data.title,
+          message: data.message,
+          type: data.type || 'general',
+          data: data.data || null,
+          read: data.read || false,
+          createdAt: convertTimestamp(data.createdAt),
+        };
+      });
 
       return {
         success: true,
-        data: requests,
-        message: 'Chat requests retrieved successfully',
+        data: notifications,
+        message: 'Notifications retrieved successfully',
       };
     } catch (error) {
-      console.error('❌ Error getting chat requests:', error);
+      console.error('❌ Error getting notifications:', error);
       return {
         success: false,
         data: [],
         message:
           error instanceof Error
             ? error.message
-            : 'Failed to get chat requests',
+            : 'Failed to get notifications',
       };
     }
   }
 
   /**
-   * Real-time listener for chat requests
-   * Only shows requests to users who haven't accepted yet
+   * Mark a notification as read
+   */
+  async markNotificationAsRead(
+    notificationId: string
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      if (!auth.currentUser) {
+        return {
+          success: false,
+          message: 'User not authenticated',
+        };
+      }
+
+      const notificationRef = doc(db, 'notifications', notificationId);
+      const notificationDoc = await getDoc(notificationRef);
+
+      if (!notificationDoc.exists()) {
+        return { success: false, message: 'Notification not found' };
+      }
+
+      const notificationData = notificationDoc.data();
+
+      // Verify ownership
+      if (notificationData.userId !== auth.currentUser.uid) {
+        return {
+          success: false,
+          message: 'You can only mark your own notifications as read',
+        };
+      }
+
+      await updateDoc(notificationRef, {
+        read: true,
+      });
+
+      console.log('✅ Notification marked as read:', notificationId);
+      return {
+        success: true,
+        message: 'Notification marked as read',
+      };
+    } catch (error) {
+      console.error('❌ Error marking notification as read:', error);
+      return {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Failed to mark notification as read',
+      };
+    }
+  }
+
+  /**
+   * Delete a notification
+   */
+  async deleteNotification(
+    notificationId: string
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      if (!auth.currentUser) {
+        return {
+          success: false,
+          message: 'User not authenticated',
+        };
+      }
+
+      const notificationRef = doc(db, 'notifications', notificationId);
+      const notificationDoc = await getDoc(notificationRef);
+
+      if (!notificationDoc.exists()) {
+        return { success: false, message: 'Notification not found' };
+      }
+
+      const notificationData = notificationDoc.data();
+
+      // Verify ownership
+      if (notificationData.userId !== auth.currentUser.uid) {
+        return {
+          success: false,
+          message: 'You can only delete your own notifications',
+        };
+      }
+
+      await deleteDoc(notificationRef);
+
+      console.log('✅ Notification deleted:', notificationId);
+      return {
+        success: true,
+        message: 'Notification deleted successfully',
+      };
+    } catch (error) {
+      console.error('❌ Error deleting notification:', error);
+      return {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Failed to delete notification',
+      };
+    }
+  }
+
+  /**
+   * Subscribe to pending claims for a user (claims on their posts)
+   */
+  subscribeToClaimsForUser(
+    userId: string,
+    callback: (
+      claims: Array<MissedConnectionClaim & { connection?: MissedConnection }>
+    ) => void
+  ): Unsubscribe {
+    // Listen to all pending claims
+    const claimsQuery = query(
+      collection(db, 'missed_connection_claims'),
+      where('status', '==', 'pending'),
+      orderBy('createdAt', 'desc')
+    );
+
+    return onSnapshot(claimsQuery, async (claimsSnapshot) => {
+      const claims: Array<
+        MissedConnectionClaim & { connection?: MissedConnection }
+      > = [];
+
+      // Process claims in batches to avoid too many concurrent requests
+      const claimPromises = claimsSnapshot.docs.map(async (claimDoc) => {
+        const claimData = claimDoc.data();
+
+        // Check if the connection belongs to the user
+        try {
+          const connectionDoc = await getDoc(
+            doc(db, 'missed_connections', claimData.connectionId)
+          );
+          if (connectionDoc.exists()) {
+            const connectionData = connectionDoc.data();
+            if (connectionData.userId === userId) {
+              const claim: MissedConnectionClaim & {
+                connection?: MissedConnection;
+              } = {
+                id: claimDoc.id,
+                connectionId: claimData.connectionId,
+                claimerId: claimData.claimerId,
+                claimerName: claimData.claimerName,
+                claimerImage: claimData.claimerImage,
+                locationVerified: claimData.locationVerified || false,
+                createdAt: convertTimestamp(claimData.createdAt),
+                status: claimData.status || 'pending',
+                connection: {
+                  id: connectionDoc.id,
+                  userId: connectionData.userId,
+                  userName: connectionData.userName,
+                  userImage: connectionData.userImage,
+                  location: connectionData.location,
+                  description: connectionData.description,
+                  tags: connectionData.tags || [],
+                  images: connectionData.images || [],
+                  timeOccurred: convertTimestamp(connectionData.timeOccurred),
+                  createdAt: convertTimestamp(connectionData.createdAt),
+                  likes: connectionData.likes || 0,
+                  likedBy: connectionData.likedBy || [],
+                  views: connectionData.views || 0,
+                  viewedBy: connectionData.viewedBy || [],
+                  claims: connectionData.claims || 0,
+                  comments: connectionData.comments || 0,
+                  claimed: connectionData.claimed || false,
+                  claimedBy: connectionData.claimedBy,
+                  verified: connectionData.verified || false,
+                  isAnonymous: connectionData.isAnonymous || false,
+                  isEdited: connectionData.isEdited || false,
+                  editedAt: connectionData.editedAt
+                    ? convertTimestamp(connectionData.editedAt)
+                    : undefined,
+                  savedBy: connectionData.savedBy || [],
+                },
+              };
+              return claim;
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching connection for claim:', error);
+        }
+        return null;
+      });
+
+      const resolvedClaims = await Promise.all(claimPromises);
+      claims.push(...resolvedClaims.filter((claim) => claim !== null));
+
+      callback(claims);
+    });
+  }
+
+  /**
+   * Subscribe to pending chat requests for a user
    */
   subscribeToChatRequests(
     userId: string,
-    callback: (requests: any[]) => void
+    callback: (requests: ChatRequest[]) => void
   ): Unsubscribe {
     const q = query(
       collection(db, 'chat_requests'),
-      where('users', 'array-contains', userId),
+      where('receiver', '==', userId),
       where('status', '==', 'pending'),
       orderBy('createdAt', 'desc')
     );
 
     return onSnapshot(q, (snapshot) => {
-      const requests = snapshot.docs
-        .map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            createdAt: convertTimestamp(data.createdAt),
-          };
-        })
-        .filter((request) => {
-          // Only show request if user hasn't accepted yet
-          const acceptedBy = request.acceptedBy || [];
-          return !acceptedBy.includes(userId);
-        });
+      const requests: ChatRequest[] = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          users: data.users || [],
+          sender: data.sender,
+          receiver: data.receiver,
+          claimId: data.claimId,
+          connectionId: data.connectionId,
+          createdAt: convertTimestamp(data.createdAt),
+          status: data.status || 'pending',
+          acceptedBy: data.acceptedBy || [],
+        };
+      });
 
       callback(requests);
     });
   }
 
   /**
-   * @deprecated Use acceptChatRequest instead
+   * Get unread notification count for a user
    */
-  async acceptTemporaryMatch(tempMatchId: string): Promise<{
-    success: boolean;
-    matchId?: string;
-    conversationId?: string;
-    message: string;
-  }> {
-    // Redirect to new method
-    return this.acceptChatRequest(tempMatchId);
-  }
+  async getUnreadNotificationCount(
+    userId: string
+  ): Promise<{ success: boolean; count: number; message: string }> {
+    try {
+      const q = query(
+        collection(db, 'notifications'),
+        where('userId', '==', userId),
+        where('read', '==', false)
+      );
 
-  /**
-   * @deprecated Use declineChatRequest instead
-   */
-  async declineTemporaryMatch(
-    tempMatchId: string
-  ): Promise<{ success: boolean; message: string }> {
-    // Redirect to new method
-    return this.declineChatRequest(tempMatchId);
-  }
+      const snapshot = await getDocs(q);
+      const count = snapshot.size;
 
-  /**
-   * @deprecated Use getUserChatRequests instead
-   */
-  async getUserTemporaryMatches(userId: string): Promise<{
-    success: boolean;
-    data: any[];
-    message: string;
-  }> {
-    // Redirect to new method
-    return this.getUserChatRequests(userId);
-  }
-
-  /**
-   * @deprecated Use subscribeToChatRequests instead
-   */
-  subscribeToTemporaryMatches(
-    userId: string,
-    callback: (matches: any[]) => void
-  ): Unsubscribe {
-    // Redirect to new method
-    return this.subscribeToChatRequests(userId, callback);
+      return {
+        success: true,
+        count,
+        message: 'Unread count retrieved successfully',
+      };
+    } catch (error) {
+      console.error('❌ Error getting unread count:', error);
+      return {
+        success: false,
+        count: 0,
+        message:
+          error instanceof Error ? error.message : 'Failed to get unread count',
+      };
+    }
   }
 }
 

@@ -1,4 +1,5 @@
-// app/components/GlobalToast.tsx
+// Global Toast Component - Always on top of all screens and components
+// Uses Portal-like approach with StatusBar for maximum visibility
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -7,6 +8,7 @@ import {
   Animated,
   TouchableOpacity,
   Dimensions,
+  StatusBar,
 } from 'react-native';
 import {
   CheckCircle,
@@ -123,70 +125,81 @@ const GlobalToast: React.FC = () => {
   };
 
   return (
-    <View style={styles.container} pointerEvents="box-none">
-      {toasts.map((toast, index) => {
-        const translateY = toast.animation.interpolate({
-          inputRange: [0, 1],
-          outputRange: [-100, 0],
-        });
+    <>
+      <StatusBar
+        style={isDarkMode ? 'light' : 'dark'}
+        translucent
+        backgroundColor="transparent"
+      />
+      <View style={styles.container} pointerEvents="box-none">
+        {toasts.map((toast, index) => {
+          const translateY = toast.animation.interpolate({
+            inputRange: [0, 1],
+            outputRange: [-100, 0],
+          });
 
-        const opacity = toast.animation;
+          const opacity = toast.animation;
 
-        return (
-          <Animated.View
-            key={toast.id}
-            style={[
-              styles.toastWrapper,
-              {
-                transform: [{ translateY }],
-                opacity,
-                top: spacing.xl + index * (verticalScale(100) + spacing.md),
-              },
-            ]}
-            pointerEvents="box-none"
-          >
-            <TouchableOpacity
-              activeOpacity={0.95}
-              onPress={() => hideToast(toast.id)}
-              style={styles.toastTouchable}
+          return (
+            <Animated.View
+              key={toast.id}
+              style={[
+                styles.toastWrapper,
+                {
+                  transform: [{ translateY }],
+                  opacity,
+                  top: spacing.xl + index * (verticalScale(100) + spacing.md),
+                  zIndex: 999999 + index, // Extremely high zIndex
+                  elevation: 999999 + index,
+                },
+              ]}
+              pointerEvents="box-none"
             >
-              <LinearGradient
-                colors={getColors(toast.type)}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[
-                  styles.toast,
-                  {
-                    ...theme.elevation.large,
-                  },
-                ]}
+              <TouchableOpacity
+                activeOpacity={0.95}
+                onPress={() => hideToast(toast.id)}
+                style={styles.toastTouchable}
               >
-                <View style={styles.iconContainer}>{getIcon(toast.type)}</View>
-
-                <View style={styles.contentContainer}>
-                  <Text style={styles.title} numberOfLines={2}>
-                    {toast.title}
-                  </Text>
-                  {toast.message ? (
-                    <Text style={styles.message} numberOfLines={4}>
-                      {toast.message}
-                    </Text>
-                  ) : null}
-                </View>
-
-                <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={() => hideToast(toast.id)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                <LinearGradient
+                  colors={getColors(toast.type)}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[
+                    styles.toast,
+                    {
+                      ...theme.elevation.large,
+                    },
+                  ]}
                 >
-                  <X size={scale(18)} color="#FFFFFF" />
-                </TouchableOpacity>
-              </LinearGradient>
-            </TouchableOpacity>
-          </Animated.View>
-        );
-      })}
-    </View>
+                  <View style={styles.iconContainer}>
+                    {getIcon(toast.type)}
+                  </View>
+
+                  <View style={styles.contentContainer}>
+                    <Text style={styles.title} numberOfLines={2}>
+                      {toast.title}
+                    </Text>
+                    {toast.message ? (
+                      <Text style={styles.message} numberOfLines={4}>
+                        {toast.message}
+                      </Text>
+                    ) : null}
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.closeButton}
+                    onPress={() => hideToast(toast.id)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <X size={scale(18)} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </LinearGradient>
+              </TouchableOpacity>
+            </Animated.View>
+          );
+        })}
+      </View>
+    </>
   );
 };
 
@@ -196,14 +209,17 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 9999,
-    elevation: 9999,
+    bottom: 0,
+    zIndex: 999998,
+    elevation: 999998,
+    pointerEvents: 'box-none',
   },
   toastWrapper: {
     position: 'absolute',
     left: spacing.lg,
     right: spacing.lg,
-    zIndex: 9999,
+    zIndex: 999999,
+    elevation: 999999,
   },
   toastTouchable: {
     width: '100%',
