@@ -702,19 +702,6 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
   }
 
   private async getInteractedUserIds(userId: string): Promise<Set<string>> {
-    // Try to get from cache first
-    const cacheKey = `interactions:${userId}`;
-    const cachedInteractions = await cacheService.getUserInteractions(userId);
-
-    if (cachedInteractions) {
-      console.log(
-        `✅ Using cached interactions for user ${userId}: ${cachedInteractions.length} interactions`
-      );
-      console.log(
-        `📋 Cached interaction IDs: ${JSON.stringify(cachedInteractions)}`
-      );
-      return new Set(cachedInteractions);
-    }
 
     console.log(
       `🔄 Fetching fresh interactions for user ${userId} from Firestore`

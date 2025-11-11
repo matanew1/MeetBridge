@@ -1595,6 +1595,50 @@ class MissedConnectionsService {
     }
   }
 
+  async getPendingClaimsForUser(
+    userId: string
+  ): Promise<{
+    success: boolean;
+    data: Array<MissedConnectionClaim>;
+    message: string;
+  }> {
+    try {
+      const q = query(
+        collection(db, 'missed_connection_claims'),
+        where('claimerId', '==', userId),
+        where('status', '==', 'pending'),
+        orderBy('createdAt', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      const claims: MissedConnectionClaim[] = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          connectionId: data.connectionId,
+          claimerId: data.claimerId,
+          claimerName: data.claimerName,
+          claimerImage: data.claimerImage,
+        };
+      });
+
+      return {
+        success: true,
+        data: claims,
+        message: 'Pending claims retrieved successfully',
+      };
+    } catch (error) {
+      console.error('❌ Error getting pending claims:', error);
+      return {
+        success: false,
+        data: [],
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Failed to get pending claims',
+      };
+    }
+  }
+
   /**
    * Decline chat request
    */
