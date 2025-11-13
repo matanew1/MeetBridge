@@ -41,7 +41,10 @@ import { Card, Button } from '../components/ui';
 import EditProfileModal from '../components/EditProfileModal';
 import ChangePasswordModal from '../components/ChangePasswordModal';
 import DeleteAccountModal from '../components/DeleteAccountModal';
+import PrivacySettingsModal from '../components/PrivacySettingsModal';
+import LanguageSettingsModal from '../components/LanguageSettingsModal';
 import { useUserStore } from '../../store/userStore';
+import { useTranslation } from 'react-i18next';
 import {
   scale,
   verticalScale,
@@ -50,8 +53,9 @@ import {
   borderRadius,
 } from '../../utils/responsive';
 import toastSerivce from '../../services/toastService';
-import { User as UserType } from '../../types/models/user';
+import { User as UserType } from '../../store/types';
 import blockReportService from '../../services/blockReportService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface SettingItemProps {
   icon: React.ReactNode;
@@ -158,26 +162,63 @@ const SettingItem: React.FC<SettingItemProps> = ({
 };
 
 const Settings: React.FC = () => {
+  const { t } = useTranslation();
   const { isDarkMode, toggleDarkMode } = useTheme();
   const { user, logout, updateProfile, refreshUserProfile, deleteAccount } =
     useAuth();
   const router = useRouter();
   const theme = isDarkMode ? darkTheme : lightTheme;
 
-  // Settings state
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [messageNotifications, setMessageNotifications] = useState(true);
-  const [matchNotifications, setMatchNotifications] = useState(true);
-  const [locationEnabled, setLocationEnabled] = useState(true);
-  const [showOnlineStatus, setShowOnlineStatus] = useState(true);
+  // Settings state - initialize from user data
+  const [notificationsEnabled, setNotificationsEnabled] = useState(
+    user?.settings?.notifications?.pushEnabled ?? true
+  );
+  const [messageNotifications, setMessageNotifications] = useState(
+    user?.settings?.notifications?.messageNotifications ?? true
+  );
+  const [matchNotifications, setMatchNotifications] = useState(
+    user?.settings?.notifications?.matchNotifications ?? true
+  );
+  const [locationEnabled, setLocationEnabled] = useState(
+    user?.settings?.privacy?.locationSharing ?? true
+  );
+  const [showOnlineStatus, setShowOnlineStatus] = useState(
+    user?.settings?.privacy?.showOnlineStatus ?? true
+  );
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
   const [showBlockedUsers, setShowBlockedUsers] = useState(false);
+  const [showPrivacySettings, setShowPrivacySettings] = useState(false);
+  const [showLanguageSettings, setShowLanguageSettings] = useState(false);
   const [blockedUsersProfiles, setBlockedUsersProfiles] = useState<UserType[]>(
     []
   );
   const [loadingBlockedUsers, setLoadingBlockedUsers] = useState(false);
+
+  // Update settings when user data changes
+  useEffect(() => {
+    if (user?.settings) {
+      setNotificationsEnabled(user.settings.notifications?.pushEnabled ?? true);
+      setMessageNotifications(
+        user.settings.notifications?.messageNotifications ?? true
+      );
+      setMatchNotifications(
+        user.settings.notifications?.matchNotifications ?? true
+      );
+      setLocationEnabled(user.settings.privacy?.locationSharing ?? true);
+      setShowOnlineStatus(user.settings.privacy?.showOnlineStatus ?? true);
+
+      // Sync theme preference from Firebase
+      if (user.settings.appearance?.theme) {
+        const shouldBeDark = user.settings.appearance.theme === 'dark';
+        // Update AsyncStorage to sync with Firebase
+        AsyncStorage.setItem('darkMode', JSON.stringify(shouldBeDark)).catch(
+          console.error
+        );
+      }
+    }
+  }, [user?.settings, isDarkMode]);
 
   useEffect(() => {
     if (showBlockedUsers) {
@@ -235,24 +276,28 @@ const Settings: React.FC = () => {
       setBlockedUsersProfiles(profiles);
     } catch (error) {
       console.error('Error loading blocked users:', error);
-      toastService.error('Error', 'Failed to load blocked users');
+      toastService.error(t('common.error'), t('settings.saveError'));
     } finally {
       setLoadingBlockedUsers(false);
     }
   };
 
   const handleLogout = () => {
-    toastService.info('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Logout',
-        style: 'destructive',
-        onPress: async () => {
-          await logout();
-          router.replace('/auth/login');
+    toastService.info(
+      t('settings.logoutConfirmTitle'),
+      t('settings.logoutConfirmMessage'),
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            await logout();
+            router.replace('/auth/login');
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
   const handleDeleteAccount = () => {
@@ -266,8 +311,8 @@ const Settings: React.FC = () => {
       if (result?.success) {
         setShowDeleteAccount(false);
         toastService.success(
-          'Account Deleted',
-          'Your account has been permanently deleted'
+          t('settings.deleteSuccess'),
+          t('settings.deleteSuccess')
         );
         // Navigate to login after a short delay
         setTimeout(() => {
@@ -297,8 +342,8 @@ const Settings: React.FC = () => {
       const result = await blockReportService.unblockUser(blockedUserId);
       if (result.success) {
         toastService.success(
-          'User Unblocked',
-          `${blockedUserName} has been unblocked`
+          t('settings.unblockSuccess'),
+          t('settings.unblockSuccess', { name: blockedUserName })
         );
         // Refresh user profile to update blockedUsers array
         if (refreshUserProfile) {
@@ -310,7 +355,87 @@ const Settings: React.FC = () => {
         toastService.error('Error', result.message);
       }
     } catch (error) {
-      toastService.error('Error', 'Failed to unblock user');
+      toastService.error(t('common.error'), t('settings.unblockError'));
+    }
+  };
+
+  const handleSaveNotificationSettings = async () => {
+    try {
+      const currentSettings = user?.settings || {};
+      const updatedSettings = {
+        ...currentSettings,
+        notifications: {
+          pushEnabled: notificationsEnabled,
+          messageNotifications: messageNotifications,
+          matchNotifications: matchNotifications,
+        },
+      };
+
+      await updateProfile({ settings: updatedSettings });
+      toastService.success(
+        t('settings.saveSuccess'),
+        t('settings.saveSuccess')
+      );
+    } catch (error) {
+      console.error('Error saving notification settings:', error);
+      toastService.error(t('common.error'), t('settings.saveError'));
+    }
+  };
+
+  const handleSavePrivacySettings = async (privacySettings: any) => {
+    try {
+      const currentSettings = user?.settings || {};
+      const updatedSettings = {
+        ...currentSettings,
+        privacy: privacySettings.privacy,
+      };
+
+      await updateProfile({ settings: updatedSettings });
+      toastService.success(
+        t('settings.saveSuccess'),
+        t('settings.updateSuccess')
+      );
+    } catch (error) {
+      console.error('Error saving privacy settings:', error);
+      toastService.error(t('common.error'), t('settings.saveError'));
+    }
+  };
+
+  const handleSaveLanguageSettings = async (appearanceSettings: any) => {
+    try {
+      const currentSettings = user?.settings || {};
+      const updatedSettings = {
+        ...currentSettings,
+        appearance: appearanceSettings.appearance,
+      };
+
+      await updateProfile({ settings: updatedSettings });
+      toastService.success(
+        t('settings.saveSuccess'),
+        t('settings.updateSuccess')
+      );
+    } catch (error) {
+      console.error('Error saving language settings:', error);
+      toastService.error(t('common.error'), t('settings.saveError'));
+    }
+  };
+
+  const handleSaveThemeSettings = async (isDark: boolean) => {
+    try {
+      const currentSettings = user?.settings || {};
+      const updatedSettings = {
+        ...currentSettings,
+        appearance: {
+          language: user?.settings?.appearance?.language || 'en',
+          theme: isDark ? 'dark' : 'light',
+        },
+      };
+
+      await updateProfile({ settings: updatedSettings });
+      // Note: Local theme state is managed by ThemeContext
+    } catch (error) {
+      console.error('Error saving theme settings:', error);
+      toastService.error(t('common.error'), t('settings.saveError'));
     }
   };
 
@@ -354,17 +479,24 @@ const Settings: React.FC = () => {
 
         console.log('✅ Profile updated and refreshed from Firebase');
         toastService.success(
-          'Profile Updated',
-          'Your profile has been updated successfully'
+          t('settings.updateSuccess'),
+          t('settings.updateSuccess')
         );
       }
     } catch (error) {
       console.error('Error updating profile:', error);
-      toastService.error(
-        'Update Failed',
-        'Failed to update your profile. Please try again.'
-      );
+      toastService.error(t('settings.updateError'), t('settings.updateError'));
     }
+  };
+
+  const handleToggleDarkMode = async () => {
+    const newDarkMode = !isDarkMode;
+
+    // Save to Firebase first
+    await handleSaveThemeSettings(newDarkMode);
+
+    // Then toggle the theme locally
+    await toggleDarkMode();
   };
 
   return (
@@ -390,7 +522,7 @@ const Settings: React.FC = () => {
               { color: theme.text, ...theme.typography.h1 },
             ]}
           >
-            Settings
+            {t('settings.title')}
           </Text>
           <Text
             style={[
@@ -398,54 +530,102 @@ const Settings: React.FC = () => {
               { color: theme.textSecondary, ...theme.typography.body },
             ]}
           >
-            Manage your account and preferences
+            {t('settings.subtitle')}
           </Text>
         </View>
 
         {/* Account Section */}
-        <SettingSection title="ACCOUNT">
+        <SettingSection title={t('settings.account')}>
           <SettingItem
             icon={<User />}
-            title="Edit Profile"
-            subtitle="Update your profile information"
+            title={t('settings.editProfile')}
+            subtitle={t('settings.editProfileSubtitle')}
             onPress={handleEditProfile}
           />
           <SettingItem
             icon={<Lock />}
-            title="Change Password"
-            subtitle="Update your account password"
+            title={t('settings.changePassword')}
+            subtitle={t('settings.changePasswordSubtitle')}
             onPress={() => setShowChangePassword(true)}
           />
         </SettingSection>
 
         {/* Privacy & Security */}
-        <SettingSection title="PRIVACY & SECURITY">
+        <SettingSection title={t('settings.privacySecurity')}>
           <SettingItem
             icon={<Shield />}
-            title="Privacy Settings"
-            subtitle="Control who can see your profile"
-            onPress={() =>
-              toastService.info(
-                'Privacy',
-                'Advanced privacy settings coming soon'
-              )
+            title={t('settings.privacySettings')}
+            subtitle={t('settings.privacySettingsSubtitle')}
+            onPress={() => setShowPrivacySettings(true)}
+          />
+          <SettingItem
+            icon={<MapPin />}
+            title={t('settings.locationServices')}
+            subtitle={
+              locationEnabled ? t('settings.enabled') : t('settings.disabled')
+            }
+            showChevron={false}
+            rightElement={
+              <Switch
+                value={locationEnabled}
+                onValueChange={(value) => {
+                  setLocationEnabled(value);
+                  setTimeout(() => {
+                    handleSavePrivacySettings({
+                      privacy: {
+                        showOnlineStatus: showOnlineStatus,
+                        locationSharing: value,
+                        profileVisibility:
+                          user?.settings?.privacy?.profileVisibility ||
+                          'public',
+                        dataSharing:
+                          user?.settings?.privacy?.dataSharing ?? true,
+                      },
+                    });
+                  }, 500);
+                }}
+                trackColor={{ false: theme.border, true: theme.primary }}
+                thumbColor={theme.surface}
+              />
             }
           />
           <SettingItem
             icon={<Ban />}
-            title="Blocked Users"
-            subtitle={`${user?.blockedUsers?.length || 0} blocked users`}
+            title={t('settings.blockedUsers')}
+            subtitle={t('settings.blockedUsersCount', {
+              count: user?.blockedUsers?.length || 0,
+            })}
             onPress={() => setShowBlockedUsers(true)}
           />
           <SettingItem
             icon={<Eye />}
-            title="Show Online Status"
-            subtitle={showOnlineStatus ? 'Visible to matches' : 'Hidden'}
+            title={t('settings.showOnlineStatus')}
+            subtitle={
+              showOnlineStatus
+                ? t('settings.showOnlineStatusVisible')
+                : t('settings.showOnlineStatusHidden')
+            }
             showChevron={false}
             rightElement={
               <Switch
                 value={showOnlineStatus}
-                onValueChange={setShowOnlineStatus}
+                onValueChange={(value) => {
+                  setShowOnlineStatus(value);
+                  // Save privacy settings
+                  setTimeout(() => {
+                    handleSavePrivacySettings({
+                      privacy: {
+                        showOnlineStatus: value,
+                        locationSharing: locationEnabled,
+                        profileVisibility:
+                          user?.settings?.privacy?.profileVisibility ||
+                          'public',
+                        dataSharing:
+                          user?.settings?.privacy?.dataSharing ?? true,
+                      },
+                    });
+                  }, 500);
+                }}
                 trackColor={{ false: theme.border, true: theme.primary }}
                 thumbColor={theme.surface}
               />
@@ -454,16 +634,24 @@ const Settings: React.FC = () => {
         </SettingSection>
 
         {/* Notifications */}
-        <SettingSection title="NOTIFICATIONS">
+        <SettingSection title={t('settings.notifications')}>
           <SettingItem
             icon={<Bell />}
-            title="Push Notifications"
-            subtitle={notificationsEnabled ? 'Enabled' : 'Disabled'}
+            title={t('settings.pushNotifications')}
+            subtitle={
+              notificationsEnabled
+                ? t('settings.enabled')
+                : t('settings.disabled')
+            }
             showChevron={false}
             rightElement={
               <Switch
                 value={notificationsEnabled}
-                onValueChange={setNotificationsEnabled}
+                onValueChange={(value) => {
+                  setNotificationsEnabled(value);
+                  // Auto-save after a short delay to avoid too many saves
+                  setTimeout(() => handleSaveNotificationSettings(), 500);
+                }}
                 trackColor={{ false: theme.border, true: theme.primary }}
                 thumbColor={theme.surface}
               />
@@ -471,13 +659,16 @@ const Settings: React.FC = () => {
           />
           <SettingItem
             icon={<Mail />}
-            title="Message Notifications"
-            subtitle="Get notified for new messages"
+            title={t('settings.messageNotifications')}
+            subtitle={t('settings.messageNotificationsSubtitle')}
             showChevron={false}
             rightElement={
               <Switch
                 value={messageNotifications}
-                onValueChange={setMessageNotifications}
+                onValueChange={(value) => {
+                  setMessageNotifications(value);
+                  setTimeout(() => handleSaveNotificationSettings(), 500);
+                }}
                 trackColor={{ false: theme.border, true: theme.primary }}
                 thumbColor={theme.surface}
                 disabled={!notificationsEnabled}
@@ -486,13 +677,16 @@ const Settings: React.FC = () => {
           />
           <SettingItem
             icon={<User />}
-            title="Match Notifications"
-            subtitle="Get notified for new matches"
+            title={t('settings.matchNotifications')}
+            subtitle={t('settings.matchNotificationsSubtitle')}
             showChevron={false}
             rightElement={
               <Switch
                 value={matchNotifications}
-                onValueChange={setMatchNotifications}
+                onValueChange={(value) => {
+                  setMatchNotifications(value);
+                  setTimeout(() => handleSaveNotificationSettings(), 500);
+                }}
                 trackColor={{ false: theme.border, true: theme.primary }}
                 thumbColor={theme.surface}
                 disabled={!notificationsEnabled}
@@ -502,16 +696,18 @@ const Settings: React.FC = () => {
         </SettingSection>
 
         {/* Appearance */}
-        <SettingSection title="APPEARANCE">
+        <SettingSection title={t('settings.appearance')}>
           <SettingItem
             icon={isDarkMode ? <Moon /> : <Sun />}
-            title="Dark Mode"
-            subtitle={isDarkMode ? 'Enabled' : 'Disabled'}
+            title={t('settings.darkMode')}
+            subtitle={
+              isDarkMode ? t('settings.enabled') : t('settings.disabled')
+            }
             showChevron={false}
             rightElement={
               <Switch
                 value={isDarkMode}
-                onValueChange={toggleDarkMode}
+                onValueChange={handleToggleDarkMode}
                 trackColor={{ false: theme.border, true: theme.primary }}
                 thumbColor={theme.surface}
               />
@@ -519,23 +715,18 @@ const Settings: React.FC = () => {
           />
           <SettingItem
             icon={<Globe />}
-            title="Language"
-            subtitle="English (US)"
-            onPress={() =>
-              toastService.info(
-                'Language',
-                'Multi-language support coming soon'
-              )
-            }
+            title={t('settings.language')}
+            subtitle={t('settings.languageSubtitle')}
+            onPress={() => setShowLanguageSettings(true)}
           />
         </SettingSection>
 
         {/* Support */}
-        <SettingSection title="SUPPORT">
+        <SettingSection title={t('settings.support')}>
           <SettingItem
             icon={<Info />}
-            title="About"
-            subtitle="Version 1.0.0"
+            title={t('settings.about')}
+            subtitle={t('settings.version', { version: '1.0.0' })}
             onPress={() =>
               toastService.info(
                 'MeetBridge',
@@ -546,18 +737,18 @@ const Settings: React.FC = () => {
         </SettingSection>
 
         {/* Danger Zone */}
-        <SettingSection title="DANGER ZONE">
+        <SettingSection title={t('settings.dangerZone')}>
           <SettingItem
             icon={<LogOut />}
-            title="Logout"
+            title={t('settings.logout')}
             onPress={handleLogout}
             showChevron={false}
             variant="danger"
           />
           <SettingItem
             icon={<Trash2 />}
-            title="Delete Account"
-            subtitle="Permanently delete your account"
+            title={t('settings.deleteAccount')}
+            subtitle={t('settings.deleteAccountSubtitle')}
             onPress={handleDeleteAccount}
             showChevron={false}
             variant="danger"
@@ -572,7 +763,7 @@ const Settings: React.FC = () => {
               { color: theme.textTertiary, ...theme.typography.caption },
             ]}
           >
-            Made with ❤️ by MeetBridge Team
+            {t('settings.footerText')}
           </Text>
           <Text
             style={[
@@ -580,7 +771,7 @@ const Settings: React.FC = () => {
               { color: theme.textTertiary, ...theme.typography.tiny },
             ]}
           >
-            © 2025 MeetBridge. All rights reserved.
+            {t('settings.copyright')}
           </Text>
         </View>
       </ScrollView>
@@ -595,7 +786,12 @@ const Settings: React.FC = () => {
         <SafeAreaView
           style={[styles.modalContainer, { backgroundColor: theme.background }]}
         >
-          <View style={styles.modalHeader}>
+          <View
+            style={[
+              styles.modalHeader,
+              { borderBottomColor: theme.borderLight },
+            ]}
+          >
             <TouchableOpacity
               style={[
                 styles.modalBackButton,
@@ -611,7 +807,7 @@ const Settings: React.FC = () => {
                 { color: theme.text, ...theme.typography.h1 },
               ]}
             >
-              Blocked Users
+              {t('settings.blockedUsersTitle')}
             </Text>
             <View style={{ width: scale(44) }} />
           </View>
@@ -620,15 +816,32 @@ const Settings: React.FC = () => {
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={theme.primary} />
               <Text
-                style={[styles.loadingText, { color: theme.textSecondary }]}
+                style={[
+                  styles.loadingText,
+                  { color: theme.textSecondary, ...theme.typography.body },
+                ]}
               >
-                Loading blocked users...
+                {t('settings.loadingBlockedUsers')}
               </Text>
             </View>
           ) : blockedUsersProfiles.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+              <Ban size={scale(48)} color={theme.textTertiary} />
+              <Text
+                style={[
+                  styles.emptyText,
+                  { color: theme.textSecondary, ...theme.typography.body },
+                ]}
+              >
                 No blocked users
+              </Text>
+              <Text
+                style={[
+                  styles.emptySubtext,
+                  { color: theme.textTertiary, ...theme.typography.caption },
+                ]}
+              >
+                Users you block will appear here
               </Text>
             </View>
           ) : (
@@ -636,41 +849,48 @@ const Settings: React.FC = () => {
               data={blockedUsersProfiles}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
-                <View
-                  style={[
-                    styles.blockedUserItem,
-                    { borderBottomColor: theme.borderLight },
-                  ]}
+                <Card
+                  variant="elevated"
+                  elevation="small"
+                  padding="md"
+                  style={styles.blockedUserCard}
                 >
-                  <View style={styles.blockedUserInfo}>
-                    <Text
-                      style={[styles.blockedUserName, { color: theme.text }]}
-                    >
-                      {item.displayName || item.name || 'Unknown User'}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.blockedUserId,
-                        { color: theme.textSecondary },
-                      ]}
-                    >
-                      @{item.id}
-                    </Text>
+                  <View style={styles.blockedUserContent}>
+                    <View style={styles.blockedUserInfo}>
+                      <Text
+                        style={[
+                          styles.blockedUserName,
+                          { color: theme.text, ...theme.typography.body },
+                        ]}
+                      >
+                        {item.name || 'Unknown User'}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.blockedUserId,
+                          {
+                            color: theme.textSecondary,
+                            ...theme.typography.caption,
+                          },
+                        ]}
+                      >
+                        @{item.id}
+                      </Text>
+                    </View>
+                    <Button
+                      title="Unblock"
+                      onPress={() =>
+                        handleUnblockUser(item.id, item.name || 'User')
+                      }
+                      variant="outline"
+                      size="small"
+                      style={styles.unblockButton}
+                    />
                   </View>
-                  <Button
-                    title="Unblock"
-                    onPress={() =>
-                      handleUnblockUser(
-                        item.id,
-                        item.displayName || item.name || 'User'
-                      )
-                    }
-                    variant="outline"
-                    size="small"
-                  />
-                </View>
+                </Card>
               )}
               contentContainerStyle={styles.blockedUsersList}
+              showsVerticalScrollIndicator={false}
             />
           )}
         </SafeAreaView>
@@ -694,6 +914,20 @@ const Settings: React.FC = () => {
         visible={showDeleteAccount}
         onClose={() => setShowDeleteAccount(false)}
         onConfirm={handleConfirmDelete}
+      />
+
+      {/* Privacy Settings Modal */}
+      <PrivacySettingsModal
+        visible={showPrivacySettings}
+        onClose={() => setShowPrivacySettings(false)}
+        onSave={handleSavePrivacySettings}
+      />
+
+      {/* Language Settings Modal */}
+      <LanguageSettingsModal
+        visible={showLanguageSettings}
+        onClose={() => setShowLanguageSettings(false)}
+        onSave={handleSaveLanguageSettings}
       />
     </SafeAreaView>
   );
@@ -783,7 +1017,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
   modalBackButton: {
     width: scale(44),
@@ -808,32 +1041,41 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: spacing.xl,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: moderateScale(16),
     textAlign: 'center',
+    marginTop: spacing.md,
+  },
+  emptySubtext: {
+    textAlign: 'center',
+    marginTop: spacing.xs,
   },
   blockedUsersList: {
     padding: spacing.lg,
+    paddingBottom: spacing['2xl'],
   },
-  blockedUserItem: {
+  blockedUserCard: {
+    marginBottom: spacing.md,
+  },
+  blockedUserContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#e0e0e0',
   },
   blockedUserInfo: {
     flex: 1,
   },
   blockedUserName: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
+    marginBottom: spacing.xs / 2,
   },
   blockedUserId: {
-    fontSize: 14,
-    marginTop: spacing.xs / 2,
+    opacity: 0.7,
+  },
+  unblockButton: {
+    minWidth: scale(80),
   },
 });
 

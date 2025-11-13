@@ -485,6 +485,23 @@ async function createMockUser(
       pushToken: '',
       isProfileComplete: true,
       hasSeenTutorial: false,
+      settings: {
+        notifications: {
+          pushEnabled: true,
+          messageNotifications: true,
+          matchNotifications: true,
+        },
+        privacy: {
+          showOnlineStatus: true,
+          locationSharing: true,
+          profileVisibility: 'public',
+          dataSharing: true,
+        },
+        appearance: {
+          language: 'en',
+          theme: 'system',
+        },
+      },
     };
 
     await setDoc(doc(db, 'users', userId), userDoc);

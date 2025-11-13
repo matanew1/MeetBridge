@@ -702,7 +702,6 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
   }
 
   private async getInteractedUserIds(userId: string): Promise<Set<string>> {
-
     console.log(
       `🔄 Fetching fresh interactions for user ${userId} from Firestore`
     );
@@ -1995,6 +1994,23 @@ export class FirebaseAuthService implements IAuthService {
           ageRange: [18, 99] as [number, number],
           maxDistance: 500,
           interestedIn: 'female' as const,
+        },
+        settings: profileData.settings || {
+          notifications: {
+            pushEnabled: true,
+            messageNotifications: true,
+            matchNotifications: true,
+          },
+          privacy: {
+            showOnlineStatus: true,
+            locationSharing: true,
+            profileVisibility: 'public' as 'public' | 'matches' | 'private',
+            dataSharing: true,
+          },
+          appearance: {
+            language: 'en',
+            theme: 'system' as 'light' | 'dark' | 'system',
+          },
         },
       };
 

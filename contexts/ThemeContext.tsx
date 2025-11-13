@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Appearance, ColorSchemeName } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import i18n, { isRTL } from '../i18n';
 
 interface ThemeContextType {
   isDarkMode: boolean;
@@ -29,6 +30,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [colorScheme, setColorScheme] = useState<ColorSchemeName>(
     Appearance.getColorScheme()
   );
+  const [currentLanguage, setCurrentLanguage] = useState(i18n.language || 'en');
 
   // Load saved theme preference on app start
   useEffect(() => {
@@ -62,6 +64,22 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     return () => subscription?.remove();
   }, []);
 
+  // Listen to i18n language changes
+  useEffect(() => {
+    const handleLanguageChange = (lng: string) => {
+      setCurrentLanguage(lng);
+    };
+
+    i18n.on('languageChanged', handleLanguageChange);
+
+    // Set initial language
+    setCurrentLanguage(i18n.language || 'en');
+
+    return () => {
+      i18n.off('languageChanged', handleLanguageChange);
+    };
+  }, []);
+
   const toggleDarkMode = async () => {
     const newDarkMode = !isDarkMode;
     setIsDarkMode(newDarkMode);
@@ -72,14 +90,22 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     } catch (error) {
       console.error('Error saving theme preference:', error);
     }
+
+    // Also save to Firebase if user is logged in
+    try {
+      // We can't directly access user here, but we can emit an event or use a callback
+      // For now, we'll handle Firebase saving in the settings component
+    } catch (error) {
+      console.error('Error saving theme to Firebase:', error);
+    }
   };
 
   const value: ThemeContextType = {
     isDarkMode,
     toggleDarkMode,
     colorScheme,
-    currentLanguage: 'en', // Fixed to English
-    isRTL: false, // Fixed to LTR
+    currentLanguage,
+    isRTL: isRTL(),
   };
 
   return (

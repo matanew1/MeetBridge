@@ -20,6 +20,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import { Image } from 'expo-image';
+import { useTranslation } from 'react-i18next';
 import {
   scale,
   verticalScale,
@@ -42,12 +43,13 @@ const LoginScreen = () => {
   const [showPassword, setShowPassword] = useState(false);
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
+  const { t } = useTranslation();
 
   const { login } = useAuth();
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      toastService.error('Login Error', 'Please fill in all fields');
+      toastService.error(t('auth.loginError'), t('auth.fillAllFields'));
       return;
     }
 
@@ -57,10 +59,13 @@ const LoginScreen = () => {
       if (result?.success) {
         router.replace('/search');
       } else {
-        toastService.error('Login Failed', result?.message || 'Login failed');
+        toastService.error(
+          t('auth.loginFailed'),
+          result?.message || t('auth.unexpectedError')
+        );
       }
     } catch (error) {
-      toastService.error('Error', 'An unexpected error occurred');
+      toastService.error(t('common.error'), t('auth.unexpectedError'));
     } finally {
       setIsLoading(false);
     }
@@ -88,22 +93,22 @@ const LoginScreen = () => {
               tintColor={theme.primary}
             />
             <Text style={[styles.welcomeText, { color: theme.textSecondary }]}>
-              Welcome back! Sign in to continue your journey
+              {t('auth.welcomeBack')}
             </Text>
             <Text style={styles.footerText}>
               <Text style={{ color: theme.textSecondary }}>
-                Don't have an account?{' '}
+                {t('auth.dontHaveAccount')}{' '}
               </Text>
               {isWeb ? (
                 <TouchableOpacity onPress={() => router.push('/auth/register')}>
                   <Text style={{ color: theme.primary, fontWeight: '600' }}>
-                    Sign Up
+                    {t('auth.signUp')}
                   </Text>
                 </TouchableOpacity>
               ) : (
                 <Link href="/auth/register" asChild>
                   <Text style={{ color: theme.primary, fontWeight: '600' }}>
-                    Sign Up
+                    {t('auth.signUp')}
                   </Text>
                 </Link>
               )}
@@ -115,13 +120,13 @@ const LoginScreen = () => {
             style={[styles.formSection, { backgroundColor: theme.surface }]}
           >
             <Text style={[styles.formTitle, { color: theme.text }]}>
-              Sign In
+              {t('auth.signIn')}
             </Text>
 
             {/* Email Input */}
             <View style={styles.inputGroup}>
               <Text style={[styles.inputLabel, { color: theme.text }]}>
-                Email Address
+                {t('auth.emailAddress')}
               </Text>
               <View
                 style={[
@@ -135,7 +140,7 @@ const LoginScreen = () => {
                 <Mail size={20} color={theme.textSecondary} />
                 <TextInput
                   style={[styles.input, { color: theme.text }]}
-                  placeholder="Enter your email"
+                  placeholder={t('auth.enterEmail')}
                   placeholderTextColor={theme.textSecondary}
                   value={email}
                   onChangeText={setEmail}
@@ -156,7 +161,7 @@ const LoginScreen = () => {
             {/* Password Input */}
             <View style={styles.inputGroup}>
               <Text style={[styles.inputLabel, { color: theme.text }]}>
-                Password
+                {t('auth.password')}
               </Text>
               <View
                 style={[
@@ -170,7 +175,7 @@ const LoginScreen = () => {
                 <Lock size={20} color={theme.textSecondary} />
                 <TextInput
                   style={[styles.input, { color: theme.text }]}
-                  placeholder="Enter your password"
+                  placeholder={t('auth.enterPassword')}
                   placeholderTextColor={theme.textSecondary}
                   value={password}
                   onChangeText={setPassword}
@@ -202,11 +207,15 @@ const LoginScreen = () => {
                 <TouchableOpacity
                   onPress={() => router.push('/auth/forgot-password')}
                 >
-                  <Text style={{ color: theme.primary }}>Forgot Password?</Text>
+                  <Text style={{ color: theme.primary }}>
+                    {t('auth.forgotPassword')}
+                  </Text>
                 </TouchableOpacity>
               ) : (
                 <Link href="/auth/forgot-password" asChild>
-                  <Text style={{ color: theme.primary }}>Forgot Password?</Text>
+                  <Text style={{ color: theme.primary }}>
+                    {t('auth.forgotPassword')}
+                  </Text>
                 </Link>
               )}
             </TouchableOpacity>
@@ -224,7 +233,9 @@ const LoginScreen = () => {
                 {isLoading ? (
                   <ActivityIndicator color="white" />
                 ) : (
-                  <Text style={styles.signInButtonText}>Sign In</Text>
+                  <Text style={styles.signInButtonText}>
+                    {t('auth.signIn')}
+                  </Text>
                 )}
               </LinearGradient>
             </TouchableOpacity>

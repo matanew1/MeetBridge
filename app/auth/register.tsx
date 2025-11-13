@@ -105,6 +105,23 @@ const RegisterScreen = () => {
           ageRange: [18, 99] as [number, number],
           maxDistance: 500, // default to 500m
         },
+        settings: {
+          notifications: {
+            pushEnabled: true,
+            messageNotifications: true,
+            matchNotifications: true,
+          },
+          privacy: {
+            showOnlineStatus: true,
+            locationSharing: true,
+            profileVisibility: 'public' as 'public' | 'matches' | 'private',
+            dataSharing: true,
+          },
+          appearance: {
+            language: 'en', // Default to English
+            theme: 'system' as 'light' | 'dark' | 'system',
+          },
+        },
       };
 
       const result = await register(userData);

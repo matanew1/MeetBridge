@@ -3,8 +3,6 @@ import {
   Search,
   MessageCircleMore,
   HeartHandshake,
-  Moon,
-  Sun,
   Bell,
   BellOff,
   Binoculars,
@@ -50,7 +48,7 @@ import {
 
 export default function TabLayout() {
   const { t } = useTranslation();
-  const { isDarkMode, toggleDarkMode } = useTheme();
+  const { isDarkMode } = useTheme();
   const { user } = useAuth();
   const router = useRouter();
   const theme = isDarkMode ? darkTheme : lightTheme;
@@ -273,32 +271,6 @@ export default function TabLayout() {
             </View>
           </View>
           <View style={styles.headerRight}>
-            <TouchableOpacity
-              style={[
-                styles.darkModeButton,
-                {
-                  backgroundColor: theme.primaryVariant,
-                  width: isTablet ? scale(48) : scale(44),
-                  height: isTablet ? scale(48) : scale(44),
-                  borderRadius: isTablet ? scale(24) : scale(22),
-                },
-              ]}
-              onPress={toggleDarkMode}
-              activeOpacity={0.7}
-            >
-              {isDarkMode ? (
-                <Sun
-                  size={isTablet ? scale(24) : scale(20)}
-                  color={theme.primary}
-                />
-              ) : (
-                <Moon
-                  size={isTablet ? scale(24) : scale(20)}
-                  color={theme.primary}
-                />
-              )}
-            </TouchableOpacity>
-
             {/* Claims Notification Bell */}
             <Animated.View style={{ transform: [{ scale: bellScaleAnim }] }}>
               <TouchableOpacity

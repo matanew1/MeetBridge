@@ -1595,9 +1595,7 @@ class MissedConnectionsService {
     }
   }
 
-  async getPendingClaimsForUser(
-    userId: string
-  ): Promise<{
+  async getPendingClaimsForUser(userId: string): Promise<{
     success: boolean;
     data: Array<MissedConnectionClaim>;
     message: string;
@@ -1997,6 +1995,104 @@ class MissedConnectionsService {
       });
 
       callback(requests);
+    });
+  }
+
+  /**
+   * Subscribe to user's own posts (real-time)
+   */
+  subscribeToUserPosts(
+    userId: string,
+    callback: (posts: MissedConnection[]) => void,
+    limitCount: number = 50
+  ): Unsubscribe {
+    const q = query(
+      collection(db, 'missed_connections'),
+      where('userId', '==', userId),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
+
+    return onSnapshot(q, (snapshot) => {
+      const posts: MissedConnection[] = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          userId: data.userId,
+          userName: data.userName,
+          userImage: data.userImage,
+          location: data.location,
+          description: data.description,
+          tags: data.tags || [],
+          images: data.images || [],
+          timeOccurred: convertTimestamp(data.timeOccurred),
+          createdAt: convertTimestamp(data.createdAt),
+          likes: data.likes || 0,
+          likedBy: data.likedBy || [],
+          views: data.views || 0,
+          viewedBy: data.viewedBy || [],
+          claims: data.claims || 0,
+          comments: data.comments || 0,
+          claimed: data.claimed || false,
+          claimedBy: data.claimedBy,
+          verified: data.verified || false,
+          isAnonymous: data.isAnonymous || false,
+          isEdited: data.isEdited || false,
+          editedAt: data.editedAt ? convertTimestamp(data.editedAt) : undefined,
+          savedBy: data.savedBy || [],
+        };
+      });
+
+      callback(posts);
+    });
+  }
+
+  /**
+   * Subscribe to user's saved posts (real-time)
+   */
+  subscribeToSavedPosts(
+    userId: string,
+    callback: (posts: MissedConnection[]) => void,
+    limitCount: number = 50
+  ): Unsubscribe {
+    const q = query(
+      collection(db, 'missed_connections'),
+      where('savedBy', 'array-contains', userId),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
+
+    return onSnapshot(q, (snapshot) => {
+      const posts: MissedConnection[] = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          userId: data.userId,
+          userName: data.userName,
+          userImage: data.userImage,
+          location: data.location,
+          description: data.description,
+          tags: data.tags || [],
+          images: data.images || [],
+          timeOccurred: convertTimestamp(data.timeOccurred),
+          createdAt: convertTimestamp(data.createdAt),
+          likes: data.likes || 0,
+          likedBy: data.likedBy || [],
+          views: data.views || 0,
+          viewedBy: data.viewedBy || [],
+          claims: data.claims || 0,
+          comments: data.comments || 0,
+          claimed: data.claimed || false,
+          claimedBy: data.claimedBy,
+          verified: data.verified || false,
+          isAnonymous: data.isAnonymous || false,
+          isEdited: data.isEdited || false,
+          editedAt: data.editedAt ? convertTimestamp(data.editedAt) : undefined,
+          savedBy: data.savedBy || [],
+        };
+      });
+
+      callback(posts);
     });
   }
 

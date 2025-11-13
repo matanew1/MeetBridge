@@ -28,6 +28,24 @@ export interface User {
     maxDistance: number; // Max distance in METERS
     interestedIn: 'male' | 'female'; // Only male or female, no "both" option
   };
+  // Settings preferences
+  settings?: {
+    notifications: {
+      pushEnabled: boolean;
+      messageNotifications: boolean;
+      matchNotifications: boolean;
+    };
+    privacy: {
+      showOnlineStatus: boolean;
+      locationSharing: boolean;
+      profileVisibility: 'public' | 'matches' | 'private';
+      dataSharing: boolean;
+    };
+    appearance: {
+      language: string; // ISO language code (e.g., 'en', 'es', 'fr')
+      theme: 'light' | 'dark' | 'system';
+    };
+  };
   notificationsEnabled?: boolean;
   pushToken?: string;
   isProfileComplete?: boolean; // Track if user has completed initial profile setup
