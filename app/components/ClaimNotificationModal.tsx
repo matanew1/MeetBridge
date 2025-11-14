@@ -75,6 +75,9 @@ export default function ClaimNotificationModal({
   const [processingNotificationId, setProcessingNotificationId] = useState<
     string | null
   >(null);
+  const [chatRequestUsers, setChatRequestUsers] = useState<{
+    [key: string]: any;
+  }>({});
 
   const handleAccept = async (
     claim: MissedConnectionClaim & { connection?: MissedConnection }
@@ -191,6 +194,48 @@ export default function ClaimNotificationModal({
     return date.toLocaleDateString();
   };
 
+  // Fetch user data for chat requests
+  useEffect(() => {
+    const fetchChatRequestUsers = async () => {
+      if (!chatRequests.length) return;
+
+      const userPromises = chatRequests.map(async (request) => {
+        const otherUserId = request.users?.find(
+          (id: string) => id !== request.receiver
+        );
+        if (otherUserId && !chatRequestUsers[otherUserId]) {
+          try {
+            const userDoc = await getDoc(doc(db, 'users', otherUserId));
+            if (userDoc.exists()) {
+              return {
+                userId: otherUserId,
+                userData: { id: userDoc.id, ...userDoc.data() },
+              };
+            }
+          } catch (error) {
+            console.error('Error fetching user data for chat request:', error);
+          }
+        }
+        return null;
+      });
+
+      const userResults = await Promise.all(userPromises);
+      const newUsers: { [key: string]: any } = {};
+
+      userResults.forEach((result) => {
+        if (result) {
+          newUsers[result.userId] = result.userData;
+        }
+      });
+
+      if (Object.keys(newUsers).length > 0) {
+        setChatRequestUsers((prev) => ({ ...prev, ...newUsers }));
+      }
+    };
+
+    fetchChatRequestUsers();
+  }, [chatRequests, chatRequestUsers]);
+
   return (
     <Modal
       visible={visible}
@@ -251,6 +296,7 @@ export default function ClaimNotificationModal({
                   const otherUserId = request.users?.find(
                     (id: string) => id !== request.receiver
                   );
+                  const otherUserData = chatRequestUsers[otherUserId];
                   return (
                     <TouchableOpacity
                       key={request.id}
@@ -265,12 +311,27 @@ export default function ClaimNotificationModal({
                       onPress={() => onChatRequestClick(request)}
                     >
                       <View style={styles.chatRequestContent}>
-                        <MessageCircle size={scale(24)} color={theme.primary} />
+                        <TouchableOpacity
+                          onPress={() => onChatRequestClick(request)}
+                          activeOpacity={0.7}
+                        >
+                          <Image
+                            source={
+                              otherUserData?.image
+                                ? { uri: otherUserData.image }
+                                : require('../../assets/images/placeholder.png')
+                            }
+                            style={[
+                              styles.chatRequestAvatar,
+                              { borderColor: theme.primary },
+                            ]}
+                          />
+                        </TouchableOpacity>
                         <View style={{ flex: 1, marginLeft: spacing.md }}>
                           <Text
                             style={[styles.claimerName, { color: theme.text }]}
                           >
-                            Chat Request 💬
+                            {otherUserData?.name || 'Chat Request'} 💬
                           </Text>
                           <Text
                             style={[
@@ -278,7 +339,9 @@ export default function ClaimNotificationModal({
                               { color: theme.textSecondary },
                             ]}
                           >
-                            Someone wants to chat with you!
+                            {otherUserData
+                              ? `From ${otherUserData.name}`
+                              : 'Someone wants to chat with you!'}
                           </Text>
                         </View>
                         <Check size={scale(20)} color={theme.primary} />
@@ -893,5 +956,11 @@ const styles = StyleSheet.create({
   deleteText: {
     fontSize: moderateScale(14),
     fontWeight: '600',
+  },
+  chatRequestAvatar: {
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(20),
+    borderWidth: 2,
   },
 });

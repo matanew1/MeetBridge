@@ -1,6 +1,6 @@
 // app/components/MapViewComponent.tsx
 // Using Leaflet (OpenStreetMap) - 100% FREE, No API keys needed!
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -8,10 +8,12 @@ import {
   Text,
   Dimensions,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { MapPin, Navigation } from 'lucide-react-native';
+import { MapPin, Navigation, RefreshCw } from 'lucide-react-native';
 import { Theme } from '../../constants/theme';
+import * as Location from 'expo-location';
 
 const { width, height } = Dimensions.get('window');
 
@@ -45,10 +47,130 @@ const MapViewComponent: React.FC<MapViewComponentProps> = ({
   isVisible = true,
 }) => {
   const webViewRef = useRef<WebView>(null);
+  const spinValue = useRef(new Animated.Value(0)).current;
+  const spinAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
   const [isMapReady, setIsMapReady] = React.useState(false);
+  const [currentLocation, setCurrentLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+  const [isRefreshingLocation, setIsRefreshingLocation] = useState(false);
 
-  // User's current location
+  // Spinning animation for refresh button
+  useEffect(() => {
+    if (isRefreshingLocation) {
+      // Start spinning animation
+      spinAnimationRef.current = Animated.loop(
+        Animated.timing(spinValue, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        })
+      );
+      spinAnimationRef.current.start();
+    } else {
+      // Stop spinning animation and reset to 0
+      if (spinAnimationRef.current) {
+        spinAnimationRef.current.stop();
+        spinAnimationRef.current = null;
+      }
+      spinValue.setValue(0);
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (spinAnimationRef.current) {
+        spinAnimationRef.current.stop();
+      }
+    };
+  }, [isRefreshingLocation, spinValue]);
+
+  // Get current location on mount and set up location watching
+  useEffect(() => {
+    let locationSubscription: Location.LocationSubscription | null = null;
+
+    const getCurrentLocation = async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          console.warn('Location permission denied');
+          return;
+        }
+
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
+
+        setCurrentLocation({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        });
+      } catch (error) {
+        console.error('Error getting current location:', error);
+      }
+    };
+
+    const watchLocation = async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') return;
+
+        locationSubscription = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.High,
+            timeInterval: 10000, // Update every 10 seconds
+            distanceInterval: 10, // Update when moved 10 meters
+          },
+          (location) => {
+            setCurrentLocation({
+              latitude: location.coords.latitude,
+              longitude: location.coords.longitude,
+            });
+          }
+        );
+
+        return () => {
+          // No heading subscription to remove
+        };
+      } catch (error) {
+        console.error('Error watching location:', error);
+      }
+    };
+
+    getCurrentLocation();
+    watchLocation();
+
+    return () => {
+      if (locationSubscription) {
+        locationSubscription.remove();
+      }
+    };
+  }, []);
+
+  // Refresh current location
+  const refreshLocation = async () => {
+    setIsRefreshingLocation(true);
+    try {
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      setCurrentLocation({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+    } catch (error) {
+      console.error('Error refreshing location:', error);
+    } finally {
+      setIsRefreshingLocation(false);
+    }
+  };
+
+  // User's current location - prioritize real-time location over cached
   const userLocation = useMemo(() => {
+    if (currentLocation) {
+      return currentLocation;
+    }
     if (currentUser?.coordinates) {
       return {
         latitude: currentUser.coordinates.latitude,
@@ -56,7 +178,7 @@ const MapViewComponent: React.FC<MapViewComponentProps> = ({
       };
     }
     return null;
-  }, [currentUser]);
+  }, [currentLocation, currentUser]);
 
   // Filter profiles with valid coordinates
   const validProfiles = useMemo(() => {
@@ -491,6 +613,40 @@ const MapViewComponent: React.FC<MapViewComponentProps> = ({
         </TouchableOpacity>
       )}
 
+      {/* Refresh location button - only show when visible */}
+      {isVisible && (
+        <TouchableOpacity
+          style={[
+            styles.refreshButton,
+            {
+              backgroundColor: theme.surface,
+              shadowColor: theme.shadow,
+            },
+          ]}
+          onPress={refreshLocation}
+          disabled={isRefreshingLocation}
+          activeOpacity={0.8}
+        >
+          <Animated.View
+            style={{
+              transform: [
+                {
+                  rotate: spinValue.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0deg', '360deg'],
+                  }),
+                },
+              ],
+            }}
+          >
+            <RefreshCw
+              size={24}
+              color={isRefreshingLocation ? theme.textSecondary : theme.primary}
+            />
+          </Animated.View>
+        </TouchableOpacity>
+      )}
+
       {/* Profile count badge - only show when visible */}
       {isVisible && (
         <View
@@ -571,6 +727,7 @@ const styles = StyleSheet.create({
     elevation: 8,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
+    marginBottom: 16, // Add margin bottom
   },
   countBadge: {
     position: 'absolute',
@@ -592,6 +749,23 @@ const styles = StyleSheet.create({
   countText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  refreshButton: {
+    position: 'absolute',
+    bottom: 170,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    marginBottom: 16, // Add margin bottom
   },
 });
 

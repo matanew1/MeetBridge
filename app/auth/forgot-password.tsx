@@ -20,6 +20,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import toastService from '../../services/toastService';
+import { useTranslation } from 'react-i18next';
 
 // Platform check helper
 const isWeb = Platform.OS === 'web';
@@ -33,17 +34,18 @@ const ForgotPasswordScreen = () => {
   const [emailSent, setEmailSent] = useState(false);
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
+  const { t } = useTranslation();
 
   const { forgotPassword } = useAuth();
 
   const handleForgotPassword = async () => {
     if (!email.trim()) {
-      toastService.error('Error', 'Please enter your email address');
+      toastService.error('Error', t('auth.pleaseEnterEmail'));
       return;
     }
 
     if (!/\S+@\S+\.\S+/.test(email)) {
-      toastService.error('Error', 'Please enter a valid email address');
+      toastService.error('Error', t('auth.invalidEmail'));
       return;
     }
 
@@ -54,16 +56,16 @@ const ForgotPasswordScreen = () => {
         setEmailSent(true);
         toastService.success(
           'Success',
-          result?.message || 'Password reset email sent'
+          result?.message || t('auth.resetEmailSent')
         );
       } else {
         toastService.error(
           'Error',
-          result?.message || 'Failed to send reset email'
+          result?.message || t('auth.resetEmailFailed')
         );
       }
     } catch (error) {
-      toastService.error('Error', 'An unexpected error occurred');
+      toastService.error('Error', t('auth.unexpectedError'));
     } finally {
       setIsLoading(false);
     }
@@ -103,12 +105,12 @@ const ForgotPasswordScreen = () => {
             />
 
             <Text style={[styles.title, { color: theme.text }]}>
-              Forgot Password?
+              {t('auth.forgotPasswordTitle')}
             </Text>
             <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
               {emailSent
-                ? "We've sent a password reset link to your email"
-                : "No worries! Enter your email and we'll send you a reset link"}
+                ? t('auth.forgotPasswordSentSubtitle')
+                : t('auth.forgotPasswordSubtitle')}
             </Text>
           </View>
 
@@ -120,7 +122,7 @@ const ForgotPasswordScreen = () => {
               <>
                 <View style={styles.inputGroup}>
                   <Text style={[styles.inputLabel, { color: theme.text }]}>
-                    Email Address
+                    {t('auth.emailAddress')}
                   </Text>
                   <View
                     style={[
@@ -134,7 +136,7 @@ const ForgotPasswordScreen = () => {
                     <Mail size={20} color={theme.textSecondary} />
                     <TextInput
                       style={[styles.input, { color: theme.text }]}
-                      placeholder="Enter your email"
+                      placeholder={t('auth.enterEmail')}
                       placeholderTextColor={theme.textSecondary}
                       value={email}
                       onChangeText={setEmail}
@@ -161,7 +163,7 @@ const ForgotPasswordScreen = () => {
                       <ActivityIndicator color="white" />
                     ) : (
                       <Text style={styles.resetButtonText}>
-                        Send Reset Link
+                        {t('auth.sendResetLink')}
                       </Text>
                     )}
                   </LinearGradient>
@@ -178,13 +180,12 @@ const ForgotPasswordScreen = () => {
                   <CheckCircle size={60} color={theme.success} />
                 </View>
                 <Text style={[styles.successTitle, { color: theme.text }]}>
-                  Email Sent!
+                  {t('auth.emailSentTitle')}
                 </Text>
                 <Text
                   style={[styles.successText, { color: theme.textSecondary }]}
                 >
-                  Check your inbox and follow the instructions to reset your
-                  password.
+                  {t('auth.emailSentDescription')}
                 </Text>
                 <TouchableOpacity
                   style={styles.resetButton}
@@ -195,7 +196,7 @@ const ForgotPasswordScreen = () => {
                     style={styles.buttonGradient}
                   >
                     <Text style={styles.resetButtonText}>
-                      Send Another Email
+                      {t('auth.sendAnotherEmail')}
                     </Text>
                   </LinearGradient>
                 </TouchableOpacity>
@@ -206,17 +207,17 @@ const ForgotPasswordScreen = () => {
           {/* Footer */}
           <View style={styles.footer}>
             <Text style={[styles.footerText, { color: theme.textSecondary }]}>
-              Remember your password?{' '}
+              {t('auth.rememberPassword')}{' '}
               {isWeb ? (
                 <TouchableOpacity onPress={() => router.push('/auth/login')}>
                   <Text style={{ color: theme.primary, fontWeight: '600' }}>
-                    Back to Sign In
+                    {t('auth.backToSignIn')}
                   </Text>
                 </TouchableOpacity>
               ) : (
                 <Link href="/auth/login" asChild>
                   <Text style={{ color: theme.primary, fontWeight: '600' }}>
-                    Back to Sign In
+                    {t('auth.backToSignIn')}
                   </Text>
                 </Link>
               )}

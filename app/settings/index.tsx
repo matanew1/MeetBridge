@@ -179,9 +179,6 @@ const Settings: React.FC = () => {
   const [matchNotifications, setMatchNotifications] = useState(
     user?.settings?.notifications?.matchNotifications ?? true
   );
-  const [locationEnabled, setLocationEnabled] = useState(
-    user?.settings?.privacy?.locationSharing ?? true
-  );
   const [showOnlineStatus, setShowOnlineStatus] = useState(
     user?.settings?.privacy?.showOnlineStatus ?? true
   );
@@ -195,10 +192,11 @@ const Settings: React.FC = () => {
     []
   );
   const [loadingBlockedUsers, setLoadingBlockedUsers] = useState(false);
+  const [isUserInteraction, setIsUserInteraction] = useState(false);
 
-  // Update settings when user data changes
+  // Update settings when user data changes (but not during user interactions)
   useEffect(() => {
-    if (user?.settings) {
+    if (user?.settings && !isUserInteraction) {
       setNotificationsEnabled(user.settings.notifications?.pushEnabled ?? true);
       setMessageNotifications(
         user.settings.notifications?.messageNotifications ?? true
@@ -206,7 +204,6 @@ const Settings: React.FC = () => {
       setMatchNotifications(
         user.settings.notifications?.matchNotifications ?? true
       );
-      setLocationEnabled(user.settings.privacy?.locationSharing ?? true);
       setShowOnlineStatus(user.settings.privacy?.showOnlineStatus ?? true);
 
       // Sync theme preference from Firebase
@@ -374,11 +371,13 @@ const Settings: React.FC = () => {
       await updateProfile({ settings: updatedSettings });
       toastService.success(
         t('settings.saveSuccess'),
-        t('settings.saveSuccess')
+        t('settings.notificationSettingsSaved')
       );
     } catch (error) {
       console.error('Error saving notification settings:', error);
       toastService.error(t('common.error'), t('settings.saveError'));
+      // Revert on error
+      setIsUserInteraction(false);
     }
   };
 
@@ -393,11 +392,13 @@ const Settings: React.FC = () => {
       await updateProfile({ settings: updatedSettings });
       toastService.success(
         t('settings.saveSuccess'),
-        t('settings.updateSuccess')
+        t('settings.privacySettingsSaved')
       );
     } catch (error) {
       console.error('Error saving privacy settings:', error);
       toastService.error(t('common.error'), t('settings.saveError'));
+      // Revert on error
+      setIsUserInteraction(false);
     }
   };
 
@@ -559,37 +560,6 @@ const Settings: React.FC = () => {
             onPress={() => setShowPrivacySettings(true)}
           />
           <SettingItem
-            icon={<MapPin />}
-            title={t('settings.locationServices')}
-            subtitle={
-              locationEnabled ? t('settings.enabled') : t('settings.disabled')
-            }
-            showChevron={false}
-            rightElement={
-              <Switch
-                value={locationEnabled}
-                onValueChange={(value) => {
-                  setLocationEnabled(value);
-                  setTimeout(() => {
-                    handleSavePrivacySettings({
-                      privacy: {
-                        showOnlineStatus: showOnlineStatus,
-                        locationSharing: value,
-                        profileVisibility:
-                          user?.settings?.privacy?.profileVisibility ||
-                          'public',
-                        dataSharing:
-                          user?.settings?.privacy?.dataSharing ?? true,
-                      },
-                    });
-                  }, 500);
-                }}
-                trackColor={{ false: theme.border, true: theme.primary }}
-                thumbColor={theme.surface}
-              />
-            }
-          />
-          <SettingItem
             icon={<Ban />}
             title={t('settings.blockedUsers')}
             subtitle={t('settings.blockedUsersCount', {
@@ -609,11 +579,11 @@ const Settings: React.FC = () => {
             rightElement={
               <Switch
                 value={showOnlineStatus}
-                onValueChange={(value) => {
+                onValueChange={async (value) => {
+                  setIsUserInteraction(true);
                   setShowOnlineStatus(value);
-                  // Save privacy settings
-                  setTimeout(() => {
-                    handleSavePrivacySettings({
+                  try {
+                    await handleSavePrivacySettings({
                       privacy: {
                         showOnlineStatus: value,
                         locationSharing: locationEnabled,
@@ -624,7 +594,9 @@ const Settings: React.FC = () => {
                           user?.settings?.privacy?.dataSharing ?? true,
                       },
                     });
-                  }, 500);
+                  } finally {
+                    setTimeout(() => setIsUserInteraction(false), 1000);
+                  }
                 }}
                 trackColor={{ false: theme.border, true: theme.primary }}
                 thumbColor={theme.surface}
@@ -647,10 +619,14 @@ const Settings: React.FC = () => {
             rightElement={
               <Switch
                 value={notificationsEnabled}
-                onValueChange={(value) => {
+                onValueChange={async (value) => {
+                  setIsUserInteraction(true);
                   setNotificationsEnabled(value);
-                  // Auto-save after a short delay to avoid too many saves
-                  setTimeout(() => handleSaveNotificationSettings(), 500);
+                  try {
+                    await handleSaveNotificationSettings();
+                  } finally {
+                    setTimeout(() => setIsUserInteraction(false), 1000);
+                  }
                 }}
                 trackColor={{ false: theme.border, true: theme.primary }}
                 thumbColor={theme.surface}
@@ -665,9 +641,14 @@ const Settings: React.FC = () => {
             rightElement={
               <Switch
                 value={messageNotifications}
-                onValueChange={(value) => {
+                onValueChange={async (value) => {
+                  setIsUserInteraction(true);
                   setMessageNotifications(value);
-                  setTimeout(() => handleSaveNotificationSettings(), 500);
+                  try {
+                    await handleSaveNotificationSettings();
+                  } finally {
+                    setTimeout(() => setIsUserInteraction(false), 1000);
+                  }
                 }}
                 trackColor={{ false: theme.border, true: theme.primary }}
                 thumbColor={theme.surface}
@@ -683,9 +664,14 @@ const Settings: React.FC = () => {
             rightElement={
               <Switch
                 value={matchNotifications}
-                onValueChange={(value) => {
+                onValueChange={async (value) => {
+                  setIsUserInteraction(true);
                   setMatchNotifications(value);
-                  setTimeout(() => handleSaveNotificationSettings(), 500);
+                  try {
+                    await handleSaveNotificationSettings();
+                  } finally {
+                    setTimeout(() => setIsUserInteraction(false), 1000);
+                  }
                 }}
                 trackColor={{ false: theme.border, true: theme.primary }}
                 thumbColor={theme.surface}

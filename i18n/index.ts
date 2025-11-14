@@ -118,6 +118,38 @@ const resources = {
         meters: 'm',
       },
 
+      // Connections Screen
+      connections: {
+        title: 'Connections',
+        matches: 'Matches',
+        posts: 'Posts',
+        noMatches: 'No matches yet',
+        startSwiping: 'Start swiping to find matches',
+        noPosts: 'No posts yet',
+        createPost: 'Create your first post',
+        comments: {
+          noComments: 'No comments yet. Be the first to comment!',
+          addComment: 'Add a comment...',
+          anonymous: 'Anonymous',
+          public: 'Public',
+          justNow: 'Just now',
+          minutesAgo: '{{count}}m ago',
+          hoursAgo: '{{count}}h ago',
+          yesterday: 'Yesterday',
+          daysAgo: '{{count}}d ago',
+          signInRequired: 'Sign In Required',
+          signInToComment: 'Please sign in to comment.',
+          failedToSendComment: 'Failed to send comment',
+          claimConnectionTitle: "That's You? 🎯",
+          claimConnectionMessage:
+            "By claiming this connection, you're saying you were at this location at the specified time.\n\n💡 Verification:\n• We'll check your location history (if enabled)\n• Post creator will review your claim\n• Multiple false claims may affect your credibility\n\nAre you sure you were there?",
+          claimSubmitted: 'Claim Submitted! ✨',
+          claimSubmittedMessage:
+            "The post creator will be notified. If they confirm, you'll both be matched!",
+          failedToClaim: 'Failed to claim connection',
+        },
+      },
+
       // Settings & Theme
       settings: {
         title: 'Settings',
@@ -205,6 +237,10 @@ const resources = {
         registrationFailed: 'Registration Failed',
         completeProfile: 'Complete Your Profile',
         profileCompletionRequired: 'Please complete your profile to continue',
+        profileSetupDescription:
+          "Let's set up your profile so you can start meeting amazing people!",
+        profileCompleted: 'Profile Completed!',
+        profileCompletedSubtext: 'Get ready to explore...',
         saveProfile: 'Save Profile',
         profileSaved: 'Profile saved successfully',
         profileSaveError: 'Failed to save profile',
@@ -212,7 +248,142 @@ const resources = {
         resetInstructions: 'Enter your email to receive reset instructions',
         sendResetEmail: 'Send Reset Email',
         resetEmailSent: 'Reset email sent successfully',
+        resetEmailFailed: 'Failed to send reset email',
+        forgotPasswordTitle: 'Forgot Password?',
+        forgotPasswordSubtitle:
+          "No worries! Enter your email and we'll send you a reset link",
+        forgotPasswordSentSubtitle:
+          "We've sent a password reset link to your email",
+        emailAddress: 'Email Address',
+        enterEmail: 'Enter your email',
+        sendResetLink: 'Send Reset Link',
+        emailSentTitle: 'Email Sent!',
+        emailSentDescription:
+          'Check your inbox and follow the instructions to reset your password.',
+        sendAnotherEmail: 'Send Another Email',
+        rememberPassword: 'Remember your password?',
+        backToSignIn: 'Back to Sign In',
         backToLogin: 'Back to Login',
+        // Validation messages
+        pleaseEnterEmail: 'Please enter your email',
+        invalidEmail: 'Please enter a valid email address',
+        passwordTooShort: 'Password must be at least 6 characters long',
+        passwordsDoNotMatch: 'Passwords do not match',
+        unexpectedError: 'An unexpected error occurred',
+        loginFailed: 'Login Failed',
+        registrationFailed: 'Registration Failed',
+        profileSaveError: 'Failed to save profile',
+        profileSaved: 'Profile saved successfully',
+      },
+
+      // Onboarding Tutorial
+      onboarding: {
+        welcomeTitle: 'Welcome to MeetBridge! 🎉',
+        welcomeDescription:
+          'Find meaningful connections with people nearby. Let us show you how it works!',
+        discoverTitle: 'Discover Matches',
+        discoverDescription:
+          "Browse through profiles of people near you. Use filters to find exactly who you're looking for.",
+        likeTitle: 'Like & Connect',
+        likeDescription:
+          "Like profiles that interest you. When they like you back, it's a match! Your matches appear in the Loved tab.",
+        chatTitle: 'Start Chatting',
+        chatDescription:
+          'Once matched, start a conversation! Send messages, share your interests, and get to know each other.',
+        locationTitle: 'Location-Based',
+        locationDescription:
+          'We use your location to show you people nearby. You can adjust the distance in your preferences.',
+        connectionsTitle: 'Manage Connections',
+        connectionsDescription:
+          'View all your connections, see who liked you, and keep track of your conversations in one place.',
+      },
+
+      // Icebreaker Suggestions
+      icebreakers: {
+        breakTheIce: 'Break the ice 💬',
+        dismiss: 'Dismiss',
+      },
+
+      // Error Boundary
+      errors: {
+        somethingWentWrong: 'Oops! Something went wrong',
+        unexpectedError: 'An unexpected error occurred',
+        tryAgain: 'Try Again',
+      },
+
+      // Interest Tag Picker
+      interests: {
+        maximumReached: 'Maximum Reached',
+        maxInterestsMessage: 'You can select up to {{count}} interests.',
+      },
+
+      // Match Animation
+      match: {
+        itsAMatch: "It's a Match!",
+        likedEachOther: 'You and {{name}} liked each other',
+        sendMessage: 'Send Message',
+      },
+
+      // Temp Match Modal
+      tempMatch: {
+        chatRequest: 'Chat Request 💬',
+        missedMatchTitle: "It's a Missed Match! 🎉",
+        conversationCreated:
+          'Conversation created! Check your Missed tab to start chatting!',
+        requestSent: 'Request Sent! ✅',
+        waitingForAcceptance: 'Waiting for the other person to accept...',
+        acceptFailed: 'Failed to accept request',
+        requestDeclined: 'Request Declined',
+        requestDeclinedMessage: 'The chat request has been declined',
+        declineFailed: 'Failed to decline request',
+        youLabel: 'You',
+        acceptedStatus: '✓ Accepted',
+        pendingStatus: '⏳ Pending',
+        infoText:
+          "💡 Both of you must accept to start chatting. They'll receive a notification about your request.",
+        declineButton: 'Decline',
+        acceptButton: 'Accept Request',
+        waitingForAcceptance: 'Waiting for {{name}} to accept...',
+      },
+
+      // Comments Section
+      comments: {
+        commentsTitle: 'Comments',
+        noComments: 'No comments yet',
+        addComment: 'Add a comment',
+        commentPlaceholder: 'Write a comment...',
+        postComment: 'Post',
+        anonymous: 'Anonymous',
+        public: 'Public',
+        justNow: 'Just now',
+        minutesAgo: '{{count}}m ago',
+        hoursAgo: '{{count}}h ago',
+        daysAgo: '{{count}}d ago',
+        signInRequired: 'Sign In Required',
+        signInToComment: 'Please sign in to comment',
+        signInToClaim: 'Please sign in to claim this connection',
+        claimConnection: 'Claim Connection',
+        claimSuccess: 'Connection claimed successfully!',
+        claimError: 'Failed to claim connection',
+        alreadyClaimed: 'This connection has already been claimed',
+        claimConfirmTitle: "That's You? 🎯",
+        claimConfirmMessage: 'Are you sure this is your connection?',
+        claimFailed: 'Failed to claim connection',
+        commentAdded: 'Comment added',
+        commentError: 'Failed to add comment',
+        deleteComment: 'Delete comment',
+        deleteConfirmTitle: 'Delete Comment',
+        deleteConfirmMessage: 'Are you sure you want to delete this comment?',
+        deleteSuccess: 'Comment deleted',
+        deleteError: 'Failed to delete comment',
+        reportComment: 'Report comment',
+        reportSuccess: 'Comment reported successfully',
+        reportError: 'Failed to report comment',
+        editComment: 'Edit comment',
+        saveChanges: 'Save changes',
+        cancelEdit: 'Cancel edit',
+        editSuccess: 'Comment updated',
+        editError: 'Failed to update comment',
       },
     },
   },
@@ -282,6 +453,27 @@ const resources = {
         startSwiping: 'התחל להחליק כדי למצוא התאמות',
         noPosts: 'אין פוסטים עדיין',
         createPost: 'צור את הפוסט הראשון שלך',
+        comments: {
+          noComments: 'אין תגובות עדיין. היה הראשון להגיב!',
+          addComment: 'הוסף תגובה...',
+          anonymous: 'אנונימי',
+          public: 'ציבורי',
+          justNow: 'כרגע',
+          minutesAgo: 'לפני {{count}} דקות',
+          hoursAgo: 'לפני {{count}} שעות',
+          yesterday: 'אתמול',
+          daysAgo: 'לפני {{count}} ימים',
+          signInRequired: 'נדרש התחברות',
+          signInToComment: 'אנא התחבר כדי להגיב.',
+          failedToSendComment: 'נכשל בשליחת התגובה',
+          claimConnectionTitle: 'זה אתה? 🎯',
+          claimConnectionMessage:
+            'על ידי תביעת קשר זה, אתה אומר שהיית במיקום זה בזמן המצוין.\n\n💡 אימות:\n• נבדוק את היסטוריית המיקום שלך (אם מופעל)\n• יוצר הפוסט יבדוק את התביעה שלך\n• תביעות שקר מרובות עלולות להשפיע על המהימנות שלך\n\nהאם אתה בטוח שהיית שם?',
+          claimSubmitted: 'התביעה נשלחה! ✨',
+          claimSubmittedMessage:
+            'יוצר הפוסט יקבל התראה. אם הוא יאשר, שניכם תתאימו!',
+          failedToClaim: 'נכשל בתביעת הקשר',
+        },
       },
 
       // Modals
@@ -390,6 +582,10 @@ const resources = {
         registrationFailed: 'הרשמה נכשלה',
         completeProfile: 'השלם את הפרופיל שלך',
         profileCompletionRequired: 'אנא השלם את הפרופיל שלך כדי להמשיך',
+        profileSetupDescription:
+          'בואו נגדיר את הפרופיל שלך כדי שתוכל להתחיל להכיר אנשים מדהימים!',
+        profileCompleted: 'הפרופיל הושלם!',
+        profileCompletedSubtext: 'התכונן לחקור...',
         saveProfile: 'שמור פרופיל',
         profileSaved: 'הפרופיל נשמר בהצלחה',
         profileSaveError: 'נכשל בשמירת הפרופיל',
@@ -397,7 +593,31 @@ const resources = {
         resetInstructions: 'הכנס את האימייל שלך כדי לקבל הוראות איפוס',
         sendResetEmail: 'שלח אימייל איפוס',
         resetEmailSent: 'אימייל איפוס נשלח בהצלחה',
+        resetEmailFailed: 'נכשל בשליחת אימייל איפוס',
+        forgotPasswordTitle: 'שכחת סיסמה?',
+        forgotPasswordSubtitle:
+          'אין דאגה! הכנס את האימייל שלך ונשלח לך קישור איפוס',
+        forgotPasswordSentSubtitle: 'שלחנו קישור איפוס סיסמה לאימייל שלך',
+        emailAddress: 'כתובת אימייל',
+        enterEmail: 'הכנס את האימייל שלך',
+        sendResetLink: 'שלח קישור איפוס',
+        emailSentTitle: 'אימייל נשלח!',
+        emailSentDescription:
+          'בדוק את תיבת הדואר שלך ועקוב אחר ההוראות לאיפוס הסיסמה.',
+        sendAnotherEmail: 'שלח אימייל נוסף',
+        rememberPassword: 'זוכר את הסיסמה?',
+        backToSignIn: 'חזור להתחברות',
         backToLogin: 'חזור להתחברות',
+        // Validation messages
+        pleaseEnterEmail: 'אנא הכנס את האימייל שלך',
+        invalidEmail: 'אנא הכנס כתובת אימייל תקינה',
+        passwordTooShort: 'הסיסמה חייבת להכיל לפחות 6 תווים',
+        passwordsDoNotMatch: 'הסיסמאות לא תואמות',
+        unexpectedError: 'אירעה שגיאה לא צפויה',
+        loginFailed: 'התחברות נכשלה',
+        registrationFailed: 'הרשמה נכשלה',
+        profileSaveError: 'נכשל בשמירת הפרופיל',
+        profileSaved: 'הפרופיל נשמר בהצלחה',
       },
 
       // Common
@@ -412,6 +632,116 @@ const resources = {
         no: 'לא',
         cancel: 'ביטול',
         unmatch: 'בטל התאמה',
+      },
+
+      // Onboarding Tutorial
+      onboarding: {
+        welcomeTitle: 'ברוך הבא ל-MeetBridge! 🎉',
+        welcomeDescription:
+          'מצא קשרים משמעותיים עם אנשים בקרבת מקום. בואו נראה לך איך זה עובד!',
+        discoverTitle: 'גלה התאמות',
+        discoverDescription:
+          'עיין בפרופילים של אנשים בקרבתך. השתמש בפילטרים כדי למצוא בדיוק את מי שאתה מחפש.',
+        likeTitle: 'אהב וצור קשר',
+        likeDescription:
+          'אהב פרופילים שמעניינים אותך. כשהם יאהבו אותך בחזרה, זו התאמה! ההתאמות שלך מופיעות בכרטיסייה Loved.',
+        chatTitle: 'התחל לשוחח',
+        chatDescription:
+          'לאחר התאמה, התחל שיחה! שלח הודעות, שתף את התחומי העניין שלך, והכר זה את זה.',
+        locationTitle: 'מבוסס מיקום',
+        locationDescription:
+          'אנו משתמשים במיקום שלך כדי להראות לך אנשים בקרבתך. אתה יכול להתאים את המרחק בהעדפות שלך.',
+        connectionsTitle: 'נהל קשרים',
+        connectionsDescription:
+          'צפה בכל הקשרים שלך, ראה מי אהב אותך, ועקב אחר השיחות שלך במקום אחד.',
+      },
+
+      // Icebreaker Suggestions
+      icebreakers: {
+        breakTheIce: 'שבור את הקרח 💬',
+        dismiss: 'סגור',
+      },
+
+      // Error Boundary
+      errors: {
+        somethingWentWrong: 'אופס! משהו השתבש',
+        unexpectedError: 'אירעה שגיאה לא צפויה',
+        tryAgain: 'נסה שוב',
+      },
+
+      // Interest Tag Picker
+      interests: {
+        maximumReached: 'הגעת למקסימום',
+        maxInterestsMessage: 'אתה יכול לבחור עד {{count}} תחומי עניין.',
+      },
+
+      // Match Animation
+      match: {
+        itsAMatch: 'יש התאמה!',
+        likedEachOther: 'אתה ו-{{name}} אהבתם זה את זה',
+        sendMessage: 'שלח הודעה',
+      },
+
+      // Temp Match Modal
+      tempMatch: {
+        chatRequest: "בקשת צ'אט 💬",
+        missedMatchTitle: 'זו התאמה מפספסת! 🎉',
+        conversationCreated:
+          'שיחה נוצרה! בדוק את הכרטיסייה Missed כדי להתחיל לשוחח!',
+        requestSent: 'בקשה נשלחה! ✅',
+        waitingForAcceptance: 'מחכה שהאדם השני יקבל...',
+        acceptFailed: 'נכשל בקבלת הבקשה',
+        requestDeclined: 'בקשה נדחתה',
+        requestDeclinedMessage: "בקשת הצ'אט נדחתה",
+        declineFailed: 'נכשל בדחיית הבקשה',
+        youLabel: 'אתה',
+        acceptedStatus: '✓ התקבל',
+        pendingStatus: '⏳ ממתין',
+        infoText:
+          '💡 שניכם חייבים לקבל כדי להתחיל לשוחח. הם יקבלו התראה על הבקשה שלך.',
+        declineButton: 'דחה',
+        acceptButton: 'קבל בקשה',
+        waitingForAcceptance: 'מחכה ש-{{name}} יקבל...',
+      },
+
+      // Comments Section
+      comments: {
+        commentsTitle: 'תגובות',
+        noComments: 'אין עדיין תגובות',
+        addComment: 'הוסף תגובה',
+        commentPlaceholder: 'כתוב תגובה...',
+        postComment: 'פרסם',
+        anonymous: 'אנונימי',
+        public: 'ציבורי',
+        justNow: 'כרגע',
+        minutesAgo: 'לפני {{count}} דק',
+        hoursAgo: 'לפני {{count}} שעות',
+        daysAgo: 'לפני {{count}} ימים',
+        signInRequired: 'נדרש כניסה',
+        signInToComment: 'היכנס כדי להגיב',
+        signInToClaim: 'היכנס כדי לתבוע קשר',
+        claimConnection: 'תבע קשר',
+        claimSuccess: 'הקשר נתבע בהצלחה!',
+        claimError: 'נכשל בתביעת הקשר',
+        alreadyClaimed: 'הקשר הזה כבר נתבע',
+        claimConfirmTitle: 'זה אתה? 🎯',
+        claimConfirmMessage: 'אתה בטוח שזה הקשר שלך?',
+        claimFailed: 'נכשל בתביעת הקשר',
+        commentAdded: 'תגובה נוספה',
+        commentError: 'נכשל בהוספת תגובה',
+        deleteComment: 'מחק תגובה',
+        deleteConfirmTitle: 'מחק תגובה',
+        deleteConfirmMessage: 'אתה בטוח שברצונך למחוק את התגובה הזו?',
+        deleteSuccess: 'תגובה נמחקה',
+        deleteError: 'נכשל במחיקת תגובה',
+        reportComment: 'דווח על תגובה',
+        reportSuccess: 'תגובה דווחה בהצלחה',
+        reportError: 'נכשל בדיווח על תגובה',
+        editComment: 'ערוך תגובה',
+        saveChanges: 'שמור שינויים',
+        cancelEdit: 'בטל עריכה',
+        editSuccess: 'תגובה עודכנה',
+        editError: 'נכשל בעדכון תגובה',
       },
     },
   },
@@ -573,6 +903,10 @@ const resources = {
         completeProfile: 'Завершите свой профиль',
         profileCompletionRequired:
           'Пожалуйста, завершите свой профиль, чтобы продолжить',
+        profileSetupDescription:
+          'Давайте настроим ваш профиль, чтобы вы могли начать знакомиться с удивительными людьми!',
+        profileCompleted: 'Профиль завершен!',
+        profileCompletedSubtext: 'Приготовьтесь к исследованию...',
         saveProfile: 'Сохранить профиль',
         profileSaved: 'Профиль успешно сохранен',
         profileSaveError: 'Не удалось сохранить профиль',
@@ -581,7 +915,33 @@ const resources = {
           'Введите ваш email, чтобы получить инструкции по сбросу',
         sendResetEmail: 'Отправить email для сброса',
         resetEmailSent: 'Email для сброса успешно отправлен',
+        resetEmailFailed: 'Не удалось отправить email для сброса',
+        forgotPasswordTitle: 'Забыли пароль?',
+        forgotPasswordSubtitle:
+          'Не волнуйтесь! Введите ваш email и мы отправим вам ссылку для сброса',
+        forgotPasswordSentSubtitle:
+          'Мы отправили ссылку для сброса пароля на ваш email',
+        emailAddress: 'Адрес электронной почты',
+        enterEmail: 'Введите ваш email',
+        sendResetLink: 'Отправить ссылку для сброса',
+        emailSentTitle: 'Email отправлен!',
+        emailSentDescription:
+          'Проверьте вашу почту и следуйте инструкциям для сброса пароля.',
+        sendAnotherEmail: 'Отправить другой email',
+        rememberPassword: 'Помните ваш пароль?',
+        backToSignIn: 'Вернуться к входу',
         backToLogin: 'Вернуться к входу',
+        // Validation messages
+        pleaseEnterEmail: 'Пожалуйста, введите ваш email',
+        invalidEmail:
+          'Пожалуйста, введите действительный адрес электронной почты',
+        passwordTooShort: 'Пароль должен содержать не менее 6 символов',
+        passwordsDoNotMatch: 'Пароли не совпадают',
+        unexpectedError: 'Произошла непредвиденная ошибка',
+        loginFailed: 'Вход не удался',
+        registrationFailed: 'Регистрация не удалась',
+        profileSaveError: 'Не удалось сохранить профиль',
+        profileSaved: 'Профиль успешно сохранен',
       },
 
       // Common
@@ -591,11 +951,122 @@ const resources = {
         retry: 'Попробовать снова',
         noData: 'Нет данных',
         comingSoon: 'Скоро',
-        ok: 'OK',
+        ok: 'ОК',
         yes: 'Да',
         no: 'Нет',
         cancel: 'Отмена',
         unmatch: 'Разорвать пару',
+      },
+
+      // Onboarding Tutorial
+      onboarding: {
+        welcomeTitle: 'Добро пожаловать в MeetBridge! 🎉',
+        welcomeDescription:
+          'Найдите значимые связи с людьми поблизости. Давайте покажем вам, как это работает!',
+        discoverTitle: 'Открыть совпадения',
+        discoverDescription:
+          'Просматривайте профили людей рядом с вами. Используйте фильтры, чтобы найти именно тех, кого вы ищете.',
+        likeTitle: 'Лайк и связь',
+        likeDescription:
+          'Ставьте лайки профилям, которые вас интересуют. Когда они ответят взаимностью, это совпадение! Ваши совпадения появляются во вкладке Loved.',
+        chatTitle: 'Начать чат',
+        chatDescription:
+          'После совпадения начните разговор! Отправляйте сообщения, делитесь своими интересами и узнавайте друг друга.',
+        locationTitle: 'На основе местоположения',
+        locationDescription:
+          'Мы используем ваше местоположение, чтобы показать людей поблизости. Вы можете настроить расстояние в настройках.',
+        connectionsTitle: 'Управление связями',
+        connectionsDescription:
+          'Просматривайте все свои связи, смотрите, кто вас лайкнул, и отслеживайте свои разговоры в одном месте.',
+      },
+
+      // Icebreaker Suggestions
+      icebreakers: {
+        breakTheIce: 'Разбей лед 💬',
+        dismiss: 'Закрыть',
+      },
+
+      // Error Boundary
+      errors: {
+        somethingWentWrong: 'Упс! Что-то пошло не так',
+        unexpectedError: 'Произошла непредвиденная ошибка',
+        tryAgain: 'Попробовать снова',
+      },
+
+      // Interest Tag Picker
+      interests: {
+        maximumReached: 'Достигнут максимум',
+        maxInterestsMessage: 'Вы можете выбрать до {{count}} интересов.',
+      },
+
+      // Match Animation
+      match: {
+        itsAMatch: 'Это совпадение!',
+        likedEachOther: 'Вы и {{name}} понравились друг другу',
+        sendMessage: 'Отправить сообщение',
+      },
+
+      // Temp Match Modal
+      tempMatch: {
+        chatRequest: 'Запрос на чат 💬',
+        missedMatchTitle: 'Это пропущенное совпадение! 🎉',
+        conversationCreated:
+          'Разговор создан! Проверьте вкладку Missed, чтобы начать чат!',
+        requestSent: 'Запрос отправлен! ✅',
+        waitingForAcceptance: 'Ожидание принятия от другого человека...',
+        acceptFailed: 'Не удалось принять запрос',
+        requestDeclined: 'Запрос отклонен',
+        requestDeclinedMessage: 'Запрос на чат был отклонен',
+        declineFailed: 'Не удалось отклонить запрос',
+        youLabel: 'Вы',
+        acceptedStatus: '✓ Принято',
+        pendingStatus: '⏳ Ожидание',
+        infoText:
+          '💡 Оба должны принять, чтобы начать чат. Они получат уведомление о вашем запросе.',
+        declineButton: 'Отклонить',
+        acceptButton: 'Принять запрос',
+        waitingForAcceptance: 'Ожидание принятия от {{name}}...',
+      },
+
+      // Comments Section
+      comments: {
+        commentsTitle: 'Комментарии',
+        noComments: 'Пока нет комментариев',
+        addComment: 'Добавить комментарий',
+        commentPlaceholder: 'Напишите комментарий...',
+        postComment: 'Опубликовать',
+        anonymous: 'Анонимно',
+        public: 'Публично',
+        justNow: 'Только что',
+        minutesAgo: '{{count}} мин назад',
+        hoursAgo: '{{count}} ч назад',
+        daysAgo: '{{count}} дн назад',
+        signInRequired: 'Требуется вход',
+        signInToComment: 'Войдите, чтобы комментировать',
+        signInToClaim: 'Войдите, чтобы заявить о связи',
+        claimConnection: 'Заявить о связи',
+        claimSuccess: 'Связь успешно заявлена!',
+        claimError: 'Не удалось заявить о связи',
+        alreadyClaimed: 'Эта связь уже заявлена',
+        claimConfirmTitle: 'Заявить о связи',
+        claimConfirmMessage: 'Вы уверены, что это ваша связь?',
+        claimFailed: 'Не удалось заявить о связи',
+        commentAdded: 'Комментарий добавлен',
+        commentError: 'Не удалось добавить комментарий',
+        deleteComment: 'Удалить комментарий',
+        deleteConfirmTitle: 'Удалить комментарий',
+        deleteConfirmMessage:
+          'Вы уверены, что хотите удалить этот комментарий?',
+        deleteSuccess: 'Комментарий удален',
+        deleteError: 'Не удалось удалить комментарий',
+        reportComment: 'Пожаловаться на комментарий',
+        reportSuccess: 'Комментарий успешно пожалован',
+        reportError: 'Не удалось пожаловаться на комментарий',
+        editComment: 'Редактировать комментарий',
+        saveChanges: 'Сохранить изменения',
+        cancelEdit: 'Отменить редактирование',
+        editSuccess: 'Комментарий обновлен',
+        editError: 'Не удалось обновить комментарий',
       },
     },
   },
@@ -757,6 +1228,10 @@ const resources = {
         completeProfile: 'Completa tu perfil',
         profileCompletionRequired:
           'Por favor, completa tu perfil para continuar',
+        profileSetupDescription:
+          '¡Configuremos tu perfil para que puedas empezar a conocer personas increíbles!',
+        profileCompleted: '¡Perfil completado!',
+        profileCompletedSubtext: 'Prepárate para explorar...',
         saveProfile: 'Guardar perfil',
         profileSaved: 'Perfil guardado exitosamente',
         profileSaveError: 'Error al guardar el perfil',
@@ -765,7 +1240,33 @@ const resources = {
           'Ingresa tu correo electrónico para recibir instrucciones de restablecimiento',
         sendResetEmail: 'Enviar correo de restablecimiento',
         resetEmailSent: 'Correo de restablecimiento enviado exitosamente',
+        resetEmailFailed: 'Error al enviar correo de restablecimiento',
+        forgotPasswordTitle: '¿Olvidaste tu contraseña?',
+        forgotPasswordSubtitle:
+          '¡No te preocupes! Ingresa tu correo electrónico y te enviaremos un enlace de restablecimiento',
+        forgotPasswordSentSubtitle:
+          'Hemos enviado un enlace de restablecimiento de contraseña a tu correo electrónico',
+        emailAddress: 'Dirección de correo electrónico',
+        enterEmail: 'Ingresa tu correo electrónico',
+        sendResetLink: 'Enviar enlace de restablecimiento',
+        emailSentTitle: '¡Correo enviado!',
+        emailSentDescription:
+          'Revisa tu bandeja de entrada y sigue las instrucciones para restablecer tu contraseña.',
+        sendAnotherEmail: 'Enviar otro correo',
+        rememberPassword: '¿Recuerdas tu contraseña?',
+        backToSignIn: 'Volver al inicio de sesión',
         backToLogin: 'Volver al inicio de sesión',
+        // Validation messages
+        pleaseEnterEmail: 'Por favor, ingresa tu correo electrónico',
+        invalidEmail:
+          'Por favor, ingresa una dirección de correo electrónico válida',
+        passwordTooShort: 'La contraseña debe tener al menos 6 caracteres',
+        passwordsDoNotMatch: 'Las contraseñas no coinciden',
+        unexpectedError: 'Ocurrió un error inesperado',
+        loginFailed: 'Inicio de sesión fallido',
+        registrationFailed: 'Registro fallido',
+        profileSaveError: 'Error al guardar el perfil',
+        profileSaved: 'Perfil guardado exitosamente',
       },
 
       // Common
@@ -780,6 +1281,117 @@ const resources = {
         no: 'No',
         cancel: 'Cancelar',
         unmatch: 'Desparejar',
+      },
+
+      // Onboarding Tutorial
+      onboarding: {
+        welcomeTitle: '¡Bienvenido a MeetBridge! 🎉',
+        welcomeDescription:
+          'Encuentra conexiones significativas con personas cercanas. ¡Te mostramos cómo funciona!',
+        discoverTitle: 'Descubrir matches',
+        discoverDescription:
+          'Navega por perfiles de personas cerca de ti. Usa filtros para encontrar exactamente a quien buscas.',
+        likeTitle: 'Like y conectar',
+        likeDescription:
+          'Da like a perfiles que te interesen. ¡Cuando te den like de vuelta, es un match! Tus matches aparecen en la pestaña Loved.',
+        chatTitle: 'Empezar a chatear',
+        chatDescription:
+          'Una vez que hay match, ¡empieza una conversación! Envía mensajes, comparte tus intereses y conoce a la otra persona.',
+        locationTitle: 'Basado en ubicación',
+        locationDescription:
+          'Usamos tu ubicación para mostrarte personas cercanas. Puedes ajustar la distancia en tus preferencias.',
+        connectionsTitle: 'Gestionar conexiones',
+        connectionsDescription:
+          'Ve todas tus conexiones, mira quién te dio like y mantén el seguimiento de tus conversaciones en un solo lugar.',
+      },
+
+      // Icebreaker Suggestions
+      icebreakers: {
+        breakTheIce: 'Rompe el hielo 💬',
+        dismiss: 'Descartar',
+      },
+
+      // Error Boundary
+      errors: {
+        somethingWentWrong: '¡Ups! Algo salió mal',
+        unexpectedError: 'Ocurrió un error inesperado',
+        tryAgain: 'Intentar de nuevo',
+      },
+
+      // Interest Tag Picker
+      interests: {
+        maximumReached: 'Máximo alcanzado',
+        maxInterestsMessage: 'Puedes seleccionar hasta {{count}} intereses.',
+      },
+
+      // Match Animation
+      match: {
+        itsAMatch: '¡Es un match!',
+        likedEachOther: 'Tú y {{name}} se gustaron mutuamente',
+        sendMessage: 'Enviar mensaje',
+      },
+
+      // Temp Match Modal
+      tempMatch: {
+        chatRequest: 'Solicitud de chat 💬',
+        missedMatchTitle: '¡Es un match perdido! 🎉',
+        conversationCreated:
+          '¡Conversación creada! Revisa la pestaña Missed para empezar a chatear.',
+        requestSent: '¡Solicitud enviada! ✅',
+        waitingForAcceptance: 'Esperando que la otra persona acepte...',
+        acceptFailed: 'Error al aceptar la solicitud',
+        requestDeclined: 'Solicitud rechazada',
+        requestDeclinedMessage: 'La solicitud de chat fue rechazada',
+        declineFailed: 'Error al rechazar la solicitud',
+        youLabel: 'Tú',
+        acceptedStatus: '✓ Aceptado',
+        pendingStatus: '⏳ Pendiente',
+        infoText:
+          '💡 Ambos deben aceptar para empezar a chatear. Recibirán una notificación sobre tu solicitud.',
+        declineButton: 'Rechazar',
+        acceptButton: 'Aceptar solicitud',
+        waitingForAcceptance: 'Esperando que {{name}} acepte...',
+      },
+
+      // Comments Section
+      comments: {
+        commentsTitle: 'Comentarios',
+        noComments: 'Aún no hay comentarios',
+        addComment: 'Agregar comentario',
+        commentPlaceholder: 'Escribe un comentario...',
+        postComment: 'Publicar',
+        anonymous: 'Anónimo',
+        public: 'Público',
+        justNow: 'Ahora mismo',
+        minutesAgo: 'Hace {{count}} min',
+        hoursAgo: 'Hace {{count}} h',
+        daysAgo: 'Hace {{count}} d',
+        signInRequired: 'Inicio de sesión requerido',
+        signInToComment: 'Inicia sesión para comentar',
+        signInToClaim: 'Inicia sesión para reclamar conexión',
+        claimConnection: 'Reclamar conexión',
+        claimSuccess: '¡Conexión reclamada exitosamente!',
+        claimError: 'Error al reclamar conexión',
+        alreadyClaimed: 'Esta conexión ya fue reclamada',
+        claimConfirmTitle: 'Reclamar conexión',
+        claimConfirmMessage: '¿Estás seguro de que esta es tu conexión?',
+        claimFailed: 'Error al reclamar conexión',
+        commentAdded: 'Comentario agregado',
+        commentError: 'Error al agregar comentario',
+        deleteComment: 'Eliminar comentario',
+        deleteConfirmTitle: 'Eliminar comentario',
+        deleteConfirmMessage:
+          '¿Estás seguro de que quieres eliminar este comentario?',
+        deleteSuccess: 'Comentario eliminado',
+        deleteError: 'Error al eliminar comentario',
+        reportComment: 'Reportar comentario',
+        reportSuccess: 'Comentario reportado exitosamente',
+        reportError: 'Error al reportar comentario',
+        editComment: 'Editar comentario',
+        saveChanges: 'Guardar cambios',
+        cancelEdit: 'Cancelar edición',
+        editSuccess: 'Comentario actualizado',
+        editError: 'Error al actualizar comentario',
       },
     },
   },

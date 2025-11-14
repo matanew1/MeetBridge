@@ -29,6 +29,7 @@ import {
   borderRadius,
   isTablet,
 } from '../../utils/responsive';
+import { useTranslation } from 'react-i18next';
 
 interface TempMatchModalProps {
   visible: boolean;
@@ -48,6 +49,7 @@ export default function TempMatchModal({
   const { user } = useAuth();
   const { loadConversations } = useUserStore();
   const router = useRouter();
+  const { t } = useTranslation();
   const [processing, setProcessing] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const confettiAnims = useRef(
@@ -145,8 +147,8 @@ export default function TempMatchModal({
             // Show celebration message
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             toastService.success(
-              "It's a Missed Match! 🎉",
-              'Conversation created! Check your Missed tab to start chatting!'
+              t('tempMatch.missedMatchTitle'),
+              t('tempMatch.conversationCreated')
             );
 
             // Reload conversations to show the new match
@@ -198,8 +200,8 @@ export default function TempMatchModal({
 
           // Show celebration message
           toastService.success(
-            "It's a Missed Match! 🎉",
-            'Conversation created! Check your Missed tab to start chatting!'
+            t('tempMatch.missedMatchTitle'),
+            t('tempMatch.conversationCreated')
           );
 
           // Close modal after confetti animation
@@ -209,8 +211,8 @@ export default function TempMatchModal({
         } else {
           // First user to accept - waiting for other user
           toastService.success(
-            'Request Sent! ✅',
-            'Waiting for the other person to accept...'
+            t('tempMatch.requestSent'),
+            t('tempMatch.waitingForAcceptance')
           );
           setHasAccepted(true);
           // Auto-close the modal after showing success message
@@ -220,8 +222,8 @@ export default function TempMatchModal({
         }
       } else {
         toastService.error(
-          'Error',
-          result.message || 'Failed to accept request'
+          t('common.error'),
+          result.message || t('tempMatch.acceptFailed')
         );
       }
     } catch (error) {
@@ -245,18 +247,18 @@ export default function TempMatchModal({
       if (result.success) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         toastService.info(
-          'Request Declined',
-          'The chat request has been declined'
+          t('tempMatch.requestDeclined'),
+          t('tempMatch.requestDeclinedMessage')
         );
         onClose();
       } else {
         toastService.error(
-          'Error',
-          result.message || 'Failed to decline request'
+          t('common.error'),
+          result.message || t('tempMatch.declineFailed')
         );
       }
     } catch (error) {
-      toastService.error('Error', 'An unexpected error occurred');
+      toastService.error(t('common.error'), t('errors.unexpectedError'));
     } finally {
       setProcessing(false);
     }
@@ -324,7 +326,7 @@ export default function TempMatchModal({
                 style={styles.userImage}
               />
               <Text style={[styles.userName, { color: theme.text }]}>
-                {otherUser.name || 'Anonymous'}
+                {otherUser.name || t('comments.anonymous')}
               </Text>
               {otherUser.bio && (
                 <Text
@@ -351,7 +353,7 @@ export default function TempMatchModal({
                 <Text
                   style={[styles.statusLabel, { color: theme.textSecondary }]}
                 >
-                  You
+                  {t('tempMatch.youLabel')}
                 </Text>
                 <Text
                   style={[
@@ -359,7 +361,9 @@ export default function TempMatchModal({
                     { color: hasAccepted ? theme.success : theme.text },
                   ]}
                 >
-                  {hasAccepted ? '✓ Accepted' : '⏳ Pending'}
+                  {hasAccepted
+                    ? t('tempMatch.acceptedStatus')
+                    : t('tempMatch.pendingStatus')}
                 </Text>
               </View>
               <View
@@ -383,7 +387,9 @@ export default function TempMatchModal({
                     { color: otherUserAccepted ? theme.success : theme.text },
                   ]}
                 >
-                  {otherUserAccepted ? '✓ Accepted' : '⏳ Pending'}
+                  {otherUserAccepted
+                    ? t('tempMatch.acceptedStatus')
+                    : t('tempMatch.pendingStatus')}
                 </Text>
               </View>
             </View>
@@ -398,8 +404,7 @@ export default function TempMatchModal({
               ]}
             >
               <Text style={[styles.infoText, { color: theme.textSecondary }]}>
-                💡 Both of you must accept to start chatting. They'll receive a
-                notification about your request.
+                {t('tempMatch.infoText')}
               </Text>
             </View>
 
@@ -426,7 +431,7 @@ export default function TempMatchModal({
                       <Text
                         style={[styles.declineText, { color: theme.error }]}
                       >
-                        Decline
+                        {t('tempMatch.declineButton')}
                       </Text>
                     </>
                   )}
@@ -446,7 +451,9 @@ export default function TempMatchModal({
                   ) : (
                     <>
                       <Check size={scale(18)} color="#FFF" />
-                      <Text style={styles.acceptText}>Accept Request</Text>
+                      <Text style={styles.acceptText}>
+                        {t('tempMatch.acceptButton')}
+                      </Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -462,7 +469,9 @@ export default function TempMatchModal({
               >
                 <ActivityIndicator size="small" color={theme.success} />
                 <Text style={[styles.waitingText, { color: theme.success }]}>
-                  Waiting for {otherUser.name} to accept...
+                  {t('tempMatch.waitingForAcceptance', {
+                    name: otherUser.name,
+                  })}
                 </Text>
               </View>
             )}

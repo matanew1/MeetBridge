@@ -17,6 +17,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import toastService from '../../services/toastService';
+import { useTranslation } from 'react-i18next';
 
 interface InterestTagPickerProps {
   selectedInterests: string[];
@@ -31,6 +32,7 @@ export default function InterestTagPicker({
 }: InterestTagPickerProps) {
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
+  const { t } = useTranslation();
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customInterest, setCustomInterest] = useState('');
 
@@ -42,8 +44,8 @@ export default function InterestTagPicker({
       // Add interest if under limit
       if (selectedInterests.length >= maxInterests) {
         toastService.error(
-          'Maximum Reached',
-          `You can select up to ${maxInterests} interests.`
+          t('interests.maximumReached'),
+          t('interests.maxInterestsMessage', { count: maxInterests })
         );
         return;
       }

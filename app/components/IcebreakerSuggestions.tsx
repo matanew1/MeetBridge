@@ -16,6 +16,7 @@ import icebreakerService, {
 } from '../../services/icebreakerService';
 import { User } from '../../store/types';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from 'react-i18next';
 
 interface IcebreakerSuggestionsProps {
   currentUser: User;
@@ -32,6 +33,7 @@ const IcebreakerSuggestions: React.FC<IcebreakerSuggestionsProps> = ({
 }) => {
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
+  const { t } = useTranslation();
   const [icebreakers, setIcebreakers] = useState<Icebreaker[]>([]);
   const [dismissed, setDismissed] = useState(false);
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -84,7 +86,7 @@ const IcebreakerSuggestions: React.FC<IcebreakerSuggestionsProps> = ({
       <View style={styles.header}>
         <Sparkles size={18} color={theme.primary} />
         <Text style={[styles.headerText, { color: theme.text }]}>
-          Break the ice 💬
+          {t('icebreakers.breakTheIce')}
         </Text>
       </View>
 
@@ -125,7 +127,7 @@ const IcebreakerSuggestions: React.FC<IcebreakerSuggestionsProps> = ({
         onPress={() => setDismissed(true)}
       >
         <Text style={[styles.dismissText, { color: theme.textSecondary }]}>
-          Dismiss
+          {t('icebreakers.dismiss')}
         </Text>
       </TouchableOpacity>
     </Animated.View>

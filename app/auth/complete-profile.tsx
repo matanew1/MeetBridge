@@ -17,11 +17,13 @@ import { User } from '../../store/types';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CheckCircle, Sparkles } from 'lucide-react-native';
 import toastService from '../../services/toastService';
+import { useTranslation } from 'react-i18next';
 
 export default function CompleteProfileScreen() {
   const { user, updateProfile } = useAuth();
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
+  const { t } = useTranslation();
   const [showEditModal, setShowEditModal] = useState(true);
   const [showTutorial, setShowTutorial] = useState(false);
   const [isProfileCompleted, setIsProfileCompleted] = useState(false);
@@ -38,10 +40,7 @@ export default function CompleteProfileScreen() {
 
       // Handle undefined result
       if (!result) {
-        toastService.error(
-          'Error',
-          'Failed to save profile. Please try again.'
-        );
+        toastService.error('Error', t('auth.profileSaveError'));
         return;
       }
 
@@ -51,11 +50,14 @@ export default function CompleteProfileScreen() {
         // Show tutorial after profile completion
         setShowTutorial(true);
       } else {
-        toastService.error('Error', result.message || 'Failed to save profile');
+        toastService.error(
+          'Error',
+          result.message || t('auth.profileSaveError')
+        );
       }
     } catch (error) {
       console.error('Error saving profile:', error);
-      toastService.error('Error', 'An unexpected error occurred');
+      toastService.error('Error', t('auth.unexpectedError'));
     }
   };
 
@@ -76,7 +78,7 @@ export default function CompleteProfileScreen() {
   const handleCloseModal = () => {
     toastService.warning(
       'Profile Required',
-      'Please complete your profile to continue using MeetBridge. This helps other users get to know you better!'
+      t('auth.profileCompletionRequired')
     );
   };
 
@@ -91,16 +93,20 @@ export default function CompleteProfileScreen() {
       >
         <View style={styles.content}>
           <Sparkles size={80} color="#fff" style={styles.icon} />
-          <Text style={styles.title}>Complete Your Profile</Text>
+          <Text style={styles.title}>{t('auth.completeProfile')}</Text>
           <Text style={styles.description}>
-            Let's set up your profile so you can start meeting amazing people!
+            {t('auth.profileSetupDescription')}
           </Text>
 
           {isProfileCompleted && (
             <View style={styles.successContainer}>
               <CheckCircle size={40} color="#4ade80" />
-              <Text style={styles.successText}>Profile Completed!</Text>
-              <Text style={styles.successSubtext}>Get ready to explore...</Text>
+              <Text style={styles.successText}>
+                {t('auth.profileCompleted')}
+              </Text>
+              <Text style={styles.successSubtext}>
+                {t('auth.profileCompletedSubtext')}
+              </Text>
             </View>
           )}
         </View>

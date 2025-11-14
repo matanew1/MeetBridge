@@ -8,14 +8,7 @@ import {
   Modal,
   SafeAreaView,
 } from 'react-native';
-import {
-  ChevronLeft,
-  Eye,
-  MapPin,
-  Share,
-  Users,
-  Lock,
-} from 'lucide-react-native';
+import { ChevronLeft, Eye, Users, Lock } from 'lucide-react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import { Card, Button } from '../components/ui';
@@ -149,9 +142,7 @@ const PrivacySettingsModal: React.FC<PrivacySettingsModalProps> = ({
   // Initialize settings from user data
   const [settings, setSettings] = useState({
     showOnlineStatus: user?.settings?.privacy?.showOnlineStatus ?? true,
-    locationSharing: user?.settings?.privacy?.locationSharing ?? true,
     profileVisibility: user?.settings?.privacy?.profileVisibility ?? 'public',
-    dataSharing: user?.settings?.privacy?.dataSharing ?? true,
   });
 
   // Update settings when user data changes
@@ -159,9 +150,7 @@ const PrivacySettingsModal: React.FC<PrivacySettingsModalProps> = ({
     if (user?.settings?.privacy) {
       setSettings({
         showOnlineStatus: user.settings.privacy.showOnlineStatus ?? true,
-        locationSharing: user.settings.privacy.locationSharing ?? true,
         profileVisibility: user.settings.privacy.profileVisibility ?? 'public',
-        dataSharing: user.settings.privacy.dataSharing ?? true,
       });
     }
   }, [user?.settings?.privacy]);
@@ -251,17 +240,6 @@ const PrivacySettingsModal: React.FC<PrivacySettingsModalProps> = ({
             />
 
             <PrivacyOption
-              icon={<MapPin />}
-              title="Location Sharing"
-              subtitle="Share your location for better matches"
-              value={settings.locationSharing}
-              onValueChange={(value) =>
-                setSettings((prev) => ({ ...prev, locationSharing: value }))
-              }
-              type="toggle"
-            />
-
-            <PrivacyOption
               icon={<Users />}
               title="Profile Visibility"
               subtitle="Who can see your profile"
@@ -271,17 +249,6 @@ const PrivacySettingsModal: React.FC<PrivacySettingsModalProps> = ({
               }
               type="select"
               options={profileVisibilityOptions}
-            />
-
-            <PrivacyOption
-              icon={<Share />}
-              title="Data Sharing"
-              subtitle="Help improve our service with analytics"
-              value={settings.dataSharing}
-              onValueChange={(value) =>
-                setSettings((prev) => ({ ...prev, dataSharing: value }))
-              }
-              type="toggle"
             />
           </Card>
 

@@ -36,7 +36,11 @@ import { useAuth } from '../../../contexts/AuthContext';
 import missedConnectionsService, {
   MissedConnection,
 } from '../../../services/firebase/missedConnectionsService';
+import ProfileDetail from '../../components/ProfileDetail';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../../services/firebase/config';
 import toastService from '../../../services/toastService';
+import { useTranslation } from 'react-i18next';
 
 interface Comment {
   id: string;
@@ -48,18 +52,18 @@ interface Comment {
   isAnonymous?: boolean;
 }
 
-function formatRelativeTime(date: Date): string {
+function formatRelativeTime(date: Date, t: any): string {
   const now = new Date();
   const diff = now.getTime() - date.getTime();
   const minutes = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
 
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  if (days === 1) return 'Yesterday';
-  if (days < 7) return `${days}d ago`;
+  if (minutes < 1) return t('comments.justNow');
+  if (minutes < 60) return t('comments.minutesAgo', { count: minutes });
+  if (hours < 24) return t('comments.hoursAgo', { count: hours });
+  if (days === 1) return t('chat.yesterday');
+  if (days < 7) return t('comments.daysAgo', { count: days });
   return date.toLocaleDateString();
 }
 
@@ -68,7 +72,9 @@ const CommentItem: React.FC<{
   comment: Comment;
   index: number;
   theme: any;
-}> = ({ comment, index, theme }) => {
+  onAvatarPress: (userId: string) => void;
+  t: any;
+}> = ({ comment, index, theme, onAvatarPress, t }) => {
   const slideAnim = useRef(new Animated.Value(50)).current;
   const commentFadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -100,14 +106,19 @@ const CommentItem: React.FC<{
         },
       ]}
     >
-      <Image
-        source={
-          comment.userImage
-            ? { uri: comment.userImage }
-            : require('../../../assets/images/placeholder.png')
-        }
-        style={styles.commentAvatar}
-      />
+      <TouchableOpacity
+        onPress={() => onAvatarPress(comment.userId)}
+        activeOpacity={0.7}
+      >
+        <Image
+          source={
+            comment.userImage
+              ? { uri: comment.userImage }
+              : require('../../../assets/images/placeholder.png')
+          }
+          style={styles.commentAvatar}
+        />
+      </TouchableOpacity>
       <View style={styles.commentContent}>
         <View style={styles.commentHeader}>
           <View style={styles.commentUserNameRow}>
@@ -128,13 +139,13 @@ const CommentItem: React.FC<{
                     { color: theme.textSecondary },
                   ]}
                 >
-                  Anonymous
+                  {t('comments.anonymous')}
                 </Text>
               </View>
             )}
           </View>
           <Text style={[styles.commentTime, { color: theme.textSecondary }]}>
-            {formatRelativeTime(comment.createdAt)}
+            {formatRelativeTime(comment.createdAt, t)}
           </Text>
         </View>
         <Text style={[styles.commentText, { color: theme.text }]}>
@@ -151,6 +162,7 @@ export default function CommentsScreen() {
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
   const { user, isAuthenticated } = useAuth();
+  const { t } = useTranslation();
 
   const [connection, setConnection] = useState<MissedConnection | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -159,6 +171,8 @@ export default function CommentsScreen() {
   const [isSending, setIsSending] = useState(false);
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [selectedUserProfile, setSelectedUserProfile] = useState<any>(null);
 
   const scrollViewRef = useRef<ScrollView>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -236,9 +250,38 @@ export default function CommentsScreen() {
     }
   };
 
+  const handleAvatarPress = async (userId: string) => {
+    try {
+      // Fetch user data from Firestore
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        setSelectedUserProfile({
+          id: userDoc.id,
+          name: userData.name || 'Unknown User',
+          age: userData.age || 0,
+          zodiacSign: userData.zodiacSign,
+          image: userData.image || '',
+          images: userData.images || [],
+          bio: userData.bio || '',
+          interests: userData.interests || [],
+          location: userData.location || '',
+          height: userData.height,
+        });
+        setShowProfileModal(true);
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      toastService.error(t('common.error'), t('errors.unexpectedError'));
+    }
+  };
+
   const handleSendComment = async () => {
     if (!isAuthenticated) {
-      toastService.error('Sign In Required', 'Please sign in to comment.');
+      toastService.error(
+        t('comments.signInRequired'),
+        t('comments.signInToComment')
+      );
       return;
     }
 
@@ -273,7 +316,10 @@ export default function CommentsScreen() {
         scrollViewRef.current?.scrollToEnd({ animated: true });
       }, 100);
     } else {
-      toastService.error('Error', result?.message || 'Failed to send comment');
+      toastService.error(
+        t('common.error'),
+        result?.message || t('comments.commentError')
+      );
     }
 
     setIsSending(false);
@@ -282,8 +328,8 @@ export default function CommentsScreen() {
   const handleClaimConnection = async () => {
     if (!isAuthenticated) {
       toastService.error(
-        'Sign In Required',
-        'Please sign in to claim this connection.'
+        t('comments.signInRequired'),
+        t('comments.signInToClaim')
       );
       return;
     }
@@ -321,20 +367,15 @@ export default function CommentsScreen() {
 
     // Show verification info and confirmation
     toastService.info(
-      "That's You? 🎯",
-      "By claiming this connection, you're saying you were at this location at the specified time.\n\n" +
-        '💡 Verification:\n' +
-        "• We'll check your location history (if enabled)\n" +
-        '• Post creator will review your claim\n' +
-        '• Multiple false claims may affect your credibility\n\n' +
-        'Are you sure you were there?',
+      t('comments.claimConfirmTitle'),
+      t('comments.claimConfirmMessage'),
       [
         {
-          text: 'Cancel',
+          text: t('common.cancel'),
           style: 'cancel',
         },
         {
-          text: "Yes, That's Me!",
+          text: t('comments.claimConnection'),
           onPress: async () => {
             setIsClaiming(true);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -345,8 +386,8 @@ export default function CommentsScreen() {
 
             if (result?.success) {
               toastService.info(
-                'Claim Submitted! ✨',
-                "The post creator will be notified. If they confirm, you'll both be matched!"
+                t('comments.claimSuccess'),
+                t('comments.claimSuccess')
               );
 
               // Reload connection to show updated claims
@@ -357,8 +398,8 @@ export default function CommentsScreen() {
               }
             } else {
               toastService.error(
-                'Error',
-                result?.message || 'Failed to claim connection'
+                t('common.error'),
+                result?.message || t('comments.claimFailed')
               );
             }
 
@@ -391,7 +432,7 @@ export default function CommentsScreen() {
           <View style={styles.headerTitleContainer}>
             <MessageCircle size={20} color={theme.primary} />
             <Text style={[styles.headerTitle, { color: theme.text }]}>
-              Comments
+              {t('comments.commentsTitle')}
             </Text>
           </View>
           <View style={styles.headerRight}>
@@ -427,19 +468,24 @@ export default function CommentsScreen() {
                 >
                   {/* User Info */}
                   <View style={styles.postHeader}>
-                    <Image
-                      source={
-                        connection.userImage
-                          ? { uri: connection.userImage }
-                          : require('../../../assets/images/placeholder.png')
-                      }
-                      style={styles.postAvatar}
-                    />
+                    <TouchableOpacity
+                      onPress={() => handleAvatarPress(connection.userId)}
+                      activeOpacity={0.7}
+                    >
+                      <Image
+                        source={
+                          connection.userImage
+                            ? { uri: connection.userImage }
+                            : require('../../../assets/images/placeholder.png')
+                        }
+                        style={styles.postAvatar}
+                      />
+                    </TouchableOpacity>
                     <View style={styles.postUserInfo}>
                       <Text
                         style={[styles.postUserName, { color: theme.text }]}
                       >
-                        {connection.userName || 'Anonymous'}
+                        {connection.userName || t('comments.anonymous')}
                       </Text>
                       <View style={styles.postLocationRow}>
                         <Text style={styles.postLocationIcon}>
@@ -507,7 +553,7 @@ export default function CommentsScreen() {
                   <Text
                     style={[styles.emptyText, { color: theme.textSecondary }]}
                   >
-                    No comments yet. Be the first to comment!
+                    {t('comments.noComments')}
                   </Text>
                 </View>
               ) : (
@@ -517,6 +563,8 @@ export default function CommentsScreen() {
                     comment={comment}
                     index={index}
                     theme={theme}
+                    onAvatarPress={handleAvatarPress}
+                    t={t}
                   />
                 ))
               )}
@@ -553,7 +601,9 @@ export default function CommentsScreen() {
                       },
                     ]}
                   >
-                    {isAnonymous ? 'Anonymous' : 'Public'}
+                    {isAnonymous
+                      ? t('comments.anonymous')
+                      : t('comments.public')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -577,7 +627,7 @@ export default function CommentsScreen() {
                       borderColor: theme.border,
                     },
                   ]}
-                  placeholder="Add a comment..."
+                  placeholder={t('comments.commentPlaceholder')}
                   placeholderTextColor={theme.textSecondary}
                   value={commentText}
                   onChangeText={setCommentText}
@@ -616,6 +666,20 @@ export default function CommentsScreen() {
           </KeyboardAvoidingView>
         )}
       </SafeAreaView>
+
+      {/* Profile Detail Modal */}
+      {selectedUserProfile && (
+        <ProfileDetail
+          user={selectedUserProfile}
+          onClose={() => {
+            setShowProfileModal(false);
+            setSelectedUserProfile(null);
+          }}
+          onLike={() => {}}
+          onDislike={() => {}}
+          isMissedConnection={true}
+        />
+      )}
     </LinearGradient>
   );
 }

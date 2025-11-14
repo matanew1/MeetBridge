@@ -16,6 +16,7 @@ import { useChatData } from '../../hooks/useChatData';
 import { useMultiplePresence } from '../../hooks/usePresence';
 import { usePulse } from '../../hooks/usePulse';
 import { ChatItem } from '../components/ChatItem';
+import ProfileDetail from '../components/ProfileDetail';
 import { EnhancedEmptyState } from '../components/ui';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
@@ -32,6 +33,8 @@ export default function ChatScreen() {
     useUserStore();
 
   const [activeTab, setActiveTab] = useState<'matches' | 'missed'>('matches');
+  const [showProfileDetail, setShowProfileDetail] = useState(false);
+  const [selectedProfile, setSelectedProfile] = useState<any>(null);
   const [fetchedProfiles] = useState(() => new Map<string, Profile>());
 
   // Data + real-time
@@ -116,16 +119,44 @@ export default function ChatScreen() {
     [router]
   );
 
+  const handleAvatarPress = useCallback((profile: any) => {
+    setSelectedProfile(profile);
+    setShowProfileDetail(true);
+  }, []);
+
   const renderItem = useCallback(
-    ({ item }: { item: ChatItemType }) => (
-      <ChatItem
-        chat={item}
-        theme={theme}
-        pulse={pulse}
-        onPress={() => handlePress(item.id)}
-      />
-    ),
-    [theme, pulse, handlePress]
+    ({ item }: { item: ChatItemType }) => {
+      // Find the full profile data for the avatar press handler
+      const conversation = conversations.find((c) => c.id === item.id);
+      const otherId = conversation?.participants.find(
+        (id) => id !== currentUser?.id
+      );
+      const profile =
+        discoverProfiles.find((p) => p.id === otherId) ||
+        matchedProfilesData.find((p) => p.id === otherId) ||
+        fetchedProfiles.get(otherId!);
+
+      return (
+        <ChatItem
+          chat={item}
+          theme={theme}
+          pulse={pulse}
+          onPress={() => handlePress(item.id)}
+          onAvatarPress={profile ? () => handleAvatarPress(profile) : undefined}
+        />
+      );
+    },
+    [
+      theme,
+      pulse,
+      handlePress,
+      handleAvatarPress,
+      conversations,
+      currentUser,
+      discoverProfiles,
+      matchedProfilesData,
+      fetchedProfiles,
+    ]
   );
 
   const getItemLayout = useCallback(
@@ -212,6 +243,29 @@ export default function ChatScreen() {
           showsVerticalScrollIndicator={false}
         />
       </View>
+
+      {showProfileDetail && selectedProfile && (
+        <View style={StyleSheet.absoluteFill}>
+          <ProfileDetail
+            user={selectedProfile}
+            onClose={() => setShowProfileDetail(false)}
+            onLike={() => {}}
+            onDislike={() => {}}
+            onMessage={() => {
+              setShowProfileDetail(false);
+              router.push(
+                `/chat/${
+                  conversations.find(
+                    (c) =>
+                      c.participants.includes(selectedProfile.id) &&
+                      c.participants.includes(currentUser?.id || '')
+                  )?.id
+                }`
+              );
+            }}
+          />
+        </View>
+      )}
     </View>
   );
 }

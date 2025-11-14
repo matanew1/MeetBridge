@@ -27,6 +27,7 @@ import {
   isTablet,
   isLandscape,
 } from '../../utils/responsive';
+import { useTranslation } from 'react-i18next';
 
 interface EnhancedMatchAnimationProps {
   visible: boolean;
@@ -51,6 +52,7 @@ export default function EnhancedMatchAnimation({
   onSendMessage,
   theme,
 }: EnhancedMatchAnimationProps) {
+  const { t } = useTranslation();
   // Animation values
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const contentScale = useRef(new Animated.Value(0.3)).current;
@@ -458,7 +460,7 @@ export default function EnhancedMatchAnimation({
               },
             ]}
           >
-            You and {matchedUser.name} liked each other
+            {t('match.likedEachOther', { name: matchedUser.name })}
           </Animated.Text>
         </View>
 
@@ -602,7 +604,7 @@ export default function EnhancedMatchAnimation({
                   },
                 ]}
               >
-                Send Message
+                {t('match.sendMessage')}
               </Text>
             </LinearGradient>
           </TouchableOpacity>

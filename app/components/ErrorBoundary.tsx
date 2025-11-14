@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
+import { useTranslation } from 'react-i18next';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -64,21 +65,22 @@ const DefaultErrorFallback: React.FC<{
 }> = ({ error, resetError }) => {
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
+  const { t } = useTranslation();
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <Text style={[styles.title, { color: theme.text }]}>
-        Oops! Something went wrong
+        {t('errors.somethingWentWrong')}
       </Text>
       <Text style={[styles.message, { color: theme.textSecondary }]}>
-        {error?.message || 'An unexpected error occurred'}
+        {error?.message || t('errors.unexpectedError')}
       </Text>
       <TouchableOpacity
         style={[styles.button, { backgroundColor: theme.primary }]}
         onPress={resetError}
       >
         <Text style={[styles.buttonText, { color: theme.textOnPrimary }]}>
-          Try Again
+          {t('errors.tryAgain')}
         </Text>
       </TouchableOpacity>
     </View>

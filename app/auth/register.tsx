@@ -21,6 +21,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import toastService from '../../services/toastService';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../../services/firebase/config';
+import { useTranslation } from 'react-i18next';
 
 // Platform check helper
 const isWeb = Platform.OS === 'web';
@@ -40,6 +41,7 @@ const RegisterScreen = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
+  const { t } = useTranslation();
 
   const { register } = useAuth();
 
@@ -59,22 +61,19 @@ const RegisterScreen = () => {
 
   const validateForm = () => {
     if (!formData.email.trim()) {
-      toastService.error('Error', 'Please enter your email');
+      toastService.error('Error', t('auth.pleaseEnterEmail'));
       return false;
     }
     if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      toastService.error('Error', 'Please enter a valid email address');
+      toastService.error('Error', t('auth.invalidEmail'));
       return false;
     }
     if (formData.password.length < 6) {
-      toastService.error(
-        'Error',
-        'Password must be at least 6 characters long'
-      );
+      toastService.error('Error', t('auth.passwordTooShort'));
       return false;
     }
     if (formData.password !== formData.confirmPassword) {
-      toastService.error('Error', 'Passwords do not match');
+      toastService.error('Error', t('auth.passwordsDoNotMatch'));
       return false;
     }
     return true;

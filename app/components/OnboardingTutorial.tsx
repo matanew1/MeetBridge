@@ -22,6 +22,7 @@ import {
 } from 'lucide-react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
+import { useTranslation } from 'react-i18next';
 
 interface OnboardingTutorialProps {
   visible: boolean;
@@ -43,50 +44,45 @@ export const OnboardingTutorial: React.FC<OnboardingTutorialProps> = ({
 }) => {
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
+  const { t } = useTranslation();
   const [currentStep, setCurrentStep] = useState(0);
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   const tutorialSteps: TutorialStep[] = [
     {
       icon: <Sparkles size={60} color="#fff" />,
-      title: 'Welcome to MeetBridge! 🎉',
-      description:
-        'Find meaningful connections with people nearby. Let us show you how it works!',
+      title: t('onboarding.welcomeTitle'),
+      description: t('onboarding.welcomeDescription'),
       gradient: ['#667eea', '#764ba2'],
     },
     {
       icon: <Search size={60} color="#fff" />,
-      title: 'Discover Matches',
-      description:
-        "Browse through profiles of people near you. Use filters to find exactly who you're looking for.",
+      title: t('onboarding.discoverTitle'),
+      description: t('onboarding.discoverDescription'),
       gradient: ['#f093fb', '#f5576c'],
     },
     {
       icon: <Heart size={60} color="#fff" />,
-      title: 'Like & Connect',
-      description:
-        "Like profiles that interest you. When they like you back, it's a match! Your matches appear in the Loved tab.",
+      title: t('onboarding.likeTitle'),
+      description: t('onboarding.likeDescription'),
       gradient: ['#4facfe', '#00f2fe'],
     },
     {
       icon: <MessageCircle size={60} color="#fff" />,
-      title: 'Start Chatting',
-      description:
-        'Once matched, start a conversation! Send messages, share your interests, and get to know each other.',
+      title: t('onboarding.chatTitle'),
+      description: t('onboarding.chatDescription'),
       gradient: ['#43e97b', '#38f9d7'],
     },
     {
       icon: <MapPin size={60} color="#fff" />,
-      title: 'Location-Based',
-      description:
-        'We use your location to show you people nearby. You can adjust the distance in your preferences.',
+      title: t('onboarding.locationTitle'),
+      description: t('onboarding.locationDescription'),
       gradient: ['#fa709a', '#fee140'],
     },
     {
       icon: <Users size={60} color="#fff" />,
-      title: 'Manage Connections',
-      description:
-        'View all your connections, see who liked you, and keep track of your conversations in one place.',
+      title: t('onboarding.connectionsTitle'),
+      description: t('onboarding.connectionsDescription'),
       gradient: ['#30cfd0', '#330867'],
     },
   ];

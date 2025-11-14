@@ -10,17 +10,22 @@ interface Props {
   theme: any;
   pulse: SharedValue<number>;
   onPress: () => void;
+  onAvatarPress?: () => void;
 }
 
 export const ChatItem = React.memo(
-  ({ chat, theme, pulse, onPress }: Props) => {
+  ({ chat, theme, pulse, onPress, onAvatarPress }: Props) => {
     return (
       <TouchableOpacity
         style={[styles.container, { backgroundColor: theme.cardBackground }]}
         activeOpacity={0.7}
         onPress={onPress}
       >
-        <View style={styles.avatarContainer}>
+        <TouchableOpacity
+          style={styles.avatarContainer}
+          activeOpacity={0.7}
+          onPress={onAvatarPress}
+        >
           {chat.image ? (
             <Image source={{ uri: chat.image }} style={styles.avatar} />
           ) : (
@@ -41,7 +46,7 @@ export const ChatItem = React.memo(
               ]}
             />
           )}
-        </View>
+        </TouchableOpacity>
 
         <View style={styles.content}>
           <View style={styles.header}>
