@@ -95,6 +95,7 @@ interface UserState {
 
   // Actions - Chat
   loadConversations: () => Promise<void>;
+  setConversations: (conversations: Conversation[]) => void;
   createConversation: (matchedUserId: string) => Promise<void>;
   sendMessage: (conversationId: string, text: string) => Promise<void>;
   markMessagesAsRead: (
@@ -803,6 +804,10 @@ export const useUserStore = create<UserState>((set, get) => ({
     } finally {
       set({ isLoadingConversations: false });
     }
+  },
+
+  setConversations: (conversations) => {
+    set({ conversations });
   },
 
   createConversation: async (matchedUserId) => {

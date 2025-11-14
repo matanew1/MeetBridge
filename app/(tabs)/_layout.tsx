@@ -141,23 +141,59 @@ export default function TabLayout() {
     return () => unsubscribe();
   }, [user?.id, pendingChatRequests.length]);
 
-  // Subscribe to notifications
+  // Subscribe to notifications with real-time updates
   useEffect(() => {
     if (!user?.id) return;
 
-    const loadNotifications = async () => {
-      const result = await missedConnectionsService.getUserNotifications(
-        user.id
-      );
-      if (result.success) {
-        setNotifications(result.data);
+    console.log('🔄 Setting up real-time notification listener');
+
+    const unsubscribe = missedConnectionsService.subscribeToNotifications(
+      user.id,
+      (updatedNotifications) => {
+        console.log(
+          '🔔 Real-time notifications update:',
+          updatedNotifications.length
+        );
+        const previousCount = notifications.length;
+        setNotifications(updatedNotifications);
+
+        // Animate bell icon when new notifications arrive
+        if (updatedNotifications.length > previousCount) {
+          Animated.sequence([
+            Animated.timing(bellScaleAnim, {
+              toValue: 1.2,
+              duration: 150,
+              useNativeDriver: true,
+            }),
+            Animated.timing(bellScaleAnim, {
+              toValue: 1,
+              duration: 150,
+              useNativeDriver: true,
+            }),
+          ]).start();
+
+          // Show toast for new match notifications
+          const newNotifications = updatedNotifications.filter(
+            (n) => !notifications.some((existing) => existing.id === n.id)
+          );
+
+          const matchNotifications = newNotifications.filter(
+            (n) => n.type === 'match'
+          );
+          if (matchNotifications.length > 0) {
+            toastService.success(
+              "It's a Match! 🎉",
+              'Check your notifications for details'
+            );
+          }
+        }
       }
+    );
+
+    return () => {
+      console.log('🔕 Cleaning up notification listener');
+      unsubscribe();
     };
-
-    loadNotifications();
-
-    // For now, we'll just load notifications once. In a production app,
-    // you might want to set up real-time listeners for notifications
   }, [user?.id]);
 
   const handleProfilePress = () => {

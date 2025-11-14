@@ -1709,7 +1709,7 @@ export class FirebaseChatService implements IChatService {
         lastMessage: {
           text: message.text,
           senderId: message.senderId,
-          createdAt: new Date(),
+          createdAt: new Date(), // Use client timestamp for now to test
         },
       };
 
@@ -1718,7 +1718,15 @@ export class FirebaseChatService implements IChatService {
           (convData.unreadCount?.[recipientId] || 0) + 1;
       }
 
+      console.log('📤 Updating conversation with lastMessage:', {
+        conversationId,
+        text: message.text,
+        senderId: message.senderId,
+      });
+
       await updateDoc(doc(db, 'conversations', conversationId), updates);
+
+      console.log('✅ Conversation updated with lastMessage');
 
       if (recipientId) {
         try {

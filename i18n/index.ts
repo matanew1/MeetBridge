@@ -28,6 +28,8 @@ const resources = {
       // Chat Screen
       chat: {
         title: 'Chats',
+        matches: 'Matches',
+        missed: 'Missed',
         noConversations: 'No conversations yet',
         startMatching: 'Start meeting new people',
         chatsCount: 'Chats',
@@ -238,6 +240,8 @@ const resources = {
       // Chat Screen
       chat: {
         title: 'שיחות',
+        matches: 'התאמות',
+        missed: 'פספסתי',
         noConversations: 'אין שיחות עדיין',
         startMatching: 'התחל להכיר אנשים חדשים',
         chatsCount: 'שיחות',
@@ -436,6 +440,8 @@ const resources = {
       // Chat Screen
       chat: {
         title: 'Чаты',
+        matches: 'Совпадения',
+        missed: 'Пропущенные',
         noConversations: 'Пока нет разговоров',
         startMatching: 'Начните знакомиться с новыми людьми',
         chatsCount: 'Чаты',
@@ -618,6 +624,8 @@ const resources = {
       // Chat Screen
       chat: {
         title: 'Chats',
+        matches: 'Matches',
+        missed: 'Perdidos',
         noConversations: 'Aún no hay conversaciones',
         startMatching: 'Empieza a conocer gente nueva',
         chatsCount: 'Chats',

@@ -1775,6 +1775,39 @@ class MissedConnectionsService {
   }
 
   /**
+   * Subscribe to notifications for a user with real-time updates
+   */
+  subscribeToNotifications(
+    userId: string,
+    callback: (notifications: NotificationItem[]) => void
+  ): Unsubscribe {
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', '==', userId),
+      orderBy('createdAt', 'desc'),
+      limit(50)
+    );
+
+    return onSnapshot(q, (snapshot) => {
+      const notifications: NotificationItem[] = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          userId: data.userId,
+          title: data.title,
+          message: data.message,
+          type: data.type || 'general',
+          data: data.data || null,
+          read: data.read || false,
+          createdAt: convertTimestamp(data.createdAt),
+        };
+      });
+
+      callback(notifications);
+    });
+  }
+
+  /**
    * Mark a notification as read
    */
   async markNotificationAsRead(
