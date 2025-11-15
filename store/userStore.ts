@@ -584,6 +584,12 @@ export const useUserStore = create<UserState>((set, get) => ({
 
           const matchedUser = response.data.matchedUser || userProfile;
 
+          // Show match toast notification
+          toastService.success(
+            "It's a Match! 💕",
+            `You and ${matchedUser?.name || 'someone'} liked each other!`
+          );
+
           set((state) => {
             // Check if already in matched profiles to avoid duplicates
             if (state.matchedProfiles.includes(profileId)) {

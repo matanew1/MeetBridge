@@ -1197,6 +1197,87 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
       };
     }
   }
+
+  /**
+   * Listen for new matches in real-time
+   */
+  onMatchAdded(
+    userId: string,
+    callback: (matchId: string, user: User, conversationId: string) => void
+  ): () => void {
+    const matchesQuery = query(
+      collection(db, 'matches'),
+      where('users', 'array-contains', userId),
+      where('unmatched', '==', false),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(matchesQuery, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          const matchData = change.doc.data();
+          const matchId = change.doc.id;
+
+          // Determine the other user in the match
+          const otherUserId =
+            matchData.user1 === userId ? matchData.user2 : matchData.user1;
+
+          // Get the other user's profile
+          getDoc(doc(db, 'users', otherUserId))
+            .then((userDoc) => {
+              if (userDoc.exists()) {
+                const user = {
+                  ...userDoc.data(),
+                  id: otherUserId,
+                } as User;
+
+                // Get or create conversation
+                const conversationId =
+                  matchData.conversationId || `${userId}_${otherUserId}`;
+
+                callback(matchId, user, conversationId);
+              }
+            })
+            .catch((error) => {
+              console.error('Error fetching matched user:', error);
+            });
+        }
+      });
+    });
+
+    return unsubscribe;
+  }
+
+  /**
+   * Listen for removed matches in real-time
+   */
+  onMatchRemoved(
+    userId: string,
+    callback: (otherUserId: string) => void
+  ): () => void {
+    const matchesQuery = query(
+      collection(db, 'matches'),
+      where('participants', 'array-contains', userId),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(matchesQuery, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'modified') {
+          const matchData = change.doc.data();
+
+          // Check if the match was unmarked (unmatched)
+          if (matchData.unmatched === true) {
+            const otherUserId =
+              matchData.user1 === userId ? matchData.user2 : matchData.user1;
+            callback(otherUserId);
+          }
+        }
+      });
+    });
+
+    return unsubscribe;
+  }
 }
 
 // ============================================

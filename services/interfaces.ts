@@ -54,6 +54,14 @@ export interface IDiscoveryService {
     reason: string
   ): Promise<ApiResponse<boolean>>;
   clearInteractionCache(userId: string): Promise<void>;
+  onMatchAdded(
+    userId: string,
+    callback: (matchId: string, user: User, conversationId: string) => void
+  ): () => void;
+  onMatchRemoved(
+    userId: string,
+    callback: (otherUserId: string) => void
+  ): () => void;
 }
 
 // Matching Service

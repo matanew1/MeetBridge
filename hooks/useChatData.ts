@@ -3,6 +3,8 @@ import { useEffect } from 'react';
 import { useUserStore } from '../store';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRealtimeConversations } from './useRealtimeConversations';
+import { useRealtimeClaims } from './useRealtimeClaims';
+import { useRealtimeComments } from './useRealtimeComments';
 import { useCallback } from 'react';
 
 export const useChatData = () => {
@@ -20,8 +22,10 @@ export const useChatData = () => {
     if (!discoverProfiles.length) loadDiscoverProfiles(true);
   }, [loadMatches, loadDiscoverProfiles, discoverProfiles.length]);
 
-  // Real-time listener
-  const unsubscribe = useRealtimeConversations(currentUser?.id);
+  // Real-time listeners
+  const conversationsUnsubscribe = useRealtimeConversations(currentUser?.id);
+  const claimsUnsubscribe = useRealtimeClaims();
+  const commentsUnsubscribe = useRealtimeComments();
 
   // Refresh on focus if stale (>30s)
   useFocusEffect(
@@ -35,5 +39,5 @@ export const useChatData = () => {
     }, [loadConversations])
   );
 
-  return { unsubscribe };
+  return { conversationsUnsubscribe, claimsUnsubscribe, commentsUnsubscribe };
 };

@@ -1,12 +1,14 @@
 // hooks/useRealtimeConversations.ts
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../services/firebase/config';
 import { useUserStore } from '../store';
 import { Conversation } from '../types/chat';
+import toastService from '../services/toastService';
 
 export const useRealtimeConversations = (userId?: string) => {
   const setConversations = useUserStore((s) => s.setConversations);
+  const previousConversationsRef = useRef<Conversation[]>([]);
 
   useEffect(() => {
     if (!userId) return;
@@ -38,6 +40,37 @@ export const useRealtimeConversations = (userId?: string) => {
             isMissedConnection: d.isMissedConnection || false,
           };
         });
+
+        // Check for new messages and show notifications
+        const previousConversations = previousConversationsRef.current;
+        data.forEach((conversation) => {
+          const previousConversation = previousConversations.find(
+            (prev) => prev.id === conversation.id
+          );
+
+          // If conversation has unread messages and wasn't previously tracked or had fewer unread messages
+          if (
+            conversation.unreadCount > 0 &&
+            conversation.lastMessage &&
+            conversation.lastMessage.senderId !== userId && // Not from current user
+            (!previousConversation ||
+              previousConversation.unreadCount < conversation.unreadCount)
+          ) {
+            // Get the other participant's name (not the current user)
+            const otherParticipantId = conversation.participants.find(
+              (id) => id !== userId
+            );
+
+            // Show message notification
+            toastService.info(
+              'New Message 💬',
+              `You have a new message from ${otherParticipantId || 'someone'}`
+            );
+          }
+        });
+
+        // Update previous conversations reference
+        previousConversationsRef.current = data;
 
         // Sort by latest message
         data.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());

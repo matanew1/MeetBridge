@@ -140,3 +140,5 @@ const styles = StyleSheet.create({
   unread: { fontWeight: '600' },
   unreadDot: { width: 8, height: 8, borderRadius: 4, marginLeft: 8 },
 });
+
+export default ChatItem;
