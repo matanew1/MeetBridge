@@ -25,7 +25,9 @@ import {
   serverTimestamp,
   setDoc,
 } from 'firebase/firestore';
+import { safeGetDoc } from '../services/firebase/firestoreHelpers';
 import { services } from '../services';
+import { useUserStore } from '../store';
 import { User } from '../store/types';
 import { smartLocationManager, geohashService } from '../services/location';
 import notificationService from '../services/notificationService';
@@ -95,8 +97,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     try {
       const userDocRef = doc(db, 'users', firebaseUser.uid);
-      const userDoc = await getDoc(userDocRef);
-      if (userDoc.exists()) {
+      const userDoc = (await safeGetDoc(
+        userDocRef,
+        `user_${firebaseUser.uid}`
+      )) as any;
+      if (userDoc && typeof userDoc.exists === 'function' && userDoc.exists()) {
         const userData = userDoc.data();
         const fullUser: User = {
           id: userDoc.id,
@@ -119,6 +124,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.error('Error refreshing user profile:', error);
     }
   }, [firebaseUser]);
+
+  const loadConversations = useUserStore((s) => s.loadConversations);
 
   // Initialize notifications and start location tracking when user is authenticated
   useEffect(() => {
@@ -397,6 +404,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               setUser(null);
               setFirebaseUser(null);
             }
+          }
+          // Preload conversations immediately after we set the user
+          try {
+            await loadConversations();
+          } catch (err) {
+            console.warn('Failed to preload conversations:', err);
           }
         } catch (error) {
           console.error('Error loading user profile:', error);

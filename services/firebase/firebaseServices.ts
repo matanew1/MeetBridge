@@ -32,6 +32,7 @@ import {
   reauthenticateWithCredential,
 } from 'firebase/auth';
 import { db, auth } from './config';
+import { safeGetDoc } from './firestoreHelpers';
 import {
   IUserProfileService,
   IDiscoveryService,
@@ -83,8 +84,31 @@ export class FirebaseUserProfileService implements IUserProfileService {
         return { data: null, success: true, message: 'No user logged in' };
       }
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists()) {
+      let userDoc: any = null;
+      try {
+        userDoc = await safeGetDoc(
+          doc(db, 'users', user.uid),
+          `user_${user.uid}`
+        );
+      } catch (e) {
+        console.warn(
+          'Failed to get user doc from Firestore, will try cache',
+          e
+        );
+        const cached = await cacheService.get(`user_${user.uid}`);
+        if (cached) {
+          // emulate snapshot-like object
+          userDoc = {
+            exists: () => true,
+            id: user.uid,
+            data: () => cached,
+          } as any;
+        }
+      }
+      if (
+        !userDoc ||
+        (typeof userDoc.exists === 'function' && !userDoc.exists())
+      ) {
         return { data: null, success: true, message: 'User profile not found' };
       }
 

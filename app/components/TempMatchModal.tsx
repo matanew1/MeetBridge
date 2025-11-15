@@ -152,7 +152,7 @@ export default function TempMatchModal({
             );
 
             // Reload conversations to show the new match
-            await loadConversations(user.id);
+            await loadConversations();
 
             // Close modal after confetti animation
             setTimeout(() => {
@@ -196,7 +196,7 @@ export default function TempMatchModal({
           triggerConfetti();
 
           // Reload conversations to get the new conversation
-          await loadConversations(user?.id || '');
+          await loadConversations();
 
           // Show celebration message
           toastService.success(

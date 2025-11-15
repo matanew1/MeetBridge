@@ -20,6 +20,11 @@ export const useChatData = () => {
   useEffect(() => {
     loadMatches();
     if (!discoverProfiles.length) loadDiscoverProfiles(true);
+    // Make sure conversations are loaded as soon as the user opens the app
+    if (currentUser && typeof loadConversations === 'function') {
+      loadConversations();
+      useUserStore.setState({ lastFetchedConversations: Date.now() });
+    }
   }, [loadMatches, loadDiscoverProfiles, discoverProfiles.length]);
 
   // Real-time listeners

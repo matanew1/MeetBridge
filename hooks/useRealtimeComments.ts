@@ -10,6 +10,7 @@ import {
 import { db } from '../services/firebase/config';
 import { useAuth } from '../contexts/AuthContext';
 import toastService from '../services/toastService';
+import { useTranslation } from 'react-i18next';
 
 interface Comment {
   id: string;
@@ -22,17 +23,18 @@ interface Comment {
 }
 
 export const useRealtimeComments = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const previousCommentsRef = useRef<Map<string, Comment[]>>(new Map());
 
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.id) return;
 
     // First, get all missed connections owned by the user
     const getUserConnections = async () => {
       const connectionsQuery = query(
         collection(db, 'missed_connections'),
-        where('userId', '==', user.uid)
+        where('userId', '==', user.id)
       );
 
       const connectionsSnapshot = await getDocs(connectionsQuery);
@@ -71,11 +73,11 @@ export const useRealtimeComments = () => {
                 (prev) => prev.id === comment.id
               );
 
-              if (isNewComment && comment.userId !== user.uid) {
+              if (isNewComment && comment.userId !== user.id) {
                 // Show comment notification (exclude own comments)
                 toastService.info(
-                  'New Comment 💬',
-                  `${comment.userName} commented on your post!`
+                  t('toasts.newCommentTitle'),
+                  t('toasts.newCommentBody', { name: comment.userName })
                 );
               }
             });
@@ -104,5 +106,5 @@ export const useRealtimeComments = () => {
     };
 
     getUserConnections();
-  }, [user?.uid]);
+  }, [user?.id]);
 };

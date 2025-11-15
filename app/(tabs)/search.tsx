@@ -53,8 +53,8 @@ import {
   limit,
   onSnapshot,
   doc as firestoreDoc,
-  getDoc,
 } from 'firebase/firestore';
+import { safeGetDoc } from '../../services/firebase/firestoreHelpers';
 import { db } from '../../services/firebase/config';
 
 const { width } = Dimensions.get('window');
@@ -501,11 +501,20 @@ export default function SearchScreen() {
 
       processedMatchesRef.current.add(change.doc.id);
 
-      const snap = await getDoc(firestoreDoc(db, 'users', otherId));
-      if (!snap.exists()) return;
-
-      const userData = snap.data();
-      const matchedUser = { id: snap.id, ...userData };
+      try {
+        const snap = await safeGetDoc(
+          firestoreDoc(db, 'users', otherId),
+          `user_${otherId}`
+        );
+        if (!snap || (typeof snap.exists === 'function' && !snap.exists()))
+          return;
+        const userData =
+          snap && (snap as any).data ? (snap as any).data() : null;
+        const matchedUser = { id: snap.id, ...userData };
+      } catch (e) {
+        console.warn('Failed to resolve matched user for match animation', e);
+        return;
+      }
 
       if (data.animationPlayed || data.isMissedConnection) return;
 
@@ -650,18 +659,23 @@ export default function SearchScreen() {
           columnWrapperStyle={styles.columnWrapper}
           contentContainerStyle={
             sortedDiscoverProfiles.length === 0
-              ? { flex: 1 }
+              ? styles.emptyListContent
               : styles.listContent
           }
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
           ListEmptyComponent={
-            <EnhancedEmptyState
-              type="discover"
-              onAction={onRefresh}
-              actionLabel={t('common.refresh')}
-            />
+            <View style={styles.emptyWrapper}>
+              <EnhancedEmptyState
+                type="discover"
+                title={t('search.noProfiles')}
+                message={t('search.noProfilesDetail')}
+                verticalAlign="top"
+                onActionPress={onRefresh}
+                actionLabel={t('search.refresh')}
+              />
+            </View>
           }
           showsVerticalScrollIndicator={false}
           removeClippedSubviews
@@ -786,7 +800,18 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 16,
     paddingBottom: 120,
-    paddingTop: 0,
+  },
+  emptyListContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 120,
+    flexGrow: 1,
+    justifyContent: 'flex-start',
+  },
+  emptyWrapper: {
+    minHeight: 80,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 6,
   },
   columnWrapper: { justifyContent: 'space-between', gap: 16 },
   gridItem: { width: (width - 48) / 2, marginBottom: 20 },

@@ -18,6 +18,7 @@ import blockReportService, {
   ReportReason,
 } from '../../services/blockReportService';
 import toastService from '../../services/toastService';
+import { useTranslation } from 'react-i18next';
 
 export interface BlockReportModalProps {
   visible: boolean;
@@ -39,6 +40,7 @@ export const BlockReportModal: React.FC<BlockReportModalProps> = ({
   onReportSuccess,
 }) => {
   const { isDarkMode } = useTheme();
+  const { t } = useTranslation();
   const theme = isDarkMode ? darkTheme : lightTheme;
 
   const [mode, setMode] = useState<ModalMode>('main');
@@ -62,7 +64,10 @@ export const BlockReportModal: React.FC<BlockReportModalProps> = ({
       const result = await blockReportService.blockUser(userId, blockReason);
 
       if (result.success) {
-        toastService.success('User Blocked', `${userName} has been blocked`);
+        toastService.success(
+          t('toasts.userBlockedTitle'),
+          t('toasts.userBlockedBody', { name: userName })
+        );
         onBlockSuccess?.();
         handleClose();
       } else {
@@ -94,7 +99,10 @@ export const BlockReportModal: React.FC<BlockReportModalProps> = ({
       );
 
       if (result.success) {
-        toastService.success('Report Submitted', result.message);
+        toastService.success(
+          t('toasts.reportSubmittedTitle'),
+          result.message || t('toasts.reportSubmittedBody')
+        );
         onReportSuccess?.();
         handleClose();
       } else {

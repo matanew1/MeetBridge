@@ -10,6 +10,7 @@ import { services } from '../services';
 import { APP_CONFIG, DATING_CONSTANTS } from '../constants';
 import cacheService from '../services/cacheService';
 import toastService from '../services/toastService';
+import i18n from '../i18n';
 
 // Use Firebase services
 const userProfileService = services.userProfile;
@@ -50,6 +51,7 @@ interface UserState {
   // Chat and conversations
   conversations: Conversation[];
   isLoadingConversations: boolean;
+  lastFetchedConversations?: number;
 
   // Error handling
   error: string | null;
@@ -143,6 +145,7 @@ export const useUserStore = create<UserState>((set, get) => ({
   preloadedNextPage: null,
   conversations: [],
   isLoadingConversations: false,
+  lastFetchedConversations: 0,
   error: null,
   isLoadingLike: false,
   isLoadingUnmatch: false,
@@ -586,8 +589,10 @@ export const useUserStore = create<UserState>((set, get) => ({
 
           // Show match toast notification
           toastService.success(
-            "It's a Match! 💕",
-            `You and ${matchedUser?.name || 'someone'} liked each other!`
+            i18n.t('toasts.matchToastTitle'),
+            i18n.t('toasts.matchToastBody', {
+              name: matchedUser?.name || 'someone',
+            })
           );
 
           set((state) => {
@@ -840,7 +845,10 @@ export const useUserStore = create<UserState>((set, get) => ({
         participants: [currentUser.id, matchedUserId],
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        unreadCount: 0,
+        unreadCount: {
+          [currentUser.id]: 0,
+          [matchedUserId]: 0,
+        },
       };
 
       const conversationRef = await addDoc(
@@ -855,7 +863,10 @@ export const useUserStore = create<UserState>((set, get) => ({
         messages: [],
         createdAt: new Date(),
         updatedAt: new Date(),
-        unreadCount: 0,
+        unreadCount: {
+          [currentUser.id]: 0,
+          [matchedUserId]: 0,
+        },
       };
 
       set((state) => ({
@@ -895,6 +906,7 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   markMessagesAsRead: async (conversationId, messageIds) => {
     try {
+      const { currentUser } = get();
       const response = await chatService.markMessagesAsRead(
         conversationId,
         messageIds
@@ -910,10 +922,14 @@ export const useUserStore = create<UserState>((set, get) => ({
                   messages: conv.messages.map((msg) =>
                     messageIds.includes(msg.id) ? { ...msg, isRead: true } : msg
                   ),
-                  unreadCount: Math.max(
-                    0,
-                    conv.unreadCount - messageIds.length
-                  ),
+                  unreadCount: {
+                    ...conv.unreadCount,
+                    [currentUser!.id]: Math.max(
+                      0,
+                      (conv.unreadCount[currentUser!.id] || 0) -
+                        messageIds.length
+                    ),
+                  },
                 }
               : conv
           ),

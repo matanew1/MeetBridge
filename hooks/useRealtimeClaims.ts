@@ -1,9 +1,11 @@
 // hooks/useRealtimeClaims.ts
 import { useEffect, useRef } from 'react';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc } from 'firebase/firestore';
+import { safeGetDoc } from '../services/firebase/firestoreHelpers';
 import { db } from '../services/firebase/config';
 import { useAuth } from '../contexts/AuthContext';
 import toastService from '../services/toastService';
+import { useTranslation } from 'react-i18next';
 
 interface Claim {
   id: string;
@@ -16,11 +18,12 @@ interface Claim {
 }
 
 export const useRealtimeClaims = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const previousClaimsRef = useRef<Claim[]>([]);
 
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.id) return;
 
     // Listen for claims on the user's missed connections posts
     const q = query(
@@ -39,14 +42,19 @@ export const useRealtimeClaims = () => {
           const claimData = docSnap.data();
 
           // Get the connection to check ownership
-          const connectionDoc = await import('firebase/firestore').then(
-            ({ doc, getDoc }) =>
-              getDoc(doc(db, 'missed_connections', claimData.connectionId))
-          );
+          let connectionDoc: any = null;
+          try {
+            connectionDoc = await safeGetDoc(
+              doc(db, 'missed_connections', claimData.connectionId),
+              `missed_connection_${claimData.connectionId}`
+            );
+          } catch (e) {
+            console.warn('Failed to fetch connection for claim', e);
+          }
 
           if (connectionDoc.exists()) {
             const connectionData = connectionDoc.data();
-            if (connectionData.userId === user.uid) {
+            if (connectionData.userId === user.id) {
               claims.push({
                 id: docSnap.id,
                 connectionId: claimData.connectionId,
@@ -70,8 +78,8 @@ export const useRealtimeClaims = () => {
           if (isNewClaim) {
             // Show claim notification
             toastService.info(
-              'New Claim! 🎯',
-              `${claim.claimerName} thinks they were at your missed connection!`
+              t('toasts.newClaimTitle'),
+              t('toasts.newClaimBody', { name: claim.claimerName })
             );
           }
         });
@@ -89,5 +97,5 @@ export const useRealtimeClaims = () => {
     );
 
     return unsub;
-  }, [user?.uid]);
+  }, [user?.id]);
 };

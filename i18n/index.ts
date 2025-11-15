@@ -12,6 +12,9 @@ const resources = {
         connections: 'Connections',
         chat: 'Chat',
       },
+      app: {
+        title: 'MeetBridge',
+      },
 
       // Search Screen
       search: {
@@ -22,6 +25,10 @@ const resources = {
         loading: 'Loading...',
         distance: 'm',
         noProfiles: 'No profiles available',
+        noProfilesDetail:
+          "We couldn't find any profiles matching your preferences. Try adjusting your filters or expanding your distance range.",
+        adjustFilters: 'Adjust Filters',
+        refresh: 'Refresh',
         checkBackLater: 'Try adjusting your filters',
       },
 
@@ -324,6 +331,31 @@ const resources = {
         sendMessage: 'Send Message',
       },
 
+      // Toasts / Notifications
+      toasts: {
+        newMessageTitle: 'New Message 💬',
+        newMessageBody: 'You have a new message from {{name}}',
+        newCommentTitle: 'New Comment 💬',
+        newCommentBody: '{{name}} commented on your post!',
+        newClaimTitle: 'New Claim! 🎯',
+        newClaimBody: '{{name}} thinks they were at your missed connection!',
+        chatRequestTitle: 'Chat Request Received! 💬',
+        chatRequestBody:
+          '{{name}} sent you a chat request. Check your notifications to respond.',
+        matchToastTitle: "It's a Match! 🎉",
+        matchToastBody: 'You and {{name}} liked each other!',
+        userBlockedTitle: 'User Blocked',
+        userBlockedBody: '{{name}} has been blocked',
+        reportSubmittedTitle: 'Report Submitted',
+        reportSubmittedBody: 'Your report has been submitted',
+        selectReasonTitle: 'Select a Reason',
+        selectReasonBody: 'Please select a reason for reporting',
+        claimRejectedTitle: 'Claim Rejected',
+        claimRejectedBody: 'The claim has been rejected',
+        notificationDeletedTitle: 'Notification Deleted',
+        notificationDeletedBody: 'The notification has been removed',
+      },
+
       // Temp Match Modal
       tempMatch: {
         chatRequest: 'Chat Request 💬',
@@ -385,6 +417,20 @@ const resources = {
         editSuccess: 'Comment updated',
         editError: 'Failed to update comment',
       },
+
+      // Common
+      common: {
+        loading: 'Loading...',
+        error: 'Error',
+        retry: 'Retry',
+        noData: 'No data',
+        comingSoon: 'Coming soon',
+        ok: 'OK',
+        yes: 'Yes',
+        no: 'No',
+        cancel: 'Cancel',
+        unmatch: 'Unmatch',
+      },
     },
   },
   he: {
@@ -406,6 +452,10 @@ const resources = {
         loading: 'טוען...',
         distance: "מ'",
         noProfiles: 'אין פרופילים זמינים. נסה לשנות את הפילטרים.',
+        noProfilesDetail:
+          'לא הצלחנו למצוא פרופילים התואמים את ההעדפות שלך. נסה לשנות את המסננים או להגדיל את טווח המרחק.',
+        adjustFilters: 'התאם פילטרים',
+        refresh: 'רענן',
       },
 
       // Chat Screen
@@ -485,6 +535,31 @@ const resources = {
         matchTitle: '!יש התאמה',
         matchText: 'שניכם אהבתם אחד את השני',
         startChatting: 'התחל לשוחח',
+      },
+
+      // Toasts / Notifications
+      toasts: {
+        newMessageTitle: 'הודעה חדשה 💬',
+        newMessageBody: 'יש לך הודעה חדשה מ- {{name}}',
+        newCommentTitle: 'תגובה חדשה 💬',
+        newCommentBody: '{{name}} הגיב לפוסט שלך!',
+        newClaimTitle: 'תביעה חדשה! 🎯',
+        newClaimBody: '{{name}} טוען שהיה בנקודת ההשמטה שלך!',
+        chatRequestTitle: 'בקשת שיחה 💬',
+        chatRequestBody:
+          '{{name}} שלח לך בקשת שיחה. בדוק את ההתראות שלך כדי להגיב.',
+        matchToastTitle: '!יש התאמה',
+        matchToastBody: 'אתה ו- {{name}} אהבתם אחד את השני!',
+        userBlockedTitle: 'המשתמש חסום',
+        userBlockedBody: '{{name}} נחסם',
+        reportSubmittedTitle: 'דווח בהצלחה',
+        reportSubmittedBody: 'הדיווח שלך נשלח',
+        selectReasonTitle: 'בחר סיבה',
+        selectReasonBody: 'בבקשה בחר סיבה לדיווח',
+        claimRejectedTitle: 'התביעה נדחתה',
+        claimRejectedBody: 'התביעה נדחתה',
+        notificationDeletedTitle: 'הודעה נמחקה',
+        notificationDeletedBody: 'ההודעה הוסרה',
       },
 
       // Filter Modal
@@ -764,6 +839,10 @@ const resources = {
         loading: 'Загрузка...',
         distance: 'м',
         noProfiles: 'Нет доступных профилей',
+        noProfilesDetail:
+          'Мы не смогли найти профили, соответствующие вашим предпочтениям. Попробуйте изменить фильтры или увеличить радиус поиска.',
+        adjustFilters: 'Настроить фильтры',
+        refresh: 'Обновить',
         checkBackLater: 'Попробуйте изменить фильтры',
       },
 
@@ -1006,6 +1085,31 @@ const resources = {
         sendMessage: 'Отправить сообщение',
       },
 
+      // Toasts / Notifications
+      toasts: {
+        newMessageTitle: 'Новое сообщение 💬',
+        newMessageBody: 'У вас новое сообщение от {{name}}',
+        newCommentTitle: 'Новый комментарий 💬',
+        newCommentBody: '{{name}} прокомментировал вашу запись!',
+        newClaimTitle: 'Новый запрос! 🎯',
+        newClaimBody: '{{name}} считает, что был на вашей встрече!',
+        chatRequestTitle: 'Запрос в чат 💬',
+        chatRequestBody:
+          '{{name}} отправил вам запрос на чат. Проверьте уведомления, чтобы ответить.',
+        matchToastTitle: 'Это совпадение! 🎉',
+        matchToastBody: 'Вы и {{name}} понравились друг другу!',
+        userBlockedTitle: 'Пользователь заблокирован',
+        userBlockedBody: '{{name}} был заблокирован',
+        reportSubmittedTitle: 'Отчет отправлен',
+        reportSubmittedBody: 'Ваш отчет был отправлен',
+        selectReasonTitle: 'Выберите причину',
+        selectReasonBody: 'Пожалуйста, выберите причину для жалобы',
+        claimRejectedTitle: 'Жалоба отклонена',
+        claimRejectedBody: 'Жалоба была отклонена',
+        notificationDeletedTitle: 'Уведомление удалено',
+        notificationDeletedBody: 'Уведомление было удалено',
+      },
+
       // Temp Match Modal
       tempMatch: {
         chatRequest: 'Запрос на чат 💬',
@@ -1089,6 +1193,10 @@ const resources = {
         loading: 'Cargando...',
         distance: 'm',
         noProfiles: 'No hay perfiles disponibles',
+        noProfilesDetail:
+          'No pudimos encontrar perfiles que coincidan con tus preferencias. Intenta ajustar tus filtros o ampliar el rango de distancia.',
+        adjustFilters: 'Ajustar filtros',
+        refresh: 'Actualizar',
         checkBackLater: 'Intenta ajustar tus filtros',
       },
 
@@ -1329,6 +1437,31 @@ const resources = {
         itsAMatch: '¡Es un match!',
         likedEachOther: 'Tú y {{name}} se gustaron mutuamente',
         sendMessage: 'Enviar mensaje',
+      },
+
+      // Toasts / Notifications
+      toasts: {
+        newMessageTitle: 'Nuevo mensaje 💬',
+        newMessageBody: 'Tienes un nuevo mensaje de {{name}}',
+        newCommentTitle: 'Nuevo comentario 💬',
+        newCommentBody: '{{name}} comentó en tu publicación!',
+        newClaimTitle: '¡Nueva reclamación! 🎯',
+        newClaimBody: '¡{{name}} cree que estuvo en tu conexión perdida!',
+        chatRequestTitle: 'Solicitud de chat 💬',
+        chatRequestBody:
+          '{{name}} te envió una solicitud de chat. Revisa tus notificaciones para responder.',
+        matchToastTitle: '¡Es un match! 🎉',
+        matchToastBody: 'Tú y {{name}} se gustaron mutuamente!',
+        userBlockedTitle: 'Usuario bloqueado',
+        userBlockedBody: '{{name}} ha sido bloqueado',
+        reportSubmittedTitle: 'Informe enviado',
+        reportSubmittedBody: 'Tu informe ha sido enviado',
+        selectReasonTitle: 'Selecciona una razón',
+        selectReasonBody: 'Por favor selecciona una razón para reportar',
+        claimRejectedTitle: 'Reclamación rechazada',
+        claimRejectedBody: 'La reclamación ha sido rechazada',
+        notificationDeletedTitle: 'Notificación eliminada',
+        notificationDeletedBody: 'La notificación ha sido eliminada',
       },
 
       // Temp Match Modal

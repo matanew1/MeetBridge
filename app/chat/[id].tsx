@@ -45,12 +45,15 @@ import Animated, {
 import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
 import { useUserStore } from '../../store';
+import { doc } from 'firebase/firestore';
+import { db } from '../../services/firebase/config';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import ProfileDetail from '../components/ProfileDetail';
 import { LoadingOverlay } from '../components/ui';
 import notificationService from '../../services/notificationService';
 import toastService from '../../services/toastService';
+import { safeGetDoc } from '../../services/firebase/firestoreHelpers';
 import IcebreakerSuggestions from '../components/IcebreakerSuggestions';
 import { storageService } from '../../services';
 import { imageCompressionService } from '../../services';
@@ -256,9 +259,10 @@ const ChatScreen = () => {
     let isMounted = true;
     const fetchUser = async () => {
       try {
-        const { doc, getDoc } = await import('firebase/firestore');
-        const { db } = await import('../../services/firebase/config');
-        const snap = await getDoc(doc(db, 'users', otherUserId));
+        const snap = (await safeGetDoc(
+          doc(db, 'users', otherUserId),
+          `user_${otherUserId}`
+        )) as any;
         if (snap.exists() && isMounted) {
           const data = snap.data();
           const user = {
@@ -310,17 +314,17 @@ const ChatScreen = () => {
         const lastSeen = data.lastSeen?.toDate?.() || null;
         setIsOnline(online);
         if (online) {
-          setLastSeenText('Online');
+          setLastSeenText(t('chat.online'));
         } else if (lastSeen) {
           const diff = (Date.now() - lastSeen.getTime()) / 1000;
-          if (diff < 60) setLastSeenText('just now');
+          if (diff < 60) setLastSeenText(t('chat.now'));
           else if (diff < 3600)
-            setLastSeenText(`${Math.floor(diff / 60)} min ago`);
+            setLastSeenText(`${Math.floor(diff / 60)} ${t('chat.minutes')}`);
           else if (diff < 86400)
-            setLastSeenText(`${Math.floor(diff / 3600)} hr ago`);
+            setLastSeenText(`${Math.floor(diff / 3600)} ${t('chat.hours')}`);
           else setLastSeenText(`${Math.floor(diff / 86400)} days ago`);
         } else {
-          setLastSeenText('Offline');
+          setLastSeenText(t('chat.offline'));
         }
         setOtherUser((prev) =>
           prev ? { ...prev, isOnline: online, lastSeen } : prev

@@ -29,6 +29,7 @@ import {
 } from '../../services/firebase/missedConnectionsService';
 import missedConnectionsService from '../../services/firebase/missedConnectionsService';
 import toastService from '../../services/toastService';
+import { useTranslation } from 'react-i18next';
 import TempMatchModal from './TempMatchModal';
 import * as Haptics from 'expo-haptics';
 import { doc, getDoc } from 'firebase/firestore';
@@ -66,6 +67,7 @@ export default function ClaimNotificationModal({
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [processingClaimId, setProcessingClaimId] = useState<string | null>(
     null
   );
@@ -92,8 +94,8 @@ export default function ClaimNotificationModal({
 
         // Show success message - chat request created
         toastService.success(
-          'Chat Request Sent! 💬',
-          'Waiting for them to accept...'
+          t('toasts.chatRequestTitle'),
+          t('tempMatch.waitingForAcceptance')
         );
 
         onClaimProcessed();
@@ -116,7 +118,10 @@ export default function ClaimNotificationModal({
       const result = await missedConnectionsService.rejectClaim(claimId);
       if (result.success) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        toastService.info('Claim Rejected', 'The claim has been rejected');
+        toastService.info(
+          t('toasts.claimRejectedTitle'),
+          t('toasts.claimRejectedBody')
+        );
         onClaimProcessed();
       } else {
         toastService.error('Error', result.message || 'Failed to reject claim');
@@ -163,8 +168,8 @@ export default function ClaimNotificationModal({
       if (result.success) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         toastService.info(
-          'Notification Deleted',
-          'The notification has been removed'
+          t('toasts.notificationDeletedTitle'),
+          t('toasts.notificationDeletedBody')
         );
         onNotificationProcessed();
       } else {

@@ -1,10 +1,12 @@
 // hooks/useRealtimeConversations.ts
 import { useEffect, useRef } from 'react';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc } from 'firebase/firestore';
+import { safeGetDoc } from '../services/firebase/firestoreHelpers';
 import { db } from '../services/firebase/config';
 import { useUserStore } from '../store';
-import { Conversation } from '../types/chat';
+import { Conversation } from '../store/types';
 import toastService from '../services/toastService';
+import i18n from '../i18n';
 
 export const useRealtimeConversations = (userId?: string) => {
   const setConversations = useUserStore((s) => s.setConversations);
@@ -33,38 +35,61 @@ export const useRealtimeConversations = (userId?: string) => {
               ? {
                   text: d.lastMessage.text || '',
                   senderId: d.lastMessage.senderId || '',
-                  timestamp: d.lastMessage.createdAt?.toDate?.() || new Date(),
+                  createdAt: d.lastMessage.createdAt?.toDate?.() || new Date(),
                 }
               : undefined,
-            unreadCount: d.unreadCount?.[userId] || 0,
+            messages: d.messages || [],
+            unreadCount: d.unreadCount || { [userId || '']: 0 },
             isMissedConnection: d.isMissedConnection || false,
           };
         });
 
         // Check for new messages and show notifications
         const previousConversations = previousConversationsRef.current;
-        data.forEach((conversation) => {
+        data.forEach(async (conversation) => {
           const previousConversation = previousConversations.find(
             (prev) => prev.id === conversation.id
           );
 
           // If conversation has unread messages and wasn't previously tracked or had fewer unread messages
+          const unreadNow = conversation.unreadCount?.[userId || ''] || 0;
+          const unreadPrev =
+            previousConversation?.unreadCount?.[userId || ''] || 0;
           if (
-            conversation.unreadCount > 0 &&
+            unreadNow > 0 &&
             conversation.lastMessage &&
             conversation.lastMessage.senderId !== userId && // Not from current user
-            (!previousConversation ||
-              previousConversation.unreadCount < conversation.unreadCount)
+            (!previousConversation || unreadPrev < unreadNow)
           ) {
             // Get the other participant's name (not the current user)
             const otherParticipantId = conversation.participants.find(
               (id) => id !== userId
             );
 
-            // Show message notification
+            // Try to resolve the other participant's display name
+            let otherName = 'someone';
+            try {
+              if (otherParticipantId) {
+                const snap = await safeGetDoc(
+                  doc(db, 'users', otherParticipantId),
+                  `user_${otherParticipantId}`
+                );
+                const u =
+                  snap && typeof snap.exists === 'function' && snap.exists()
+                    ? snap.data()
+                    : null;
+                otherName =
+                  (u && (u as any).name) || otherParticipantId || otherName;
+              }
+            } catch (e) {
+              // Best-effort fallback to id
+              console.warn('Failed to fetch other participant name', e);
+            }
+
+            // Show message notification with name instead of id
             toastService.info(
-              'New Message 💬',
-              `You have a new message from ${otherParticipantId || 'someone'}`
+              i18n.t('toasts.newMessageTitle'),
+              i18n.t('toasts.newMessageBody', { name: otherName })
             );
           }
         });

@@ -1,5 +1,6 @@
 // app/components/ui/EnhancedEmptyState.tsx
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View,
   Text,
@@ -44,6 +45,7 @@ export interface EnhancedEmptyStateProps {
   onSecondaryActionPress?: () => void;
   icon?: React.ReactNode;
   animated?: boolean;
+  verticalAlign?: 'top' | 'center';
 }
 
 export const EnhancedEmptyState: React.FC<EnhancedEmptyStateProps> = ({
@@ -56,6 +58,7 @@ export const EnhancedEmptyState: React.FC<EnhancedEmptyStateProps> = ({
   onSecondaryActionPress,
   icon,
   animated = true,
+  verticalAlign = 'center',
 }) => {
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
@@ -80,48 +83,45 @@ export const EnhancedEmptyState: React.FC<EnhancedEmptyStateProps> = ({
     }
   }, []);
 
+  const { t } = useTranslation();
+
   const getDefaultContent = () => {
     switch (type) {
       case 'discover':
         return {
           icon: <Search size={64} color={theme.textSecondary} />,
-          title: 'No Profiles Found',
-          message:
-            "We couldn't find any profiles matching your preferences. Try adjusting your filters or expanding your distance range.",
-          actionLabel: 'Adjust Filters',
-          secondaryActionLabel: 'Refresh',
+          title: t('search.noProfiles'),
+          message: t('search.noProfilesDetail'),
+          actionLabel: t('search.adjustFilters'),
+          secondaryActionLabel: t('search.refresh'),
         };
       case 'loved':
         return {
           icon: <Heart size={64} color={theme.textSecondary} />,
-          title: 'No Likes Yet',
-          message:
-            "You haven't liked anyone yet. Start exploring profiles to find your perfect match!",
-          actionLabel: 'Start Exploring',
+          title: t('loved.noLiked'),
+          message: t('loved.startSwiping'),
+          actionLabel: t('actions.like'),
         };
       case 'matches':
         return {
           icon: <Users size={64} color={theme.textSecondary} />,
-          title: 'No Matches Yet',
-          message:
-            "Keep swiping! When someone you like likes you back, you'll see them here.",
-          actionLabel: 'Find Matches',
+          title: t('loved.noMatches'),
+          message: t('loved.keepSwiping'),
+          actionLabel: t('actions.like'),
         };
       case 'chat':
         return {
           icon: <MessageCircle size={64} color={theme.textSecondary} />,
-          title: 'No Conversations',
-          message:
-            "You don't have any active conversations. Match with someone to start chatting!",
-          actionLabel: 'Find Matches',
+          title: t('chat.noConversations'),
+          message: t('chat.startMatching'),
+          actionLabel: t('actions.message'),
         };
       case 'connections':
         return {
           icon: <MapPin size={64} color={theme.textSecondary} />,
-          title: 'No Missed Connections',
-          message:
-            "Haven't seen anyone interesting nearby? Create a missed connection post and see who responds!",
-          actionLabel: 'Create Post',
+          title: t('connections.noPosts'),
+          message: t('connections.createPost'),
+          actionLabel: t('connections.createPost'),
         };
       case 'no-results':
         return {
@@ -179,9 +179,15 @@ export const EnhancedEmptyState: React.FC<EnhancedEmptyStateProps> = ({
   const displaySecondaryActionLabel =
     secondaryActionLabel || defaultContent.secondaryActionLabel;
 
+  // Removed duplicate hook call earlier
+
   const containerStyle = animated
     ? [
-        styles.container,
+        {
+          ...styles.container,
+          justifyContent: verticalAlign === 'top' ? 'flex-start' : 'center',
+          paddingTop: verticalAlign === 'top' ? 8 : 32,
+        },
         {
           opacity: fadeAnim,
           transform: [{ scale: scaleAnim }],
@@ -190,7 +196,7 @@ export const EnhancedEmptyState: React.FC<EnhancedEmptyStateProps> = ({
     : styles.container;
 
   return (
-    <Animated.View style={containerStyle}>
+    <Animated.View style={containerStyle as any}>
       <View style={styles.content}>
         <View style={styles.iconContainer}>{displayIcon}</View>
         <Text style={[styles.title, { color: theme.text }]}>

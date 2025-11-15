@@ -34,6 +34,8 @@ import missedConnectionsService, {
   NotificationItem,
 } from '../../services/firebase/missedConnectionsService';
 import { doc, getDoc } from 'firebase/firestore';
+import { safeGetDoc } from '../../services/firebase/firestoreHelpers';
+import { useChatData } from '../../hooks/useChatData';
 import { db } from '../../services/firebase/config';
 import {
   scale,
@@ -65,6 +67,9 @@ export default function TabLayout() {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const bellScaleAnim = useRef(new Animated.Value(1)).current;
   const insets = useSafeAreaInsets();
+
+  // Ensure chat data is loaded as early as possible
+  useChatData();
 
   // Redirect to profile completion if needed
   useEffect(() => {
@@ -114,11 +119,39 @@ export default function TabLayout() {
         const previousCount = pendingChatRequests.length;
         setPendingChatRequests(requests);
 
-        // Show toast notification for new requests
+        // Show toast notification for new requests containing sender name
         if (requests.length > previousCount) {
+          const newRequests = requests.slice(
+            0,
+            requests.length - previousCount
+          );
+          const firstNew = newRequests[0];
+          let senderName = 'Someone';
+          try {
+            if (firstNew?.sender) {
+              const snap = await safeGetDoc(
+                doc(db, 'users', firstNew.sender),
+                `user_${firstNew.sender}`
+              );
+              const u =
+                snap && typeof snap.exists === 'function' && snap.exists()
+                  ? snap.data()
+                  : null;
+              senderName =
+                (u && ((u as any).name || (u as any).displayName)) ||
+                firstNew.sender ||
+                senderName;
+            }
+          } catch (e) {
+            console.warn(
+              'Failed to resolve sender name for chat request toast',
+              e
+            );
+          }
+
           toastService.info(
-            'Chat Request Received! 💬',
-            'Check your notifications to respond'
+            t('toasts.chatRequestTitle'),
+            t('toasts.chatRequestBody', { name: senderName })
           );
 
           // Animate bell icon
@@ -182,8 +215,10 @@ export default function TabLayout() {
           );
           if (matchNotifications.length > 0) {
             toastService.success(
-              "It's a Match! 🎉",
-              'Check your notifications for details'
+              t('toasts.matchToastTitle'),
+              t('toasts.matchToastBody', {
+                name: matchNotifications[0]?.displayName || '',
+              })
             );
           }
         }
@@ -302,7 +337,7 @@ export default function TabLayout() {
                   },
                 ]}
               >
-                MeetBridge
+                {t('app.title')}
               </Text>
             </View>
           </View>
@@ -611,15 +646,26 @@ export default function TabLayout() {
             (id: string) => id !== user?.id
           );
           if (otherUserId) {
-            const userDoc = await getDoc(doc(db, 'users', otherUserId));
-            if (userDoc.exists()) {
-              setCurrentTempMatch(request);
-              setOtherUser({
-                id: userDoc.id,
-                ...userDoc.data(),
-              });
-              handleClaimsClose();
-              setShowTempMatchModal(true);
+            try {
+              const userDoc = await safeGetDoc(
+                doc(db, 'users', otherUserId),
+                `user_${otherUserId}`
+              );
+              if (
+                userDoc &&
+                typeof userDoc.exists === 'function' &&
+                userDoc.exists()
+              ) {
+                setCurrentTempMatch(request);
+                setOtherUser({
+                  id: otherUserId,
+                  ...(userDoc.data() as any),
+                });
+                handleClaimsClose();
+                setShowTempMatchModal(true);
+              }
+            } catch (e) {
+              console.warn('Failed to fetch other user for claim modal', e);
             }
           }
         }}
