@@ -13,10 +13,10 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
-  Dimensions,
   FlatList,
   ListRenderItemInfo,
   RefreshControl,
+  useWindowDimensions,
 } from 'react-native';
 import { SlidersVertical, Map, Grid3x3 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
@@ -56,8 +56,6 @@ import {
 } from 'firebase/firestore';
 import { safeGetDoc } from '../../services/firebase/firestoreHelpers';
 import { db } from '../../services/firebase/config';
-
-const { width } = Dimensions.get('window');
 
 interface ProfileCardProps {
   user: {
@@ -106,10 +104,10 @@ const ProfileCard = memo(
     useEffect(() => {
       if (isAnimatingOut) {
         opacity.value = withTiming(0, { duration: 180 });
-        translateY.value = withTiming(isLiked ? -120 : 120, { duration: 220 });
+        translateY.value = withTiming(isLiked ? -140 : 140, { duration: 240 });
         scale.value = withSequence(
-          withTiming(1.05, { duration: 60 }),
-          withTiming(0.8, { duration: 160 })
+          withTiming(1.06, { duration: 70 }),
+          withTiming(0.82, { duration: 170 })
         );
       }
     }, [isAnimatingOut, isLiked]);
@@ -172,14 +170,14 @@ const ProfileCard = memo(
                   <TouchableOpacity
                     style={styles.imageNavLeft}
                     onPress={goPrev}
-                    activeOpacity={1}
+                    activeOpacity={0.7}
                   />
                 )}
                 {currentImageIndex < userImages.length - 1 && (
                   <TouchableOpacity
                     style={styles.imageNavRight}
                     onPress={goNext}
-                    activeOpacity={1}
+                    activeOpacity={0.7}
                   />
                 )}
               </>
@@ -225,6 +223,10 @@ const ProfileCard = memo(
   }
 );
 
+const NUM_COLUMNS = 2;
+const HORIZONTAL_PADDING = 48; // 24 left + 24 right
+const ITEM_GAP = 16;
+
 export default function SearchScreen() {
   const { t } = useTranslation();
   const { isDarkMode } = useTheme();
@@ -235,6 +237,10 @@ export default function SearchScreen() {
   } = useAuth();
   const theme = isDarkMode ? darkTheme : lightTheme;
   const router = useRouter();
+  const { width: screenWidth } = useWindowDimensions();
+
+  const cardWidth = (screenWidth - HORIZONTAL_PADDING - ITEM_GAP) / NUM_COLUMNS;
+  const itemHeight = cardWidth + 40; // card (1:1) + marginBottom + distance badge margin
 
   const [selectedProfile, setSelectedProfile] = useState<any>(null);
   const [showProfileDetail, setShowProfileDetail] = useState(false);
@@ -278,30 +284,31 @@ export default function SearchScreen() {
     clearError,
   } = useUserStore();
 
+  // Keep animating cards in the list until animation finishes
   const sortedDiscoverProfiles = useMemo(() => {
     const matched = new Set(matchedProfiles);
     const liked = new Set(likedProfiles);
     const disliked = new Set(dislikedProfiles);
-    const seen = new Set<string>();
 
     const missed = new Set(
       (conversations || [])
         .filter((c: any) => c.isMissedConnection)
-        .flatMap((c: any) => c.participants || [])
-        .filter((id: string) => id !== currentUser?.id)
+        .flatMap((c: any) =>
+          (c.participants || []).filter((id: string) => id !== currentUser?.id)
+        )
     );
 
     return discoverProfiles
       .filter((p) => {
-        if (
+        const isProcessed =
           matched.has(p.id) ||
           liked.has(p.id) ||
           disliked.has(p.id) ||
-          missed.has(p.id) ||
-          seen.has(p.id)
-        )
-          return false;
-        seen.add(p.id);
+          missed.has(p.id);
+
+        // Keep card if it is currently animating out
+        if (isProcessed && !animatingOut.has(p.id)) return false;
+
         const age = p.age || 0;
         return age >= ageRange[0] && age <= ageRange[1];
       })
@@ -314,6 +321,7 @@ export default function SearchScreen() {
     conversations,
     currentUser?.id,
     ageRange,
+    animatingOut, // ← critical
   ]);
 
   const syncPreferences = useCallback(() => {
@@ -385,7 +393,7 @@ export default function SearchScreen() {
               return ns;
             });
           });
-      }, 200);
+      }, 220); // longer than animation
     },
     [currentUser, likeProfile]
   );
@@ -403,7 +411,7 @@ export default function SearchScreen() {
           ns.delete(id);
           return ns;
         });
-      }, 200);
+      }, 220);
     },
     [dislikeProfile]
   );
@@ -477,14 +485,14 @@ export default function SearchScreen() {
     ]
   );
 
-  // Real-time match listener
+  // Real-time new match listener (fixed scope bug)
   useEffect(() => {
     if (!currentUser?.id) return;
 
     const handleChange = async (change: any, isUser1: boolean) => {
       if (!change.doc?.exists()) return;
       const data = change.doc.data();
-      if (!data?.user1 || !data.user2) return;
+      if (!data?.user1 || !data?.user2) return;
 
       const otherId = isUser1 ? data.user2 : data.user1;
 
@@ -501,16 +509,19 @@ export default function SearchScreen() {
 
       processedMatchesRef.current.add(change.doc.id);
 
+      let matchedUser: any = null;
+
       try {
         const snap = await safeGetDoc(
           firestoreDoc(db, 'users', otherId),
           `user_${otherId}`
         );
+
         if (!snap || (typeof snap.exists === 'function' && !snap.exists()))
           return;
-        const userData =
-          snap && (snap as any).data ? (snap as any).data() : null;
-        const matchedUser = { id: snap.id, ...userData };
+
+        const userData = (snap as any).data ? (snap as any).data() : null;
+        matchedUser = { id: snap.id, ...userData };
       } catch (e) {
         console.warn('Failed to resolve matched user for match animation', e);
         return;
@@ -561,9 +572,10 @@ export default function SearchScreen() {
   }, [currentUser?.id]);
 
   const keyExtractor = useCallback((item: any) => item.id, []);
+
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<any>) => (
-      <View style={styles.gridItem}>
+      <View style={[styles.gridItem, { width: cardWidth }]}>
         <ProfileCard
           user={item}
           onPress={handleProfilePress}
@@ -575,6 +587,15 @@ export default function SearchScreen() {
       </View>
     ),
     [handleProfilePress, likedProfiles, dislikedProfiles, animatingOut, theme]
+  );
+
+  const getItemLayout = useCallback(
+    (_: any, index: number) => ({
+      length: itemHeight,
+      offset: itemHeight * Math.floor(index / NUM_COLUMNS),
+      index,
+    }),
+    [itemHeight]
   );
 
   if (isSearching || isLoadingDiscover) {
@@ -655,7 +676,7 @@ export default function SearchScreen() {
           data={sortedDiscoverProfiles}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
-          numColumns={2}
+          numColumns={NUM_COLUMNS}
           columnWrapperStyle={styles.columnWrapper}
           contentContainerStyle={
             sortedDiscoverProfiles.length === 0
@@ -679,8 +700,10 @@ export default function SearchScreen() {
           }
           showsVerticalScrollIndicator={false}
           removeClippedSubviews
-          maxToRenderPerBatch={8}
-          windowSize={5}
+          maxToRenderPerBatch={20}
+          windowSize={15}
+          initialNumToRender={12}
+          getItemLayout={getItemLayout}
         />
       )}
 
@@ -814,7 +837,7 @@ const styles = StyleSheet.create({
     paddingTop: 6,
   },
   columnWrapper: { justifyContent: 'space-between', gap: 16 },
-  gridItem: { width: (width - 48) / 2, marginBottom: 20 },
+  gridItem: { marginBottom: 20 },
   cardContainer: { position: 'relative' },
   card: {
     borderRadius: 28,
@@ -841,8 +864,8 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.95 }],
   },
   imageContainer: {
-    width: 120,
-    height: 120,
+    width: 100,
+    height: 100,
     borderRadius: 60,
     overflow: 'hidden',
     marginBottom: 16,

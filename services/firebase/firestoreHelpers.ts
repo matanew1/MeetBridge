@@ -16,7 +16,7 @@ export async function safeGetDoc<T = any>(
   cacheTtlMs?: number
 ): Promise<
   | DocumentSnapshot<T>
-  | { exists: () => boolean; data: () => T | undefined }
+  | { exists: () => boolean; id: string; data: () => T | undefined }
   | null
 > {
   try {
@@ -41,6 +41,7 @@ export async function safeGetDoc<T = any>(
       if (cached) {
         return {
           exists: () => true,
+          id: (ref as any).id || cacheKey || '',
           data: () => cached,
         };
       }

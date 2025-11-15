@@ -225,8 +225,7 @@ const resources = {
         dontHaveAccount: "Don't have an account?",
         signUp: 'Sign Up',
         signIn: 'Sign In',
-        emailAddress: 'Email Address',
-        enterEmail: 'Enter your email',
+        /* emailAddress and enterEmail are defined later for reset flow */
         password: 'Password',
         enterPassword: 'Enter your password',
         forgotPassword: 'Forgot Password?',
@@ -251,7 +250,6 @@ const resources = {
         saveProfile: 'Save Profile',
         profileSaved: 'Profile saved successfully',
         profileSaveError: 'Failed to save profile',
-        forgotPasswordTitle: 'Forgot Password',
         resetInstructions: 'Enter your email to receive reset instructions',
         sendResetEmail: 'Send Reset Email',
         resetEmailSent: 'Reset email sent successfully',
@@ -276,11 +274,7 @@ const resources = {
         invalidEmail: 'Please enter a valid email address',
         passwordTooShort: 'Password must be at least 6 characters long',
         passwordsDoNotMatch: 'Passwords do not match',
-        unexpectedError: 'An unexpected error occurred',
-        loginFailed: 'Login Failed',
-        registrationFailed: 'Registration Failed',
-        profileSaveError: 'Failed to save profile',
-        profileSaved: 'Profile saved successfully',
+        /* validation messages defined above */
       },
 
       // Onboarding Tutorial
@@ -333,6 +327,11 @@ const resources = {
 
       // Toasts / Notifications
       toasts: {
+        permissionNeededTitle: 'Permission needed',
+        grantPhotoAccess: 'Grant photo access',
+        photoSentTitle: 'Photo sent',
+        photoSentBody: 'Photo has been sent successfully',
+        photoFailedTitle: 'Failed to send photo',
         newMessageTitle: 'New Message 💬',
         newMessageBody: 'You have a new message from {{name}}',
         newCommentTitle: 'New Comment 💬',
@@ -375,7 +374,7 @@ const resources = {
           "💡 Both of you must accept to start chatting. They'll receive a notification about your request.",
         declineButton: 'Decline',
         acceptButton: 'Accept Request',
-        waitingForAcceptance: 'Waiting for {{name}} to accept...',
+        waitingForAcceptanceWithName: 'Waiting for {{name}} to accept...',
       },
 
       // Comments Section
@@ -638,15 +637,13 @@ const resources = {
         dontHaveAccount: 'אין לך חשבון?',
         signUp: 'הרשם',
         signIn: 'התחבר',
-        emailAddress: 'כתובת אימייל',
-        enterEmail: 'הכנס את האימייל שלך',
         password: 'סיסמה',
         enterPassword: 'הכנס את הסיסמה שלך',
         forgotPassword: 'שכחת סיסמה?',
         loginError: 'שגיאת התחברות',
         fillAllFields: 'אנא מלא את כל השדות',
         loginFailed: 'התחברות נכשלה',
-        unexpectedError: 'אירעה שגיאה לא צפויה',
+        /* unexpectedError defined above in the auth block */
         register: 'הרשם',
         createAccount: 'צור חשבון',
         fullName: 'שם מלא',
@@ -664,7 +661,6 @@ const resources = {
         saveProfile: 'שמור פרופיל',
         profileSaved: 'הפרופיל נשמר בהצלחה',
         profileSaveError: 'נכשל בשמירת הפרופיל',
-        forgotPasswordTitle: 'שכחת סיסמה',
         resetInstructions: 'הכנס את האימייל שלך כדי לקבל הוראות איפוס',
         sendResetEmail: 'שלח אימייל איפוס',
         resetEmailSent: 'אימייל איפוס נשלח בהצלחה',
@@ -689,10 +685,6 @@ const resources = {
         passwordTooShort: 'הסיסמה חייבת להכיל לפחות 6 תווים',
         passwordsDoNotMatch: 'הסיסמאות לא תואמות',
         unexpectedError: 'אירעה שגיאה לא צפויה',
-        loginFailed: 'התחברות נכשלה',
-        registrationFailed: 'הרשמה נכשלה',
-        profileSaveError: 'נכשל בשמירת הפרופיל',
-        profileSaved: 'הפרופיל נשמר בהצלחה',
       },
 
       // Common
@@ -776,7 +768,7 @@ const resources = {
           '💡 שניכם חייבים לקבל כדי להתחיל לשוחח. הם יקבלו התראה על הבקשה שלך.',
         declineButton: 'דחה',
         acceptButton: 'קבל בקשה',
-        waitingForAcceptance: 'מחכה ש-{{name}} יקבל...',
+        waitingForAcceptanceWithName: 'מחכה ש-{{name}} יקבל...',
       },
 
       // Comments Section
@@ -962,15 +954,14 @@ const resources = {
         dontHaveAccount: 'Нет аккаунта?',
         signUp: 'Регистрация',
         signIn: 'Войти',
-        emailAddress: 'Адрес электронной почты',
-        enterEmail: 'Введите ваш email',
+        /* emailAddress and enterEmail are defined later for reset flow */
         password: 'Пароль',
         enterPassword: 'Введите ваш пароль',
         forgotPassword: 'Забыли пароль?',
         loginError: 'Ошибка входа',
         fillAllFields: 'Пожалуйста, заполните все поля',
         loginFailed: 'Вход не удался',
-        unexpectedError: 'Произошла непредвиденная ошибка',
+        /* validation messages defined above */
         register: 'Регистрация',
         createAccount: 'Создать аккаунт',
         fullName: 'Полное имя',
@@ -989,7 +980,6 @@ const resources = {
         saveProfile: 'Сохранить профиль',
         profileSaved: 'Профиль успешно сохранен',
         profileSaveError: 'Не удалось сохранить профиль',
-        forgotPasswordTitle: 'Забыли пароль',
         resetInstructions:
           'Введите ваш email, чтобы получить инструкции по сбросу',
         sendResetEmail: 'Отправить email для сброса',
@@ -1017,10 +1007,6 @@ const resources = {
         passwordTooShort: 'Пароль должен содержать не менее 6 символов',
         passwordsDoNotMatch: 'Пароли не совпадают',
         unexpectedError: 'Произошла непредвиденная ошибка',
-        loginFailed: 'Вход не удался',
-        registrationFailed: 'Регистрация не удалась',
-        profileSaveError: 'Не удалось сохранить профиль',
-        profileSaved: 'Профиль успешно сохранен',
       },
 
       // Common
@@ -1129,7 +1115,7 @@ const resources = {
           '💡 Оба должны принять, чтобы начать чат. Они получат уведомление о вашем запросе.',
         declineButton: 'Отклонить',
         acceptButton: 'Принять запрос',
-        waitingForAcceptance: 'Ожидание принятия от {{name}}...',
+        waitingForAcceptanceWithName: 'Ожидание принятия от {{name}}...',
       },
 
       // Comments Section
@@ -1316,8 +1302,7 @@ const resources = {
         dontHaveAccount: '¿No tienes una cuenta?',
         signUp: 'Registrarse',
         signIn: 'Iniciar sesión',
-        emailAddress: 'Dirección de correo electrónico',
-        enterEmail: 'Ingresa tu correo electrónico',
+        /* emailAddress and enterEmail defined later for reset flow */
         password: 'Contraseña',
         enterPassword: 'Ingresa tu contraseña',
         forgotPassword: '¿Olvidaste tu contraseña?',
@@ -1343,7 +1328,6 @@ const resources = {
         saveProfile: 'Guardar perfil',
         profileSaved: 'Perfil guardado exitosamente',
         profileSaveError: 'Error al guardar el perfil',
-        forgotPasswordTitle: 'Olvidé mi contraseña',
         resetInstructions:
           'Ingresa tu correo electrónico para recibir instrucciones de restablecimiento',
         sendResetEmail: 'Enviar correo de restablecimiento',
@@ -1370,11 +1354,7 @@ const resources = {
           'Por favor, ingresa una dirección de correo electrónico válida',
         passwordTooShort: 'La contraseña debe tener al menos 6 caracteres',
         passwordsDoNotMatch: 'Las contraseñas no coinciden',
-        unexpectedError: 'Ocurrió un error inesperado',
-        loginFailed: 'Inicio de sesión fallido',
-        registrationFailed: 'Registro fallido',
-        profileSaveError: 'Error al guardar el perfil',
-        profileSaved: 'Perfil guardado exitosamente',
+        /* validation messages already defined earlier */
       },
 
       // Common
@@ -1483,7 +1463,7 @@ const resources = {
           '💡 Ambos deben aceptar para empezar a chatear. Recibirán una notificación sobre tu solicitud.',
         declineButton: 'Rechazar',
         acceptButton: 'Aceptar solicitud',
-        waitingForAcceptance: 'Esperando que {{name}} acepte...',
+        waitingForAcceptanceWithName: 'Esperando que {{name}} acepte...',
       },
 
       // Comments Section

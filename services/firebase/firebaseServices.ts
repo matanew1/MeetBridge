@@ -279,7 +279,7 @@ export class FirebaseUserProfileService implements IUserProfileService {
       await updateDoc(userRef, updateData);
 
       // Get updated document
-      const updatedDoc = await getDoc(userRef);
+      const updatedDoc = await safeGetDoc(userRef, `users:${userRef.id}`);
       const updatedUserData = updatedDoc.data();
 
       return {
@@ -390,7 +390,10 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         throw new Error('No user logged in');
       }
 
-      const currentUserDoc = await getDoc(doc(db, 'users', currentUserId));
+      const currentUserDoc = await safeGetDoc(
+        doc(db, 'users', currentUserId),
+        `users:${currentUserId}`
+      );
       if (!currentUserDoc.exists()) {
         throw new Error('Current user not found');
       }
@@ -858,26 +861,36 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
         const matchResult = await this.createMatch(userId, targetUserId);
 
         if (matchResult.success) {
-          const matchedUserDoc = await getDoc(doc(db, 'users', targetUserId));
-          const matchedUserData = matchedUserDoc.exists()
-            ? matchedUserDoc.data()
-            : null;
+          const matchedUserDoc = await safeGetDoc(
+            doc(db, 'users', targetUserId),
+            `users:${targetUserId}`
+          );
+          const matchedUserData =
+            matchedUserDoc && matchedUserDoc.exists()
+              ? matchedUserDoc.data()
+              : null;
 
           // Send match notification to the target user (only from the user with smaller ID to avoid duplicates)
           if (userId < targetUserId) {
             try {
-              const currentUserDoc = await getDoc(doc(db, 'users', userId));
-              const currentUserData = currentUserDoc.exists()
-                ? currentUserDoc.data()
-                : null;
+              const currentUserDoc = await safeGetDoc(
+                doc(db, 'users', userId),
+                `users:${userId}`
+              );
+              const currentUserData =
+                currentUserDoc && currentUserDoc.exists()
+                  ? currentUserDoc.data()
+                  : null;
               const currentUserToken = currentUserData?.pushToken;
 
-              const targetUserDoc = await getDoc(
-                doc(db, 'users', targetUserId)
+              const targetUserDoc = await safeGetDoc(
+                doc(db, 'users', targetUserId),
+                `users:${targetUserId}`
               );
-              const targetUserData = targetUserDoc.exists()
-                ? targetUserDoc.data()
-                : null;
+              const targetUserData =
+                targetUserDoc && targetUserDoc.exists()
+                  ? targetUserDoc.data()
+                  : null;
               const targetUserToken = targetUserData?.pushToken;
 
               // Don't send notification if both users have the same push token (same device)
@@ -890,9 +903,10 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
                   '📱 Same push token, skipping match notification to avoid self-notification'
                 );
               } else {
-                const currentUserName = currentUserDoc.exists()
-                  ? currentUserDoc.data().name || 'Someone'
-                  : 'Someone';
+                const currentUserName =
+                  currentUserDoc && currentUserDoc.exists()
+                    ? currentUserDoc.data().name || 'Someone'
+                    : 'Someone';
 
                 notificationService
                   .broadcastMatchNotification(
@@ -1131,8 +1145,8 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
       // Send notifications to both users
       try {
         const [user1Doc, user2Doc] = await Promise.all([
-          getDoc(doc(db, 'users', userId)),
-          getDoc(doc(db, 'users', targetUserId)),
+          safeGetDoc(doc(db, 'users', userId), `users:${userId}`),
+          safeGetDoc(doc(db, 'users', targetUserId), `users:${targetUserId}`),
         ]);
 
         if (user1Doc.exists() && user2Doc.exists()) {
@@ -1238,10 +1252,10 @@ export class FirebaseDiscoveryService implements IDiscoveryService {
           const otherUserId =
             matchData.user1 === userId ? matchData.user2 : matchData.user1;
 
-          // Get the other user's profile
-          getDoc(doc(db, 'users', otherUserId))
+          // Get the other user's profile (safe get with cache fallback)
+          safeGetDoc(doc(db, 'users', otherUserId), `users:${otherUserId}`)
             .then((userDoc) => {
-              if (userDoc.exists()) {
+              if (userDoc && userDoc.exists && userDoc.exists()) {
                 const user = {
                   ...userDoc.data(),
                   id: otherUserId,
@@ -1308,7 +1322,10 @@ export class FirebaseMatchingService implements IMatchingService {
       const pageSize = 20;
 
       // Get current user's blocked users
-      const currentUserDoc = await getDoc(doc(db, 'users', userId));
+      const currentUserDoc = await safeGetDoc(
+        doc(db, 'users', userId),
+        `users:${userId}`
+      );
       if (!currentUserDoc.exists()) {
         return {
           data: [],
@@ -1372,7 +1389,10 @@ export class FirebaseMatchingService implements IMatchingService {
         if (!seenUserIds.has(otherUserId) && !blockedUsers.has(otherUserId)) {
           seenUserIds.add(otherUserId);
 
-          const userDoc = await getDoc(doc(db, 'users', otherUserId));
+          const userDoc = await safeGetDoc(
+            doc(db, 'users', otherUserId),
+            `users:${otherUserId}`
+          );
           if (userDoc.exists()) {
             const userData = userDoc.data();
             console.log(
@@ -1422,7 +1442,10 @@ export class FirebaseMatchingService implements IMatchingService {
       const pageSize = 20;
 
       // Get current user's blocked users
-      const currentUserDoc = await getDoc(doc(db, 'users', userId));
+      const currentUserDoc = await safeGetDoc(
+        doc(db, 'users', userId),
+        `users:${userId}`
+      );
       if (!currentUserDoc.exists()) {
         return {
           data: [],
@@ -1453,7 +1476,10 @@ export class FirebaseMatchingService implements IMatchingService {
         if (matchedUserIds.has(targetUserId) || blockedUsers.has(targetUserId))
           continue;
 
-        const userDoc = await getDoc(doc(db, 'users', targetUserId));
+        const userDoc = await safeGetDoc(
+          doc(db, 'users', targetUserId),
+          `users:${targetUserId}`
+        );
 
         if (userDoc.exists()) {
           const userData = userDoc.data();
@@ -1714,7 +1740,10 @@ export class FirebaseChatService implements IChatService {
     page: number = 1
   ): Promise<ApiResponse<Conversation>> {
     try {
-      const convDoc = await getDoc(doc(db, 'conversations', conversationId));
+      const convDoc = await safeGetDoc(
+        doc(db, 'conversations', conversationId),
+        `conversations:${conversationId}`
+      );
 
       if (!convDoc.exists()) {
         throw new Error('Conversation not found');
@@ -1791,7 +1820,10 @@ export class FirebaseChatService implements IChatService {
         messageData
       );
 
-      const convDoc = await getDoc(doc(db, 'conversations', conversationId));
+      const convDoc = await safeGetDoc(
+        doc(db, 'conversations', conversationId),
+        `conversations:${conversationId}`
+      );
       if (!convDoc.exists()) {
         throw new Error('Conversation not found');
       }
@@ -1827,11 +1859,17 @@ export class FirebaseChatService implements IChatService {
 
       if (recipientId) {
         try {
-          const senderDoc = await getDoc(doc(db, 'users', message.senderId));
+          const senderDoc = await safeGetDoc(
+            doc(db, 'users', message.senderId),
+            `users:${message.senderId}`
+          );
           const senderData = senderDoc.exists() ? senderDoc.data() : null;
           const senderToken = senderData?.pushToken;
 
-          const recipientDoc = await getDoc(doc(db, 'users', recipientId));
+          const recipientDoc = await safeGetDoc(
+            doc(db, 'users', recipientId),
+            `users:${recipientId}`
+          );
           const recipientData = recipientDoc.exists()
             ? recipientDoc.data()
             : null;
@@ -1982,7 +2020,10 @@ export class FirebaseAuthService implements IAuthService {
       );
       const firebaseUser = userCredential.user;
 
-      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+      const userDoc = await safeGetDoc(
+        doc(db, 'users', firebaseUser.uid),
+        `users:${firebaseUser.uid}`
+      );
       let userData: User;
 
       if (userDoc.exists()) {
@@ -2317,7 +2358,10 @@ export class FirebaseAuthService implements IAuthService {
         firebaseUser.uid
       );
 
-      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+      const userDoc = await safeGetDoc(
+        doc(db, 'users', firebaseUser.uid),
+        `users:${firebaseUser.uid}`
+      );
 
       if (!userDoc.exists()) {
         console.log(
@@ -2413,7 +2457,10 @@ export class FirebaseAuthService implements IAuthService {
 
       // Step 2: Delete user's profile image from storage
       try {
-        const userDoc = await getDoc(doc(db, 'users', userId));
+        const userDoc = await safeGetDoc(
+          doc(db, 'users', userId),
+          `users:${userId}`
+        );
         if (userDoc.exists()) {
           const userData = userDoc.data();
           if (userData.image) {

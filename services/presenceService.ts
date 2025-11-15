@@ -442,11 +442,14 @@ class PresenceService {
     lastSeen: Date | null;
   }> {
     try {
-      const { doc: firestoreDoc, getDoc } = await import('firebase/firestore');
-      const userDocRef = firestoreDoc(db, 'users', userId);
-      const userDoc = await getDoc(userDocRef);
+      // Use safe helper which falls back to cache when offline
+      const { safeGetDoc } = await import('./firebase/firestoreHelpers');
+      const userDoc = await safeGetDoc(
+        doc(db, 'users', userId),
+        `users:${userId}`
+      );
 
-      if (userDoc.exists()) {
+      if (userDoc && userDoc.exists && userDoc.exists()) {
         const data = userDoc.data();
         return {
           isOnline: data.isOnline || false,

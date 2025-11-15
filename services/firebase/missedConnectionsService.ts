@@ -2,7 +2,6 @@
 import {
   collection,
   doc,
-  getDoc,
   addDoc,
   updateDoc,
   deleteDoc,
@@ -17,6 +16,7 @@ import {
   increment,
 } from 'firebase/firestore';
 import { db, auth } from './config';
+import { safeGetDoc } from './firestoreHelpers';
 import { geohashService } from '../location';
 import notificationService from '../notificationService';
 import storageService from '../storageService';
@@ -129,7 +129,10 @@ class MissedConnectionsService {
       }
 
       // Get user profile for display info
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      const userDoc = await safeGetDoc(
+        doc(db, 'users', user.uid),
+        `users:${user.uid}`
+      );
       const userData = userDoc.exists() ? userDoc.data() : null;
 
       // Handle image upload to Cloudinary
@@ -233,7 +236,10 @@ class MissedConnectionsService {
       }
 
       const connectionRef = doc(db, 'missed_connections', connectionId);
-      const connectionSnap = await getDoc(connectionRef);
+      const connectionSnap = await safeGetDoc(
+        connectionRef,
+        `connections:${connectionRef.id}`
+      );
 
       if (!connectionSnap.exists()) {
         return {
@@ -319,7 +325,10 @@ class MissedConnectionsService {
           updateData.userImage = null;
         } else {
           // Get current user data
-          const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+          const userDoc = await safeGetDoc(
+            doc(db, 'users', auth.currentUser.uid),
+            `users:${auth.currentUser.uid}`
+          );
           const userData = userDoc.data();
           updateData.userName = userData?.name || 'Anonymous';
           updateData.userImage = userData?.image || null;
@@ -365,7 +374,10 @@ class MissedConnectionsService {
       }
 
       // Get current user's blocked users
-      const currentUserDoc = await getDoc(doc(db, 'users', currentUser.uid));
+      const currentUserDoc = await safeGetDoc(
+        doc(db, 'users', currentUser.uid),
+        `users:${currentUser.uid}`
+      );
       if (!currentUserDoc.exists()) {
         return {
           success: false,
@@ -513,7 +525,10 @@ class MissedConnectionsService {
   ): Promise<{ success: boolean; message: string; isLiked?: boolean }> {
     try {
       const connectionRef = doc(db, 'missed_connections', connectionId);
-      const connectionDoc = await getDoc(connectionRef);
+      const connectionDoc = await safeGetDoc(
+        connectionRef,
+        `connections:${connectionRef.id}`
+      );
 
       if (!connectionDoc.exists()) {
         return { success: false, message: 'Connection not found' };
@@ -559,7 +574,10 @@ class MissedConnectionsService {
   ): Promise<{ success: boolean; message: string }> {
     try {
       const connectionRef = doc(db, 'missed_connections', connectionId);
-      const connectionDoc = await getDoc(connectionRef);
+      const connectionDoc = await safeGetDoc(
+        connectionRef,
+        `connections:${connectionRef.id}`
+      );
 
       if (!connectionDoc.exists()) {
         return { success: false, message: 'Connection not found' };
@@ -602,7 +620,7 @@ class MissedConnectionsService {
       }
 
       // Get the connection to find the post owner
-      const connectionDoc = await getDoc(
+      const connectionDoc = await safeGetDoc(
         doc(db, 'missed_connections', connectionId)
       );
       if (!connectionDoc.exists()) {
@@ -613,7 +631,10 @@ class MissedConnectionsService {
       const postOwnerId = connectionData.userId;
 
       // Check if current user blocked the post owner
-      const currentUserDoc = await getDoc(doc(db, 'users', user.uid));
+      const currentUserDoc = await safeGetDoc(
+        doc(db, 'users', user.uid),
+        `users:${user.uid}`
+      );
       if (currentUserDoc.exists()) {
         const currentUserData = currentUserDoc.data();
         const blockedUsers = currentUserData.blockedUsers || [];
@@ -674,7 +695,10 @@ class MissedConnectionsService {
       }
 
       // Get user profile
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      const userDoc = await safeGetDoc(
+        doc(db, 'users', user.uid),
+        `users:${user.uid}`
+      );
       const userData = userDoc.exists() ? userDoc.data() : null;
 
       // Create claim
@@ -832,8 +856,9 @@ class MissedConnectionsService {
     message: string;
   }> {
     try {
-      const connectionDoc = await getDoc(
-        doc(db, 'missed_connections', connectionId)
+      const connectionDoc = await safeGetDoc(
+        doc(db, 'missed_connections', connectionId),
+        `connections:${connectionId}`
       );
 
       if (!connectionDoc.exists()) {
@@ -900,7 +925,10 @@ class MissedConnectionsService {
       // Get user profile for display info
       let userData = null;
       try {
-        const userDoc = await getDoc(doc(db, 'users', userId));
+        const userDoc = await safeGetDoc(
+          doc(db, 'users', userId),
+          `users:${userId}`
+        );
         userData = userDoc.exists() ? userDoc.data() : null;
       } catch (err) {
         console.log('Could not fetch user data, using defaults');
@@ -1037,7 +1065,10 @@ class MissedConnectionsService {
   ): Promise<{ success: boolean; message: string; isSaved?: boolean }> {
     try {
       const connectionRef = doc(db, 'missed_connections', connectionId);
-      const connectionDoc = await getDoc(connectionRef);
+      const connectionDoc = await safeGetDoc(
+        connectionRef,
+        `connections:${connectionRef.id}`
+      );
 
       if (!connectionDoc.exists()) {
         return { success: false, message: 'Connection not found' };
@@ -1208,7 +1239,7 @@ class MissedConnectionsService {
 
       // Get the claim
       const claimRef = doc(db, 'missed_connection_claims', claimId);
-      const claimDoc = await getDoc(claimRef);
+      const claimDoc = await safeGetDoc(claimRef, `claims:${claimRef.id}`);
 
       if (!claimDoc.exists()) {
         return { success: false, message: 'Claim not found' };
@@ -1222,7 +1253,10 @@ class MissedConnectionsService {
         'missed_connections',
         claimData.connectionId
       );
-      const connectionDoc = await getDoc(connectionRef);
+      const connectionDoc = await safeGetDoc(
+        connectionRef,
+        `connections:${connectionRef.id}`
+      );
 
       if (!connectionDoc.exists()) {
         return { success: false, message: 'Connection not found' };
@@ -1261,8 +1295,11 @@ class MissedConnectionsService {
       // Send push notification to the claimer (receiver)
       try {
         const [senderDoc, receiverDoc] = await Promise.all([
-          getDoc(doc(db, 'users', user.uid)),
-          getDoc(doc(db, 'users', claimData.claimerId)),
+          safeGetDoc(doc(db, 'users', user.uid), `users:${user.uid}`),
+          safeGetDoc(
+            doc(db, 'users', claimData.claimerId),
+            `users:${claimData.claimerId}`
+          ),
         ]);
 
         if (senderDoc.exists() && receiverDoc.exists()) {
@@ -1356,7 +1393,7 @@ class MissedConnectionsService {
 
       // Get the claim
       const claimRef = doc(db, 'missed_connection_claims', claimId);
-      const claimDoc = await getDoc(claimRef);
+      const claimDoc = await safeGetDoc(claimRef, `claims:${claimRef.id}`);
 
       if (!claimDoc.exists()) {
         return { success: false, message: 'Claim not found' };
@@ -1370,7 +1407,10 @@ class MissedConnectionsService {
         'missed_connections',
         claimData.connectionId
       );
-      const connectionDoc = await getDoc(connectionRef);
+      const connectionDoc = await safeGetDoc(
+        connectionRef,
+        `connections:${connectionRef.id}`
+      );
 
       if (!connectionDoc.exists()) {
         return { success: false, message: 'Connection not found' };
@@ -1420,7 +1460,10 @@ class MissedConnectionsService {
       }
 
       const chatRequestRef = doc(db, 'chat_requests', chatRequestId);
-      const chatRequestDoc = await getDoc(chatRequestRef);
+      const chatRequestDoc = await safeGetDoc(
+        chatRequestRef,
+        `chatRequests:${chatRequestRef.id}`
+      );
 
       if (!chatRequestDoc.exists()) {
         return { success: false, message: 'Chat request not found' };
@@ -1491,8 +1534,14 @@ class MissedConnectionsService {
         // Send match notifications to BOTH users
         try {
           const [user1Doc, user2Doc] = await Promise.all([
-            getDoc(doc(db, 'users', chatRequestData.users[0])),
-            getDoc(doc(db, 'users', chatRequestData.users[1])),
+            safeGetDoc(
+              doc(db, 'users', chatRequestData.users[0]),
+              `users:${chatRequestData.users[0]}`
+            ),
+            safeGetDoc(
+              doc(db, 'users', chatRequestData.users[1]),
+              `users:${chatRequestData.users[1]}`
+            ),
           ]);
 
           if (user1Doc.exists() && user2Doc.exists()) {
@@ -1650,7 +1699,10 @@ class MissedConnectionsService {
       }
 
       const chatRequestRef = doc(db, 'chat_requests', chatRequestId);
-      const chatRequestDoc = await getDoc(chatRequestRef);
+      const chatRequestDoc = await safeGetDoc(
+        chatRequestRef,
+        `chatRequests:${chatRequestRef.id}`
+      );
 
       if (!chatRequestDoc.exists()) {
         return { success: false, message: 'Chat request not found' };
@@ -1822,7 +1874,10 @@ class MissedConnectionsService {
       }
 
       const notificationRef = doc(db, 'notifications', notificationId);
-      const notificationDoc = await getDoc(notificationRef);
+      const notificationDoc = await safeGetDoc(
+        notificationRef,
+        `notifications:${notificationRef.id}`
+      );
 
       if (!notificationDoc.exists()) {
         return { success: false, message: 'Notification not found' };
@@ -1874,7 +1929,10 @@ class MissedConnectionsService {
       }
 
       const notificationRef = doc(db, 'notifications', notificationId);
-      const notificationDoc = await getDoc(notificationRef);
+      const notificationDoc = await safeGetDoc(
+        notificationRef,
+        `notifications:${notificationRef.id}`
+      );
 
       if (!notificationDoc.exists()) {
         return { success: false, message: 'Notification not found' };

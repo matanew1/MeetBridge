@@ -456,7 +456,7 @@ const ChatScreen = () => {
               (c) => !c.participants?.includes(otherUserId)
             ) || [],
         }));
-        toastService.show(t('chat.unmatchTitle'), t('chat.unmatchDetected'));
+        toastService.info(t('chat.unmatchTitle'), t('chat.unmatchDetected'));
         router.back();
       }
     });
@@ -532,8 +532,13 @@ const ChatScreen = () => {
     if (!id || !currentUser) return;
     setShowAttachMenu(false);
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted')
-      return toastService.show('Permission needed', 'Grant photo access');
+    if (status !== 'granted') {
+      toastService.warning(
+        t('toasts.permissionNeededTitle'),
+        t('toasts.grantPhotoAccess')
+      );
+      return;
+    }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
@@ -547,9 +552,12 @@ const ChatScreen = () => {
       );
       const url = await storageService.uploadChatImage(compressed.uri);
       await sendMessage(id as string, url);
-      toastService.show('Photo sent', 'success');
+      toastService.success(
+        t('toasts.photoSentTitle'),
+        t('toasts.photoSentBody')
+      );
     } catch (err) {
-      toastService.show('Failed to send photo', 'error');
+      toastService.error(t('toasts.photoFailedTitle'));
     } finally {
       setUploadingImage(false);
     }

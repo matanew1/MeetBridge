@@ -3,7 +3,8 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform, AppState, AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
+import { safeGetDoc } from './firebase/firestoreHelpers';
 import { db } from './firebase/config';
 
 // Configure notification behavior (will be set properly after service initialization)
@@ -329,7 +330,7 @@ class NotificationService {
 
       // Get the user's push token from Firebase
       const userRef = doc(db, 'users', userId);
-      const userDoc = await getDoc(userRef);
+      const userDoc = await safeGetDoc(userRef, `users:${userId}`);
 
       if (!userDoc.exists()) {
         console.log('User not found for broadcast notification');
@@ -400,7 +401,7 @@ class NotificationService {
 
       // Get the user's push token from Firebase
       const userRef = doc(db, 'users', userId);
-      const userDoc = await getDoc(userRef);
+      const userDoc = await safeGetDoc(userRef, `users:${userId}`);
 
       if (!userDoc.exists()) {
         console.log('User not found for broadcast notification');

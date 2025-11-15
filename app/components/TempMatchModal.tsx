@@ -469,7 +469,7 @@ export default function TempMatchModal({
               >
                 <ActivityIndicator size="small" color={theme.success} />
                 <Text style={[styles.waitingText, { color: theme.success }]}>
-                  {t('tempMatch.waitingForAcceptance', {
+                  {t('tempMatch.waitingForAcceptanceWithName', {
                     name: otherUser.name,
                   })}
                 </Text>
