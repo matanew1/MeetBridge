@@ -1,6 +1,12 @@
 // app/components/MapViewComponent.tsx
-// Using Leaflet (OpenStreetMap) - 100% FREE, No API keys needed!
-import React, { useRef, useMemo, useState, useEffect } from 'react';
+// Professional, accurate & performant Leaflet map for React Native (100% free – no API keys)
+import React, {
+  useRef,
+  useMemo,
+  useEffect,
+  useState,
+  useCallback,
+} from 'react';
 import {
   View,
   StyleSheet,
@@ -8,10 +14,10 @@ import {
   Text,
   Dimensions,
   ActivityIndicator,
-  Animated,
+  Platform,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { MapPin, Navigation, RefreshCw } from 'lucide-react-native';
+import { MapPin, Navigation } from 'lucide-react-native';
 import { Theme } from '../../constants/theme';
 import * as Location from 'expo-location';
 
@@ -35,7 +41,7 @@ interface MapViewComponentProps {
   onProfileSelect: (profile: User) => void;
   maxDistance: number; // in meters
   theme: Theme;
-  isVisible?: boolean; // Optional prop to control visibility for preloading
+  isVisible?: boolean;
 }
 
 const MapViewComponent: React.FC<MapViewComponentProps> = ({
@@ -47,529 +53,319 @@ const MapViewComponent: React.FC<MapViewComponentProps> = ({
   isVisible = true,
 }) => {
   const webViewRef = useRef<WebView>(null);
-  const spinValue = useRef(new Animated.Value(0)).current;
-  const spinAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
-  const [isMapReady, setIsMapReady] = React.useState(false);
+  const [mapReady, setMapReady] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{
     latitude: number;
     longitude: number;
   } | null>(null);
-  const [isRefreshingLocation, setIsRefreshingLocation] = useState(false);
 
-  // Spinning animation for refresh button
-  useEffect(() => {
-    if (isRefreshingLocation) {
-      // Start spinning animation
-      spinAnimationRef.current = Animated.loop(
-        Animated.timing(spinValue, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        })
-      );
-      spinAnimationRef.current.start();
-    } else {
-      // Stop spinning animation and reset to 0
-      if (spinAnimationRef.current) {
-        spinAnimationRef.current.stop();
-        spinAnimationRef.current = null;
-      }
-      spinValue.setValue(0);
-    }
-
-    // Cleanup on unmount
-    return () => {
-      if (spinAnimationRef.current) {
-        spinAnimationRef.current.stop();
-      }
-    };
-  }, [isRefreshingLocation, spinValue]);
-
-  // Get current location on mount and set up location watching
-  useEffect(() => {
-    let locationSubscription: Location.LocationSubscription | null = null;
-
-    const getCurrentLocation = async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          console.warn('Location permission denied');
-          return;
-        }
-
-        const location = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High,
-        });
-
-        setCurrentLocation({
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-        });
-      } catch (error) {
-        console.error('Error getting current location:', error);
-      }
-    };
-
-    const watchLocation = async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') return;
-
-        locationSubscription = await Location.watchPositionAsync(
-          {
-            accuracy: Location.Accuracy.High,
-            timeInterval: 10000, // Update every 10 seconds
-            distanceInterval: 10, // Update when moved 10 meters
-          },
-          (location) => {
-            setCurrentLocation({
-              latitude: location.coords.latitude,
-              longitude: location.coords.longitude,
-            });
-          }
-        );
-
-        return () => {
-          // No heading subscription to remove
-        };
-      } catch (error) {
-        console.error('Error watching location:', error);
-      }
-    };
-
-    getCurrentLocation();
-    watchLocation();
-
-    return () => {
-      if (locationSubscription) {
-        locationSubscription.remove();
-      }
-    };
-  }, []);
-
-  // Refresh current location
-  const refreshLocation = async () => {
-    setIsRefreshingLocation(true);
-    try {
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-
-      setCurrentLocation({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      });
-    } catch (error) {
-      console.error('Error refreshing location:', error);
-    } finally {
-      setIsRefreshingLocation(false);
-    }
-  };
-
-  // User's current location - prioritize real-time location over cached
+  // Use real location if available, fallback to user's stored coordinates
   const userLocation = useMemo(() => {
-    if (currentLocation) {
-      return currentLocation;
-    }
-    if (currentUser?.coordinates) {
-      return {
-        latitude: currentUser.coordinates.latitude,
-        longitude: currentUser.coordinates.longitude,
-      };
-    }
-    return null;
+    return (
+      currentLocation ||
+      (currentUser?.coordinates
+        ? {
+            latitude: currentUser.coordinates.latitude,
+            longitude: currentUser.coordinates.longitude,
+          }
+        : null)
+    );
   }, [currentLocation, currentUser]);
 
-  // Filter profiles with valid coordinates
+  // Filter only profiles with valid coordinates
   const validProfiles = useMemo(() => {
     return profiles.filter(
-      (profile) =>
-        profile.coordinates &&
-        profile.coordinates.latitude &&
-        profile.coordinates.longitude &&
-        !isNaN(profile.coordinates.latitude) &&
-        !isNaN(profile.coordinates.longitude)
+      (p) =>
+        p.coordinates &&
+        typeof p.coordinates.latitude === 'number' &&
+        typeof p.coordinates.longitude === 'number' &&
+        !isNaN(p.coordinates.latitude) &&
+        !isNaN(p.coordinates.longitude)
     );
   }, [profiles]);
 
-  // Generate HTML for Leaflet map
-  const generateMapHTML = useMemo(() => {
-    if (!userLocation) return '';
+  // Request permissions + watch location
+  useEffect(() => {
+    let subscription: Location.LocationSubscription | null = null;
 
-    const isDark = theme.isDark;
+    const initLocation = async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+
+      // Initial position
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+      setCurrentLocation({
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+      });
+
+      // Continuous updates - live watch mode
+      subscription = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          timeInterval: 5000, // More frequent updates (5 seconds)
+          distanceInterval: 10, // Smaller distance threshold (10 meters)
+        },
+        (position) => {
+          setCurrentLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+        }
+      );
+    };
+
+    initLocation();
+
+    return () => {
+      subscription?.remove();
+    };
+  }, []);
+
+  // Recenter map to user location with smart zoom based on maxDistance
+  const handleRecenter = useCallback(() => {
+    webViewRef.current?.injectJavaScript(`
+      if (window.recenterMap) window.recenterMap();
+    `);
+  }, []);
+
+  // Handle messages from WebView
+  const handleMessage = useCallback(
+    (event: any) => {
+      try {
+        const data = JSON.parse(event.nativeEvent.data);
+        if (data.type === 'profileSelect') {
+          const profile = validProfiles.find((p) => p.id === data.profileId);
+          if (profile) onProfileSelect(profile);
+        } else if (data.type === 'mapReady') {
+          setMapReady(true);
+        }
+      } catch (e) {
+        // Ignore invalid messages
+      }
+    },
+    [validProfiles, onProfileSelect]
+  );
+
+  // Generate Leaflet HTML – fully optimized, dark-mode aware, clean UI
+  const html = useMemo(() => {
+    if (!userLocation) return '<div></div>';
+
+    const isDark = theme.isDark ?? false;
+
     const markers = validProfiles
-      .map((profile) => {
-        const distance =
-          profile.distance !== null && profile.distance !== undefined
-            ? profile.distance >= 1000
-              ? `${(profile.distance / 1000).toFixed(1)}km`
-              : profile.distance < 100
-              ? `${profile.distance.toFixed(1)}m`
-              : `${Math.round(profile.distance)}m`
+      .map((p) => {
+        const dist =
+          p.distance != null
+            ? p.distance >= 1000
+              ? `${(p.distance / 1000).toFixed(1)} km`
+              : p.distance < 100
+              ? `${p.distance.toFixed(0)} m`
+              : `${Math.round(p.distance)} m`
             : '';
 
-        // Escape quotes in name to prevent JS errors
-        const escapedName = (profile.name || '').replace(/"/g, '\\"');
-        const escapedImage = (profile.image || '').replace(/"/g, '\\"');
+        const safe = (str: string) => str.replace(/"/g, '&quot;');
 
-        return `
-        {
-          lat: ${profile.coordinates!.latitude},
-          lng: ${profile.coordinates!.longitude},
-          id: "${profile.id}",
-          name: "${escapedName}",
-          age: ${profile.age},
-          distance: "${distance}",
-          image: "${escapedImage}"
+        return `{
+          lat: ${p.coordinates!.latitude},
+          lng: ${p.coordinates!.longitude},
+          id: "${p.id}",
+          name: "${safe(p.name)}",
+          age: ${p.age},
+          distance: "${dist}",
+          image: "${p.image || ''}"
         }`;
       })
       .join(',');
+
+    // Smart zoom level based on maxDistance
+    let zoom = 16;
+    if (maxDistance <= 50) zoom = 19;
+    else if (maxDistance <= 100) zoom = 18;
+    else if (maxDistance <= 250) zoom = 17;
+    else if (maxDistance <= 500) zoom = 16;
+    else zoom = 15;
 
     return `
 <!DOCTYPE html>
 <html>
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
-    body, html, #map { 
-      margin: 0; 
-      padding: 0; 
-      height: 100%; 
-      width: 100%;
-      background: ${isDark ? '#0A0A0A' : '#FAFAFA'};
-      overflow: hidden;
-    }
-    /* Hide all Leaflet attribution and branding */
-    .leaflet-control-attribution,
-    .leaflet-attribution-flag,
-    .leaflet-control-container .leaflet-control-attribution {
-      display: none !important;
-      visibility: hidden !important;
-      opacity: 0 !important;
-    }
-    /* Ensure map fills container */
-    .leaflet-container {
-      background: ${isDark ? '#0A0A0A' : '#FAFAFA'} !important;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    }
-    /* Dark mode map controls */
-    .leaflet-bar {
-      background: ${isDark ? '#1C1C1E' : '#FFFFFF'} !important;
-      border: 1px solid ${isDark ? '#3A3A3C' : '#E5E7EB'} !important;
-      box-shadow: 0 2px 8px rgba(0,0,0,${isDark ? '0.5' : '0.15'}) !important;
-    }
-    .leaflet-bar a {
-      background: ${isDark ? '#1C1C1E' : '#FFFFFF'} !important;
-      color: ${isDark ? '#E5E5E5' : '#1A1A1A'} !important;
-      border-bottom: 1px solid ${isDark ? '#3A3A3C' : '#E5E7EB'} !important;
-    }
-    .leaflet-bar a:hover {
-      background: ${isDark ? '#2C2C2E' : '#F5F5F7'} !important;
-    }
+    * { margin:0; padding:0; }
+    html, body, #map { height:100%; width:100%; background:${
+      isDark ? '#0f0f0f' : '#f5f5f5'
+    }; }
+    .leaflet-container { background:${
+      isDark ? '#0f0f0f' : '#f5f5f5'
+    } !important; }
+    .leaflet-control-attribution { display:none !important; }
+    .leaflet-bar { box-shadow:0 2px 10px rgba(0,0,0,${
+      isDark ? '0.6' : '0.2'
+    }) !important; border:none !important; }
+    .leaflet-bar a { background:${
+      isDark ? '#1f1f1f' : '#fff'
+    } !important; color:${isDark ? '#ddd' : '#333'} !important; }
+    
+    .marker-cluster { background-clip: padding-box; border-radius: 20px; }
+    .marker-cluster div { background-color: ${
+      theme.primary
+    }CC; color:white; font-weight:bold; }
+    
     .custom-marker {
+      width: 64px;
       text-align: center;
-      width: 70px !important;
-      height: 90px !important;
-      margin-left: -35px !important;
-      margin-top: -90px !important;
+      margin-left: -32px;
+      margin-top: -80px;
     }
-    .marker-avatar {
-      width: 50px;
-      height: 50px;
-      border-radius: 25px;
-      border: 3px solid ${theme.primary};
+    .avatar {
+      width: 52px;
+      height: 52px;
+      border-radius: 26px;
+      border: 3.5px solid ${theme.primary};
       overflow: hidden;
-      margin: 0 auto;
       background: white;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
     }
-    .marker-avatar img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    .marker-distance {
+    .avatar img { width:100%; height:100%; object-fit:cover; }
+    .distance {
       background: ${theme.primary};
       color: white;
-      padding: 4px 8px;
+      padding: 3px 9px;
       border-radius: 12px;
       font-size: 11px;
-      font-weight: bold;
-      display: inline-block;
-      margin-bottom: 4px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      font-weight: 700;
+      margin: 6px auto 4px;
+      min-width: 44px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
-    .marker-pin {
+    .pin {
       width: 0;
       height: 0;
-      border-left: 8px solid transparent;
-      border-right: 8px solid transparent;
-      border-top: 12px solid ${theme.primary};
-      margin: -2px auto 0;
+      border-left: 9px solid transparent;
+      border-right: 9px solid transparent;
+      border-top: 14px solid ${theme.primary};
+      margin: 0 auto;
     }
-    .current-user-marker {
-      width: 20px;
-      height: 20px;
+    .me {
+      width: 24px;
+      height: 24px;
       background: ${theme.primary};
-      border: 3px solid white;
+      border: 4px solid white;
       border-radius: 50%;
-      box-shadow: 0 0 20px ${theme.primary}80;
+      box-shadow: 0 0 0 4px ${theme.primary}44, 0 4px 12px rgba(0,0,0,0.4);
       animation: pulse 2s infinite;
     }
     @keyframes pulse {
-      0%, 100% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.2); opacity: 0.8; }
+      0% { box-shadow: 0 0 0 0 ${theme.primary}88; }
+      70% { box-shadow: 0 0 0 12px ${theme.primary}00; }
+      100% { box-shadow: 0 0 0 0 ${theme.primary}00; }
     }
     .leaflet-popup-content-wrapper {
-      background: ${isDark ? '#1C1C1E' : '#FFFFFF'};
-      color: ${isDark ? '#E5E5E5' : '#1A1A1A'};
+      background: ${isDark ? '#1f1f1f' : '#fff'};
+      color: ${isDark ? '#eee' : '#222'};
       border-radius: 16px;
-      padding: 0;
-      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
     }
-    .popup-content {
-      padding: 12px;
+    .leaflet-popup-content {
+      margin: 12px !important;
       text-align: center;
-      min-width: 150px;
+      font-family: -apple-system, system-ui, sans-serif;
     }
-    .popup-name {
-      font-size: 16px;
-      font-weight: 600;
-      margin-bottom: 4px;
-    }
-    .popup-distance {
-      color: ${theme.primary};
-      font-size: 14px;
-      font-weight: 500;
-    }
-    .leaflet-popup-tip {
-      background: ${isDark ? '#1C1C1E' : '#FFFFFF'};
-    }
-    .leaflet-popup-close-button {
-      color: ${isDark ? '#A1A1A1' : '#6B7280'} !important;
-      font-size: 24px !important;
-      padding: 8px 12px !important;
-    }
-    .leaflet-popup-close-button:hover {
-      color: ${theme.primary} !important;
-      background: ${isDark ? '#2C2C2E' : '#F5F5F7'} !important;
-    }
-    /* Scale indicator */
-    .scale-indicator {
-      position: absolute;
-      bottom: 20px;
-      left: 20px;
-      background: ${
-        isDark ? 'rgba(28, 28, 30, 0.95)' : 'rgba(255, 255, 255, 0.95)'
-      };
-      color: ${isDark ? '#E5E5E5' : '#1A1A1A'};
-      padding: 8px 12px;
-      border-radius: 12px;
-      font-size: 12px;
-      font-weight: 600;
-      box-shadow: 0 2px 8px rgba(0,0,0,${isDark ? '0.5' : '0.15'});
-      border: 1px solid ${isDark ? '#3A3A3C' : '#E5E7EB'};
-      z-index: 1000;
-    }
+    .popup-name { font-size:16px; font-weight:600; margin-bottom:4px; }
+    .popup-distance { font-size:14px; color:${theme.primary}; font-weight:500; }
+    .leaflet-popup-tip { background: ${isDark ? '#1f1f1f' : '#fff'}; }
   </style>
 </head>
 <body>
   <div id="map"></div>
-  <div class="scale-indicator" id="scaleIndicator">~100m</div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    // Initialize map with higher accuracy for 5m-500m range
     const map = L.map('map', {
       zoomControl: false,
       attributionControl: false,
-      zoomSnap: 0.25,        // Finer zoom increments for precision
-      zoomDelta: 0.5,        // Smoother zoom transitions
-      wheelPxPerZoomLevel: 80, // More responsive wheel zoom
-      maxBoundsViscosity: 1.0,
-      trackResize: true,
-      worldCopyJump: false,
-      maxZoom: 20,           // Allow higher zoom for close range (5m)
-      minZoom: 13            // Reasonable minimum for 500m range
-    }).setView([${userLocation.latitude}, ${userLocation.longitude}], 17);
+      zoomSnap: 0.25,
+      zoomDelta: 0.75,
+      wheelPxPerZoomLevel: 100,
+      maxZoom: 19,
+      minZoom: 13
+    }).setView([${userLocation.latitude}, ${userLocation.longitude}], ${zoom});
 
-    // Add OpenStreetMap tiles with dark mode support (FREE!)
-    const tileLayerUrl = ${isDark} 
+    L.tileLayer(${isDark}
       ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-    
-    L.tileLayer(tileLayerUrl, {
-      maxZoom: 20,          // Support high zoom levels
-      minZoom: 13,
-      attribution: '', // Hide attribution
-      updateWhenZooming: false, // Improve performance
-      keepBuffer: 2        // Keep more tiles loaded for smoother panning
+      : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19
     }).addTo(map);
 
-    // Add distance radius circle
+    // Search radius
     L.circle([${userLocation.latitude}, ${userLocation.longitude}], {
       radius: ${maxDistance},
       color: '${theme.primary}',
+      weight: 2,
+      opacity: 0.8,
       fillColor: '${theme.primary}',
-      fillOpacity: 0.1,
-      weight: 2
+      fillOpacity: 0.08
     }).addTo(map);
 
-    // Add current user marker
-    const currentUserIcon = L.divIcon({
-      className: 'custom-marker',
-      html: '<div class="current-user-marker"></div>',
-      iconSize: [20, 20],
-      iconAnchor: [10, 10]
-    });
-    L.marker([${userLocation.latitude}, ${userLocation.longitude}], { 
-      icon: currentUserIcon,
-      zIndexOffset: 1000 
+    // Current user pulsing dot
+    L.marker([${userLocation.latitude}, ${userLocation.longitude}], {
+      icon: L.divIcon({ className: 'custom-marker', html: '<div class="me"></div>', iconSize: [24,24], iconAnchor: [12,12] }),
+      zIndexOffset: 1000
     }).addTo(map);
 
-    // Add profile markers
+    // Profiles
     const profiles = [${markers}];
-    
-    profiles.forEach(profile => {
-      const markerIcon = L.divIcon({
-        className: 'custom-marker',
-        html: \`
-          <div>
-            \${profile.distance ? '<div class="marker-distance">' + profile.distance + '</div>' : ''}
-            <div class="marker-avatar">
-              <img src="\${profile.image}" onerror="this.src='https://via.placeholder.com/50'" />
-            </div>
-            <div class="marker-pin"></div>
-          </div>
-        \`,
-        iconSize: [70, 90],
-        iconAnchor: [35, 90],
-        popupAnchor: [0, -90]
-      });
+    profiles.forEach(p => {
+      const html = \`
+        <div>
+          \${p.distance ? '<div class="distance">' + p.distance + '</div>' : ''}
+          <div class="avatar"><img src="\${p.image}" onerror="this.style.background='#ccc'" /></div>
+          <div class="pin"></div>
+        </div>\`;
 
-      const marker = L.marker([profile.lat, profile.lng], { 
-        icon: markerIcon,
-        riseOnHover: true
-      })
+      const icon = L.divIcon({ className: 'custom-marker', html, iconSize: [64,80], iconAnchor: [32,80], popupAnchor: [0,-70] });
+
+      L.marker([p.lat, p.lng], { icon })
+        .bindPopup('<div class="popup-name">' + p.name + ', ' + p.age + '</div>' +
+                   (p.distance ? '<div class="popup-distance">' + p.distance + ' away</div>' : ''))
         .addTo(map)
-        .bindPopup(\`
-          <div class="popup-content">
-            <div class="popup-name">\${profile.name}, \${profile.age}</div>
-            \${profile.distance ? '<div class="popup-distance">' + profile.distance + ' away</div>' : ''}
-          </div>
-        \`, {
-          closeButton: true,
-          className: 'custom-popup',
-          maxWidth: 250,
-          offset: [0, 0]
+        .on('click', () => {
+          window.ReactNativeWebView?.postMessage(JSON.stringify({ type: 'profileSelect', profileId: p.id }));
         });
-
-      marker.on('click', () => {
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'profileSelect',
-          profileId: profile.id
-        }));
-      });
     });
 
-    // Handle recenter command from React Native with better accuracy
-    window.recenterMap = function() {
-      // Calculate optimal zoom based on maxDistance
-      let optimalZoom = 17; // Default for close range
-      if (${maxDistance} <= 50) {
-        optimalZoom = 19;     // Very close range (5-50m)
-      } else if (${maxDistance} <= 100) {
-        optimalZoom = 18;     // Close range (50-100m)
-      } else if (${maxDistance} <= 250) {
-        optimalZoom = 17;     // Medium-close range (100-250m)
-      } else if (${maxDistance} <= 500) {
-        optimalZoom = 16;     // Medium range (250-500m)
-      } else {
-        optimalZoom = 15;     // Wider range (500m+)
-      }
-      
+    window.recenterMap = () => {
       map.setView([${userLocation.latitude}, ${
       userLocation.longitude
-    }], optimalZoom, {
-        animate: true,
-        duration: 0.5
-      });
+    }], ${zoom}, { animate: true });
     };
-    
-    // Update scale indicator based on zoom level
-    function updateScaleIndicator() {
-      const zoom = map.getZoom();
-      const scaleIndicator = document.getElementById('scaleIndicator');
-      let scaleText = '';
-      
-      if (zoom >= 19) {
-        scaleText = '~10-25m';
-      } else if (zoom >= 18) {
-        scaleText = '~25-50m';
-      } else if (zoom >= 17) {
-        scaleText = '~50-100m';
-      } else if (zoom >= 16) {
-        scaleText = '~100-250m';
-      } else if (zoom >= 15) {
-        scaleText = '~250-500m';
-      } else {
-        scaleText = '~500m+';
-      }
-      
-      if (scaleIndicator) {
-        scaleIndicator.textContent = scaleText;
-      }
-    }
-    
-    // Update scale on zoom
-    map.on('zoomend', updateScaleIndicator);
-    
-    // Improve accuracy by forcing map to recalculate and set optimal zoom
+
     setTimeout(() => {
       map.invalidateSize();
-      window.recenterMap(); // Apply optimal zoom on load
-      updateScaleIndicator(); // Update scale indicator
-      
-      // Notify React Native that map is ready
-      window.ReactNativeWebView?.postMessage(JSON.stringify({
-        type: 'mapReady'
-      }));
-    }, 100);
+      window.recenterMap();
+      window.ReactNativeWebView?.postMessage(JSON.stringify({ type: 'mapReady' }));
+    }, 150);
   </script>
 </body>
-</html>`;
+</html>
+    `.trim();
   }, [userLocation, validProfiles, maxDistance, theme]);
-
-  const handleRecenterMap = () => {
-    webViewRef.current?.injectJavaScript('window.recenterMap();');
-  };
-
-  const handleWebViewMessage = (event: any) => {
-    try {
-      const data = JSON.parse(event.nativeEvent.data);
-      if (data.type === 'profileSelect') {
-        const profile = validProfiles.find((p) => p.id === data.profileId);
-        if (profile) {
-          onProfileSelect(profile);
-        }
-      } else if (data.type === 'mapReady') {
-        setIsMapReady(true);
-      }
-    } catch (error) {
-      console.error('Error parsing WebView message:', error);
-    }
-  };
 
   if (!userLocation) {
     return (
       <View style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={styles.errorContainer}>
-          <MapPin size={48} color={theme.textSecondary} />
-          <Text style={[styles.errorText, { color: theme.text }]}>
-            Location not available
+        <View style={styles.placeholder}>
+          <MapPin size={56} color={theme.textSecondary} />
+          <Text style={[styles.placeholderTitle, { color: theme.text }]}>
+            Waiting for location…
           </Text>
-          <Text style={[styles.errorSubtext, { color: theme.textSecondary }]}>
-            Please enable location services to view the map
+          <Text
+            style={[styles.placeholderSubtitle, { color: theme.textSecondary }]}
+          >
+            Enable location services to see people nearby
           </Text>
         </View>
       </View>
@@ -577,92 +373,55 @@ const MapViewComponent: React.FC<MapViewComponentProps> = ({
   }
 
   return (
-    <View style={[styles.container, !isVisible && styles.hidden]}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: theme.background },
+        !isVisible && { opacity: 0 },
+      ]}
+    >
       <WebView
         ref={webViewRef}
-        source={{ html: generateMapHTML }}
-        style={styles.map}
-        onMessage={handleWebViewMessage}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
+        source={{ html }}
+        style={styles.webview}
+        onMessage={handleMessage}
+        javaScriptEnabled
+        domStorageEnabled
         startInLoadingState={true}
         renderLoading={() => (
-          <View style={styles.loadingContainer}>
+          <View style={styles.loadingOverlay}>
             <ActivityIndicator size="large" color={theme.primary} />
             <Text style={[styles.loadingText, { color: theme.text }]}>
-              Loading map...
+              Loading map…
             </Text>
           </View>
         )}
+        // Better performance on Android
+        {...(Platform.OS === 'android'
+          ? { setBuiltInZoomControls: false, setDisplayZoomControls: false }
+          : {})}
       />
 
-      {/* Recenter button - only show when visible */}
+      {/* Controls – only visible when map is active */}
       {isVisible && (
-        <TouchableOpacity
-          style={[
-            styles.recenterButton,
-            {
-              backgroundColor: theme.surface,
-              shadowColor: theme.shadow,
-            },
-          ]}
-          onPress={handleRecenterMap}
-          activeOpacity={0.8}
-        >
-          <Navigation size={24} color={theme.primary} />
-        </TouchableOpacity>
-      )}
-
-      {/* Refresh location button - only show when visible */}
-      {isVisible && (
-        <TouchableOpacity
-          style={[
-            styles.refreshButton,
-            {
-              backgroundColor: theme.surface,
-              shadowColor: theme.shadow,
-            },
-          ]}
-          onPress={refreshLocation}
-          disabled={isRefreshingLocation}
-          activeOpacity={0.8}
-        >
-          <Animated.View
-            style={{
-              transform: [
-                {
-                  rotate: spinValue.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0deg', '360deg'],
-                  }),
-                },
-              ],
-            }}
+        <>
+          {/* Recenter */}
+          <TouchableOpacity
+            style={[styles.controlBtn, styles.recenterBtn]}
+            onPress={handleRecenter}
+            activeOpacity={0.8}
           >
-            <RefreshCw
-              size={24}
-              color={isRefreshingLocation ? theme.textSecondary : theme.primary}
-            />
-          </Animated.View>
-        </TouchableOpacity>
-      )}
+            <Navigation size={24} color={theme.primary} />
+          </TouchableOpacity>
 
-      {/* Profile count badge - only show when visible */}
-      {isVisible && (
-        <View
-          style={[
-            styles.countBadge,
-            {
-              backgroundColor: theme.surface,
-              shadowColor: theme.shadow,
-            },
-          ]}
-        >
-          <MapPin size={16} color={theme.primary} />
-          <Text style={[styles.countText, { color: theme.text }]}>
-            {validProfiles.length} nearby
-          </Text>
-        </View>
+          {/* Count badge */}
+          <View style={[styles.badge, { backgroundColor: theme.surface }]}>
+            <MapPin size={16} color={theme.primary} />
+            <Text style={[styles.badgeText, { color: theme.text }]}>
+              {validProfiles.length} nearby
+            </Text>
+          </View>
+        </>
       )}
     </View>
   );
@@ -671,101 +430,79 @@ const MapViewComponent: React.FC<MapViewComponentProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#000',
   },
-  hidden: {
-    position: 'absolute',
-    left: -10000, // Move offscreen to keep loaded but hidden
-    width: width,
-    height: height,
-  },
-  map: {
+  webview: {
     flex: 1,
-    width: width,
-    height: height,
+    backgroundColor: 'transparent',
   },
-  loadingContainer: {
+  placeholder: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    paddingHorizontal: 40,
+  },
+  placeholderTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginTop: 20,
+    textAlign: 'center',
+  },
+  placeholderSubtitle: {
+    fontSize: 15,
+    marginTop: 8,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   loadingText: {
-    marginTop: 12,
+    marginTop: 16,
     fontSize: 16,
     fontWeight: '500',
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-  },
-  errorText: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginTop: 16,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  errorSubtext: {
-    fontSize: 16,
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  recenterButton: {
+  controlBtn: {
     position: 'absolute',
-    bottom: 100,
-    right: 20,
     width: 56,
     height: 56,
     borderRadius: 28,
+    backgroundColor: 'rgba(28,28,30,0.9)',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    marginBottom: 16, // Add margin bottom
+    elevation: 10,
+    marginBottom: 8,
   },
-  countBadge: {
+  recenterBtn: {
+    bottom: 100,
+    right: 16,
+  },
+  badge: {
     position: 'absolute',
     top: 20,
-    left: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
+    left: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 20,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.25,
     shadowRadius: 6,
-    elevation: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    elevation: 8,
   },
-  countText: {
+  badgeText: {
     fontSize: 14,
     fontWeight: '600',
-  },
-  refreshButton: {
-    position: 'absolute',
-    bottom: 170,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    marginBottom: 16, // Add margin bottom
   },
 });
 
