@@ -26,8 +26,9 @@ likeProfile: async (profileId: string) => {
     // 2. Call Firebase service
     const result = await matchingService.likeProfile(profileId);
     // 3. Handle success (real-time listeners will update UI)
+    // 4. Show match animation if mutual match found
   } catch (error) {
-    // 4. Rollback on failure
+    // 5. Rollback on failure
     set((state) => ({
       ...state,
       likedProfiles: state.likedProfiles.filter((id) => id !== profileId),
@@ -39,12 +40,23 @@ likeProfile: async (profileId: string) => {
 ### Service Layer Pattern
 
 ```typescript
-// Services follow consistent interface pattern
-export class FirebaseMatchingService {
+// Services follow consistent interface pattern with real-time capabilities
+export class FirebaseDiscoveryService {
+  async getDiscoverProfiles(filters: SearchFilters) {
+    // Query and filter profiles
+  }
+
   async likeProfile(userId: string, targetId: string) {
-    // 1. Create Firestore document
-    // 2. Check for mutual match
-    // 3. Return result with metadata
+    // Create like document and check for match
+  }
+
+  // Real-time listeners for instant UI updates
+  onMatchAdded(userId: string, callback: Function): () => void {
+    // Set up Firestore listener for new matches
+  }
+
+  onMatchRemoved(userId: string, callback: Function): () => void {
+    // Set up Firestore listener for removed matches
   }
 }
 ```
@@ -69,6 +81,32 @@ useEffect(() => {
   );
   return unsubscribe;
 }, [userId]);
+
+// Real-time match listeners for instant notifications
+useEffect(() => {
+  const unsubAdd = discoveryService.onMatchAdded(
+    currentUser.id,
+    (matchId, user, convId) => {
+      // Show match animation and send notification
+      setShowMatch(true);
+      notificationService.sendMatchNotification(user.name, matchId);
+    }
+  );
+
+  const unsubRemove = discoveryService.onMatchRemoved(
+    currentUser.id,
+    (otherUserId) => {
+      // Handle match removal animations
+      animatingOut.add(otherUserId);
+      setTimeout(() => animatingOut.delete(otherUserId), 500);
+    }
+  );
+
+  return () => {
+    unsubAdd();
+    unsubRemove();
+  };
+}, [currentUser?.id]);
 ```
 
 ### Location & Discovery
@@ -134,14 +172,16 @@ components/            # Reusable UI components
 3. **Client Filtering**: Apply exact distance + preference filters
 4. **Deduplication**: Exclude liked/disliked/matched profiles
 5. **Pagination**: Load more profiles on scroll
+6. **Real-time Matches**: Listen for new matches and show instant notifications
 
 ### Match Creation Flow
 
 1. **Optimistic UI**: Show like animation immediately
-2. **Firestore Write**: Create like document
-3. **Match Check**: Query reciprocal like
-4. **Real-time Update**: Listeners update both users' UI
-5. **Notifications**: Send match notifications
+2. **Firestore Write**: Create like document and check for mutual match
+3. **Real-time Update**: Firestore listeners (`onMatchAdded`) instantly notify both users
+4. **Match Animation**: Trigger match modal and celebration animation
+5. **Notifications**: Send push notifications to matched users
+6. **Conversation Creation**: Auto-create chat conversation on match
 
 ### Chat Architecture
 
@@ -322,7 +362,7 @@ try {
 3. **Create Service**: Implement in appropriate service class
 4. **Update Store**: Add actions to Zustand store
 5. **Create UI**: Build components with proper state management
-6. **Add Real-time**: Set up Firestore listeners if needed
+6. **Add Real-time**: Set up Firestore listeners using `onMatchAdded`/`onMatchRemoved` patterns if needed
 
 ### Debugging Real-time Issues
 
@@ -338,4 +378,4 @@ try {
 3. **Audit Re-renders**: Use `React.memo` and `useMemo` appropriately
 4. **Monitor Network**: Check Firestore query efficiency
 
-Remember: This codebase emphasizes **optimistic updates**, **real-time synchronization**, and **performance optimization**. Always consider the user experience impact of changes, especially around matching and chat features.
+Remember: This codebase emphasizes **optimistic updates**, **real-time synchronization** with Firestore listeners for matches and conversations, and **performance optimization**. Always consider the user experience impact of changes, especially around matching and chat features.

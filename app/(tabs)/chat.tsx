@@ -178,7 +178,7 @@ export default function ChatScreen() {
       <View style={styles.safeArea}>
         <View style={styles.header}>
           <Text style={[styles.title, { color: theme.text }]}>
-            {t('chat.title')}
+            {t('chat.title')}{chatItems.length > 0 ? ` (${chatItems.length})` : ''}
           </Text>
         </View>
 

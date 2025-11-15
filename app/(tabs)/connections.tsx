@@ -1034,7 +1034,7 @@ export default function ConnectionsScreen() {
       <View style={styles.emptyState}>
         <Sparkles size={60} color={theme.textSecondary} />
         <Text style={[styles.emptyTitle, { color: theme.text }]}>
-          {message.title}
+          {message.title}{connections.length > 0 ? ` (${connections.length})` : ''}
         </Text>
         <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
           {message.subtitle}
@@ -1809,7 +1809,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 24,
   },
-  title: { fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
+  title: { fontSize: 24, fontWeight: '700', letterSpacing: -0.5 },
   headerIcons: { flexDirection: 'row', gap: 10 },
   iconButton: {
     width: 48,
