@@ -785,8 +785,8 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingTop: 8,
     paddingBottom: 120,
+    paddingTop: 0,
   },
   columnWrapper: { justifyContent: 'space-between', gap: 16 },
   gridItem: { width: (width - 48) / 2, marginBottom: 20 },

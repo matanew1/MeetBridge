@@ -52,20 +52,12 @@ import notificationService from '../notificationService';
 import { calculateZodiacSign } from '../../utils/dateUtils';
 // [SECURITY FIX] Import sanitization utilities
 import {
-  sanitizeString,
-  sanitizeEmail,
-  sanitizeUserId,
-  sanitizeNumber,
   sanitizeCoordinates,
-  sanitizeUrl,
   sanitizeObjectKeys,
   sanitizeStringArray,
   sanitizeAge,
   sanitizeDisplayName,
   sanitizeBio,
-  sanitizeDocumentId,
-  sanitizeSearchQuery,
-  checkRateLimit,
 } from '../../utils/inputSanitizer';
 import cacheService from '../cacheService';
 import performanceMonitor from '../performanceMonitor';

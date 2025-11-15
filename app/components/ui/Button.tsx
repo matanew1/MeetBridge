@@ -111,7 +111,7 @@ const Button: React.FC<ButtonProps> = ({
       },
       large: {
         paddingVertical: spacing.lg,
-        paddingHorizontal: spacing['2xl'],
+        paddingHorizontal: spacing.xxl,
         minHeight: verticalScale(56),
       },
     };

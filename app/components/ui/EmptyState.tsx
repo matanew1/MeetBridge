@@ -86,7 +86,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({
           variant="gradient"
           size="large"
           onPress={onAction}
-          style={{ marginTop: spacing['2xl'] }}
+          style={{ marginTop: spacing.xxl }}
         >
           {actionLabel}
         </Button>
@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: spacing['2xl'],
+    paddingHorizontal: spacing.xxl,
   },
   iconContainer: {
     marginBottom: spacing.xl,

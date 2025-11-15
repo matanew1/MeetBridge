@@ -928,7 +928,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing['2xl'],
+    paddingBottom: spacing.xxl,
   },
   header: {
     marginTop: spacing.lg,
@@ -1040,7 +1040,7 @@ const styles = StyleSheet.create({
   },
   blockedUsersList: {
     padding: spacing.lg,
-    paddingBottom: spacing['2xl'],
+    paddingBottom: spacing.xxl,
   },
   blockedUserCard: {
     marginBottom: spacing.md,
