@@ -94,9 +94,13 @@ export default function ChatScreen() {
           age: profile.age,
           image: profile.image,
           lastMessage: conv.lastMessage?.text || t('chat.newMatch'),
-          time: conv.lastMessage
+          time: conv.lastMessage?.timestamp
             ? formatTime(conv.lastMessage.timestamp)
-            : formatTime(conv.createdAt),
+            : conv.createdAt
+            ? formatTime(conv.createdAt)
+            : conv.updatedAt
+            ? formatTime(conv.updatedAt)
+            : formatTime(new Date()),
           unread: (conv.unreadCount || 0) > 0,
           isOnline,
         };
@@ -178,7 +182,8 @@ export default function ChatScreen() {
       <View style={styles.safeArea}>
         <View style={styles.header}>
           <Text style={[styles.title, { color: theme.text }]}>
-            {t('chat.title')}{chatItems.length > 0 ? ` (${chatItems.length})` : ''}
+            {t('chat.title')}
+            {chatItems.length > 0 ? ` (${chatItems.length})` : ''}
           </Text>
         </View>
 

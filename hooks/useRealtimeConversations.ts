@@ -7,10 +7,12 @@ import { useUserStore } from '../store';
 import { Conversation } from '../store/types';
 import toastService from '../services/toastService';
 import i18n from '../i18n';
+import { usePathname } from 'expo-router';
 
 export const useRealtimeConversations = (userId?: string) => {
   const setConversations = useUserStore((s) => s.setConversations);
   const previousConversationsRef = useRef<Conversation[]>([]);
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!userId) return;
@@ -61,6 +63,17 @@ export const useRealtimeConversations = (userId?: string) => {
             conversation.lastMessage.senderId !== userId && // Not from current user
             (!previousConversation || unreadPrev < unreadNow)
           ) {
+            // Skip toast if user is currently viewing this chat
+            const isInChat = pathname === `/chat/${conversation.id}`;
+            if (isInChat) {
+              if (__DEV__)
+                console.log(
+                  'Skipping toast - user is in chat:',
+                  conversation.id
+                );
+              return;
+            }
+
             // Get the other participant's name (not the current user)
             const otherParticipantId = conversation.participants.find(
               (id) => id !== userId
@@ -111,5 +124,5 @@ export const useRealtimeConversations = (userId?: string) => {
     );
 
     return unsub;
-  }, [userId, setConversations]);
+  }, [userId, setConversations, pathname]);
 };

@@ -215,10 +215,11 @@ const ChatScreen = () => {
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [showProfileDetail, setShowProfileDetail] = useState(false);
   const [showUnmatchConfirm, setShowUnmatchConfirm] = useState(false);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   const [showIcebreakers, setShowIcebreakers] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [sending, setSending] = useState(false);
 
   const flatListRef = useRef<FlatList>(null);
   const textInputRef = useRef<TextInput>(null);
@@ -498,7 +499,10 @@ const ChatScreen = () => {
   useEffect(() => {
     keyboardDidShowListener.current = Keyboard.addListener(
       'keyboardDidShow',
-      () => scrollToBottom(false)
+      () => {
+        scrollToBottom(false);
+        setShowAttachMenu(false); // Close attach menu when keyboard shows
+      }
     );
     keyboardDidHideListener.current = Keyboard.addListener(
       'keyboardDidHide',
@@ -512,24 +516,36 @@ const ChatScreen = () => {
   }, [scrollToBottom]);
 
   // Handlers
-  const handleSendMessage = useCallback(() => {
-    if (!inputText.trim() || !id || !currentUser) return;
-    sendMessage(id as string, inputText.trim());
-    setInputText('');
-  }, [inputText, id, currentUser, sendMessage]);
+  const handleSendMessage = useCallback(async () => {
+    if (!inputText.trim() || !id || !currentUser || sending) return;
+    setSending(true);
+    setShowAttachMenu(false); // Close attach menu when sending message
+    try {
+      await sendMessage(id as string, inputText.trim());
+      setInputText('');
+    } finally {
+      setSending(false);
+    }
+  }, [inputText, id, currentUser, sendMessage, sending]);
 
-  const handleSendHeart = useCallback(() => {
-    if (!id || !currentUser) return;
-    heartScale.value = withSpring(
-      1.4,
-      {},
-      () => (heartScale.value = withSpring(1))
-    );
-    sendMessage(id as string, '❤️');
-  }, [id, currentUser, sendMessage, heartScale]);
+  const handleSendHeart = useCallback(async () => {
+    if (!id || !currentUser || sending) return;
+    setSending(true);
+    setShowAttachMenu(false); // Close attach menu when sending heart
+    try {
+      heartScale.value = withSpring(
+        1.4,
+        {},
+        () => (heartScale.value = withSpring(1))
+      );
+      await sendMessage(id as string, '❤️');
+    } finally {
+      setSending(false);
+    }
+  }, [id, currentUser, sendMessage, heartScale, sending]);
 
   const handlePickImage = useCallback(async () => {
-    if (!id || !currentUser) return;
+    if (!id || !currentUser || sending) return;
     setShowAttachMenu(false);
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -561,7 +577,7 @@ const ChatScreen = () => {
     } finally {
       setUploadingImage(false);
     }
-  }, [id, currentUser, sendMessage]);
+  }, [id, currentUser, sendMessage, sending]);
 
   const renderMessage = useCallback(
     ({ item }: { item: Message }) => (
@@ -757,6 +773,7 @@ const ChatScreen = () => {
           <TouchableOpacity
             onPress={() => setShowAttachMenu((v) => !v)}
             style={styles.attachButton}
+            disabled={sending}
           >
             <Plus size={24} color={theme.primary} />
           </TouchableOpacity>
@@ -777,18 +794,18 @@ const ChatScreen = () => {
             multiline
             onSubmitEditing={handleSendMessage}
             returnKeyType="send"
+            editable={!sending}
           />
           <TouchableOpacity
             style={[
               styles.sendButton,
               {
-                backgroundColor: inputText.trim()
-                  ? theme.primary
-                  : theme.border,
+                backgroundColor:
+                  inputText.trim() && !sending ? theme.primary : theme.border,
               },
             ]}
             onPress={handleSendMessage}
-            disabled={!inputText.trim()}
+            disabled={!inputText.trim() || sending}
           >
             <Send
               size={18}

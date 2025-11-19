@@ -1,5 +1,5 @@
 // utils/responsive.ts
-import { Dimensions, PixelRatio, Platform } from 'react-native';
+import { Dimensions, PixelRatio, Platform, I18nManager } from 'react-native';
 
 // Get screen dimensions
 export const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } =
@@ -131,3 +131,41 @@ export const deviceInfo = {
   pixelRatio: PixelRatio.get(),
   platform: Platform.OS,
 } as const;
+
+// RTL utilities
+export const isRTL = I18nManager.isRTL;
+
+export const rtlSpacing = (left: number, right: number) => ({
+  [isRTL ? 'marginRight' : 'marginLeft']: left,
+  [isRTL ? 'marginLeft' : 'marginRight']: right,
+});
+
+export const rtlPadding = (left: number, right: number) => ({
+  [isRTL ? 'paddingRight' : 'paddingLeft']: left,
+  [isRTL ? 'paddingLeft' : 'paddingRight']: right,
+});
+
+export const rtlMargin = (left: number, right: number) => ({
+  [isRTL ? 'marginRight' : 'marginLeft']: left,
+  [isRTL ? 'marginLeft' : 'marginRight']: right,
+});
+
+export const rtlBorderRadius = (
+  topLeft: number,
+  topRight: number,
+  bottomRight: number,
+  bottomLeft: number
+) => ({
+  [isRTL ? 'borderTopRightRadius' : 'borderTopLeftRadius']: topLeft,
+  [isRTL ? 'borderTopLeftRadius' : 'borderTopRightRadius']: topRight,
+  [isRTL ? 'borderBottomLeftRadius' : 'borderBottomRightRadius']: bottomRight,
+  [isRTL ? 'borderBottomRightRadius' : 'borderBottomLeftRadius']: bottomLeft,
+});
+
+export const rtlFlexDirection = (
+  direction: 'row' | 'row-reverse' | 'column' | 'column-reverse'
+) => {
+  if (direction === 'row') return isRTL ? 'row-reverse' : 'row';
+  if (direction === 'row-reverse') return isRTL ? 'row' : 'row-reverse';
+  return direction;
+};

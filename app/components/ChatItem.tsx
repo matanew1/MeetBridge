@@ -4,6 +4,7 @@ import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
 import Animated, { SharedValue } from 'react-native-reanimated';
 import { ImageIcon } from 'lucide-react-native';
 import { ChatItem as ChatItemType } from '../../types/chat';
+import { rtlSpacing } from '../../utils/responsive';
 
 interface Props {
   chat: ChatItemType;
@@ -109,7 +110,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0, 0, 0, 0.05)',
   },
-  avatarContainer: { position: 'relative', marginRight: 16 },
+  avatarContainer: {
+    position: 'relative',
+    ...rtlSpacing(16, 0), // marginRight in LTR, marginLeft in RTL
+  },
   avatar: { width: 60, height: 60, borderRadius: 30 },
   placeholder: {
     backgroundColor: '#e0e0e0',
