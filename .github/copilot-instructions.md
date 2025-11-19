@@ -460,9 +460,14 @@ try {    index,
 
 const filteredProfiles = useMemo(
 
-## Recent Updates  () => profiles.filter((profile) => distance <= maxDistance),
+## Recent Updates
 
-  [profiles, maxDistance]
+### UI/UX Fixes (2025-11-19)
+- **Map Location Button Theming**: Fixed map view location button to respect theme context instead of hardcoded dark mode. Updated `controlBtn` style to use theme-aware `backgroundColor` and `borderColor` properties.
+- **Tablet Distance Meter Positioning**: Adjusted tablet search screen distance meter positioning and sizing to prevent image occlusion. Made container smaller and repositioned for tablets.
+- **Global Toast Deduplication**: Enhanced toast service with proper deduplication to prevent repeated notifications. Added `clearRecentToasts`, `getSessionToastCount`, and `getRecentToastCount` methods for better debugging.
+- **Tablet Tab Responsiveness**: Optimized tablet tab bar design for better space utilization. Reduced height from 60 to 50, icon size from 26 to 22, and adjusted padding/font sizes.
+- **Toast Focus Management**: Added `useFocusEffect` hook in tab layout to clear recent toasts when tabs become focused, preventing stale notifications.
 
 ### Code Cleanup (2025-11-15));
 
@@ -490,9 +495,9 @@ const filteredProfiles = useMemo(
 
 ## Development Best Practicesconst CACHE_TTL = {
 
-CURRENT_USER: 10 _ 60 _ 1000, // 10 minutes
+CURRENT*USER: 10 * 60 \_ 1000, // 10 minutes
 
-### Adding Features DISCOVER_PROFILES: 5 _ 60 _ 1000, // 5 minutes
+### Adding Features DISCOVER*PROFILES: 5 * 60 \_ 1000, // 5 minutes
 
 1. Design Firestore document structure first CONVERSATIONS: 2 _ 60 _ 1000, // 2 minutes
 

@@ -40,6 +40,7 @@ import InterestTagPicker from './InterestTagPicker';
 import { ZodiacBadge } from './ZodiacBadge';
 import { calculateAge, calculateZodiacSign } from '../../utils/dateUtils';
 import { smartLocationManager } from '../../services/location';
+import { isRTL } from '../../i18n';
 
 interface EditProfileModalProps {
   visible: boolean;
@@ -527,6 +528,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   }
                   placeholder="Enter your name"
                   placeholderTextColor={theme.textSecondary}
+                  textAlign={isRTL() ? 'right' : 'left'}
                 />
               </View>
 
@@ -717,6 +719,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   multiline
                   numberOfLines={4}
                   textAlignVertical="top"
+                  textAlign={isRTL() ? 'right' : 'left'}
                 />
               </View>
 
@@ -743,6 +746,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   }
                   placeholder="Your city will be detected automatically..."
                   placeholderTextColor={theme.textSecondary}
+                  textAlign={isRTL() ? 'right' : 'left'}
                 />
                 <Text
                   style={[

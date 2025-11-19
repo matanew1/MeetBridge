@@ -407,7 +407,7 @@ const MapViewComponent: React.FC<MapViewComponentProps> = ({
         <>
           {/* Recenter */}
           <TouchableOpacity
-            style={[styles.controlBtn, styles.recenterBtn]}
+            style={[styles.controlBtn(theme), styles.recenterBtn]}
             onPress={handleRecenter}
             activeOpacity={0.8}
           >
@@ -465,12 +465,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  controlBtn: {
+  controlBtn: (theme: Theme) => ({
     position: 'absolute',
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: 'rgba(28,28,30,0.9)',
+    backgroundColor: theme.surface,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -479,9 +479,11 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 10,
     marginBottom: 8,
-  },
+    borderWidth: 1,
+    borderColor: theme.border,
+  }),
   recenterBtn: {
-    bottom: 100,
+    bottom: 180,
     right: 16,
   },
   badge: {

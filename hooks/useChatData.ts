@@ -5,6 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRealtimeConversations } from './useRealtimeConversations';
 import { useRealtimeClaims } from './useRealtimeClaims';
 import { useRealtimeComments } from './useRealtimeComments';
+import { useRealtimeLikes } from './useRealtimeLikes';
 import { useCallback } from 'react';
 
 export const useChatData = () => {
@@ -31,6 +32,7 @@ export const useChatData = () => {
   const conversationsUnsubscribe = useRealtimeConversations(currentUser?.id);
   const claimsUnsubscribe = useRealtimeClaims();
   const commentsUnsubscribe = useRealtimeComments();
+  const likesUnsubscribe = useRealtimeLikes();
 
   // Refresh on focus if stale (>30s)
   useFocusEffect(
@@ -44,5 +46,10 @@ export const useChatData = () => {
     }, [loadConversations])
   );
 
-  return { conversationsUnsubscribe, claimsUnsubscribe, commentsUnsubscribe };
+  return {
+    conversationsUnsubscribe,
+    claimsUnsubscribe,
+    commentsUnsubscribe,
+    likesUnsubscribe,
+  };
 };

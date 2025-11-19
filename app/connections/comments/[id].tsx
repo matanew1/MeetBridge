@@ -41,6 +41,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../../services/firebase/config';
 import toastService from '../../../services/toastService';
 import { useTranslation } from 'react-i18next';
+import { isRTL } from '../../../i18n';
 
 interface Comment {
   id: string;
@@ -641,6 +642,7 @@ export default function CommentsScreen() {
                   maxLength={500}
                   returnKeyType="send"
                   blurOnSubmit={false}
+                  textAlign={isRTL() ? 'right' : 'left'}
                 />
                 <TouchableOpacity
                   style={[

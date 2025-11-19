@@ -288,7 +288,7 @@ class MissedConnectionsService {
       if (updates.images !== undefined) {
         // Handle image upload to Cloudinary
         let uploadedImages: string[] = [];
-        if (updates.images.length > 0) {
+        if (updates.images && updates.images.length > 0) {
           console.log('📤 Uploading images to Cloudinary...');
           for (const imageUri of updates.images) {
             if (
@@ -536,6 +536,37 @@ class MissedConnectionsService {
       }
 
       const data = connectionDoc.data();
+      const postAuthorId = data.userId;
+
+      // Check if users have blocked each other
+      const currentUserRef = doc(db, 'users', userId);
+      const currentUserDoc = await safeGetDoc(
+        currentUserRef,
+        `users:${userId}`
+      );
+      const authorUserRef = doc(db, 'users', postAuthorId);
+      const authorUserDoc = await safeGetDoc(
+        authorUserRef,
+        `users:${postAuthorId}`
+      );
+
+      const currentUserBlockedUsers = currentUserDoc.exists()
+        ? currentUserDoc.data().blockedUsers || []
+        : [];
+      const authorBlockedUsers = authorUserDoc.exists()
+        ? authorUserDoc.data().blockedUsers || []
+        : [];
+
+      if (
+        currentUserBlockedUsers.includes(postAuthorId) ||
+        authorBlockedUsers.includes(userId)
+      ) {
+        return {
+          success: false,
+          message: 'You cannot interact with this user',
+        };
+      }
+
       const likedBy = data.likedBy || [];
       const isCurrentlyLiked = likedBy.includes(userId);
 
@@ -553,6 +584,27 @@ class MissedConnectionsService {
           likes: increment(1),
           likedBy: [...likedBy, userId],
         });
+
+        // Send notification to post author (if not the liker)
+        if (postAuthorId !== userId) {
+          try {
+            const likerDoc = await safeGetDoc(
+              doc(db, 'users', userId),
+              `users:${userId}`
+            );
+            const likerData = likerDoc.exists() ? likerDoc.data() : null;
+            const likerName = likerData?.name || 'Someone';
+
+            notificationService
+              .broadcastLikeNotification(postAuthorId, likerName, connectionId)
+              .catch((err) => {
+                console.error('Failed to send like notification:', err);
+              });
+          } catch (notifError) {
+            console.error('Error preparing like notification:', notifError);
+          }
+        }
+
         console.log('✅ Connection liked:', connectionId);
         return { success: true, message: 'Connection liked', isLiked: true };
       }
@@ -723,6 +775,19 @@ class MissedConnectionsService {
       await updateDoc(connectionRef, {
         claims: increment(1),
       });
+
+      // Send notification to post author
+      try {
+        const claimerName = userData?.name || 'Someone';
+
+        notificationService
+          .broadcastClaimNotification(postOwnerId, claimerName, connectionId)
+          .catch((err) => {
+            console.error('Failed to send claim notification:', err);
+          });
+      } catch (notifError) {
+        console.error('Error preparing claim notification:', notifError);
+      }
 
       console.log('✅ Connection claimed:', connectionId);
       return {
@@ -923,6 +988,48 @@ class MissedConnectionsService {
         return { success: false, message: 'User not authenticated' };
       }
 
+      // Get connection to check author
+      const connectionRef = doc(db, 'missed_connections', connectionId);
+      const connectionDoc = await safeGetDoc(
+        connectionRef,
+        `connections:${connectionId}`
+      );
+      if (!connectionDoc.exists()) {
+        return { success: false, message: 'Connection not found' };
+      }
+
+      const connectionData = connectionDoc.data();
+      const postAuthorId = connectionData.userId;
+
+      // Check if users have blocked each other
+      const currentUserRef = doc(db, 'users', userId);
+      const currentUserDoc = await safeGetDoc(
+        currentUserRef,
+        `users:${userId}`
+      );
+      const authorUserRef = doc(db, 'users', postAuthorId);
+      const authorUserDoc = await safeGetDoc(
+        authorUserRef,
+        `users:${postAuthorId}`
+      );
+
+      const currentUserBlockedUsers = currentUserDoc.exists()
+        ? currentUserDoc.data().blockedUsers || []
+        : [];
+      const authorBlockedUsers = authorUserDoc.exists()
+        ? authorUserDoc.data().blockedUsers || []
+        : [];
+
+      if (
+        currentUserBlockedUsers.includes(postAuthorId) ||
+        authorBlockedUsers.includes(userId)
+      ) {
+        return {
+          success: false,
+          message: 'You cannot interact with this user',
+        };
+      }
+
       // Get user profile for display info
       let userData = null;
       try {
@@ -952,10 +1059,35 @@ class MissedConnectionsService {
       );
 
       // Increment comment count
-      const connectionRef = doc(db, 'missed_connections', connectionId);
       await updateDoc(connectionRef, {
         comments: increment(1),
       });
+
+      // Send notification to post author (if not the commenter)
+      if (postAuthorId !== userId) {
+        try {
+          const commenterDoc = await safeGetDoc(
+            doc(db, 'users', userId),
+            `users:${userId}`
+          );
+          const commenterData = commenterDoc.exists()
+            ? commenterDoc.data()
+            : null;
+          const commenterName = commenterData?.name || 'Someone';
+
+          notificationService
+            .broadcastCommentNotification(
+              postAuthorId,
+              commenterName,
+              connectionId
+            )
+            .catch((err) => {
+              console.error('Failed to send comment notification:', err);
+            });
+        } catch (notifError) {
+          console.error('Error preparing comment notification:', notifError);
+        }
+      }
 
       console.log('✅ Comment added to connection:', connectionId);
       return { success: true, message: 'Comment added successfully' };
@@ -1076,6 +1208,37 @@ class MissedConnectionsService {
       }
 
       const data = connectionDoc.data();
+      const postAuthorId = data.userId;
+
+      // Check if users have blocked each other
+      const currentUserRef = doc(db, 'users', userId);
+      const currentUserDoc = await safeGetDoc(
+        currentUserRef,
+        `users:${userId}`
+      );
+      const authorUserRef = doc(db, 'users', postAuthorId);
+      const authorUserDoc = await safeGetDoc(
+        authorUserRef,
+        `users:${postAuthorId}`
+      );
+
+      const currentUserBlockedUsers = currentUserDoc.exists()
+        ? currentUserDoc.data().blockedUsers || []
+        : [];
+      const authorBlockedUsers = authorUserDoc.exists()
+        ? authorUserDoc.data().blockedUsers || []
+        : [];
+
+      if (
+        currentUserBlockedUsers.includes(postAuthorId) ||
+        authorBlockedUsers.includes(userId)
+      ) {
+        return {
+          success: false,
+          message: 'You cannot interact with this user',
+        };
+      }
+
       const savedBy = data.savedBy || [];
       const isCurrentlySaved = savedBy.includes(userId);
 

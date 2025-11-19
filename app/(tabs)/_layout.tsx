@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useState, useEffect, useRef } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -231,6 +232,11 @@ export default function TabLayout() {
     };
   }, [user?.id]);
 
+  // Clear recent toasts when tab becomes focused
+  useFocusEffect(() => {
+    toastService.clearRecentToasts();
+  });
+
   const handleProfilePress = () => {
     Animated.sequence([
       Animated.timing(scaleAnim, {
@@ -285,13 +291,13 @@ export default function TabLayout() {
 
   // Calculate responsive dimensions
   const tabBarHeight = isTablet
-    ? verticalScale(70)
+    ? verticalScale(50)
     : deviceInfo.isSmallDevice
     ? verticalScale(65)
     : verticalScale(80);
 
   const iconSize = isTablet
-    ? scale(26)
+    ? scale(22)
     : deviceInfo.isSmallDevice
     ? scale(22)
     : scale(24);
@@ -478,11 +484,11 @@ export default function TabLayout() {
             }),
             paddingTop: spacing.sm,
             paddingBottom: Platform.select({
-              ios: spacing.lg,
-              android: spacing.md,
+              ios: isTablet ? spacing.md : spacing.lg,
+              android: isTablet ? spacing.sm : spacing.md,
               default: spacing.md,
             }),
-            paddingHorizontal: isTablet ? spacing.xl : spacing.md,
+            paddingHorizontal: isTablet ? spacing.lg : spacing.md,
             marginBottom: Platform.select({
               ios: spacing.md,
               android: spacing.sm,
@@ -501,7 +507,7 @@ export default function TabLayout() {
           tabBarInactiveTintColor: theme.tabBarInactive,
           tabBarLabelStyle: {
             fontSize: isTablet
-              ? moderateScale(13)
+              ? moderateScale(11)
               : deviceInfo.isSmallDevice
               ? moderateScale(9.5)
               : moderateScale(10.5),

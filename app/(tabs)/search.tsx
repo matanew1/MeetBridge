@@ -56,6 +56,17 @@ import {
 } from 'firebase/firestore';
 import { safeGetDoc } from '../../services/firebase/firestoreHelpers';
 import { db } from '../../services/firebase/config';
+import {
+  scale,
+  verticalScale,
+  moderateScale,
+  spacing,
+  borderRadius,
+  deviceInfo,
+  isTablet,
+  SCREEN_WIDTH,
+  getNumColumns,
+} from '../../utils/responsive';
 
 interface ProfileCardProps {
   user: {
@@ -223,9 +234,9 @@ const ProfileCard = memo(
   }
 );
 
-const NUM_COLUMNS = 2;
-const HORIZONTAL_PADDING = 48; // 24 left + 24 right
-const ITEM_GAP = 16;
+const NUM_COLUMNS = isTablet ? 3 : 2;
+const HORIZONTAL_PADDING = spacing.lg * 2; // responsive padding
+const ITEM_GAP = spacing.md;
 
 export default function SearchScreen() {
   const { t } = useTranslation();
@@ -239,8 +250,10 @@ export default function SearchScreen() {
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
 
-  const cardWidth = (screenWidth - HORIZONTAL_PADDING - ITEM_GAP) / NUM_COLUMNS;
-  const itemHeight = cardWidth + 40; // card (1:1) + marginBottom + distance badge margin
+  const cardWidth =
+    (screenWidth - HORIZONTAL_PADDING - ITEM_GAP * (NUM_COLUMNS - 1)) /
+    NUM_COLUMNS;
+  const itemHeight = cardWidth + verticalScale(40); // card (1:1) + marginBottom + distance badge margin
 
   const [selectedProfile, setSelectedProfile] = useState<any>(null);
   const [showProfileDetail, setShowProfileDetail] = useState(false);
@@ -798,78 +811,89 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 16,
+    paddingHorizontal: spacing.lg,
+    paddingTop: verticalScale(20),
+    paddingBottom: spacing.md,
   },
-  headerTitle: { fontSize: 24, fontWeight: '700' },
-  headerButtons: { flexDirection: 'row', gap: 12 },
+  headerTitle: {
+    fontSize: moderateScale(24),
+    fontWeight: '700',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
   viewToggle: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
+    width: scale(48),
+    height: verticalScale(48),
+    borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1.5,
   },
   filterButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
+    width: scale(48),
+    height: verticalScale(48),
+    borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1.5,
   },
   listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 120,
+    paddingHorizontal: spacing.md,
+    paddingBottom: verticalScale(120),
   },
   emptyListContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 120,
+    paddingHorizontal: spacing.md,
+    paddingBottom: verticalScale(120),
     flexGrow: 1,
     justifyContent: 'flex-start',
   },
   emptyWrapper: {
-    minHeight: 80,
+    minHeight: verticalScale(80),
     alignItems: 'center',
     justifyContent: 'flex-start',
-    paddingTop: 6,
+    paddingTop: spacing.xs,
   },
-  columnWrapper: { justifyContent: 'space-between', gap: 16 },
-  gridItem: { marginBottom: 20 },
+  columnWrapper: {
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  gridItem: { marginBottom: verticalScale(20) },
   cardContainer: { position: 'relative' },
   card: {
-    borderRadius: 28,
+    borderRadius: borderRadius.xl,
     overflow: 'hidden',
     elevation: 10,
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: scale(8) },
     shadowOpacity: 0.22,
-    shadowRadius: 20,
+    shadowRadius: scale(20),
     aspectRatio: 1,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
-    padding: 16,
+    padding: scale(16),
     alignItems: 'center',
     justifyContent: 'center',
   },
   likedCard: {
-    borderWidth: 4,
+    borderWidth: scale(4),
     elevation: 16,
     shadowOpacity: 0.4,
   },
   dislikedCard: {
     opacity: 0.6,
-    borderWidth: 3,
+    borderWidth: scale(3),
     transform: [{ scale: 0.95 }],
   },
   imageContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 60,
+    width: '80%', // Responsive to card width
+    height: '80%', // Responsive to card height
+    maxWidth: scale(120), // Cap maximum size for tablets
+    maxHeight: scale(120), // Cap maximum size for tablets
+    borderRadius: scale(60),
     overflow: 'hidden',
-    marginBottom: 16,
-    borderWidth: 4,
+    marginBottom: verticalScale(16),
+    borderWidth: scale(4),
     borderColor: 'rgba(255,255,255,0.9)',
     position: 'relative',
   },
@@ -894,57 +918,68 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cardText: {
-    fontSize: 18,
+    fontSize: moderateScale(18),
     fontWeight: '600',
   },
   distanceContainer: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    minWidth: 60,
+    top: isTablet ? scale(8) : scale(12),
+    right: isTablet ? scale(8) : scale(12),
+    paddingHorizontal: isTablet ? scale(10) : scale(14),
+    paddingVertical: isTablet ? verticalScale(6) : verticalScale(8),
+    borderRadius: scale(16),
+    minWidth: isTablet ? scale(50) : scale(60),
     alignItems: 'center',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: scale(2) },
     shadowOpacity: 0.3,
-    shadowRadius: 6,
+    shadowRadius: scale(6),
     elevation: 6,
   },
-  distanceText: { fontSize: 13, fontWeight: '700' },
+  distanceText: {
+    fontSize: isTablet ? moderateScale(11) : moderateScale(13),
+    fontWeight: '700',
+  },
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.52)',
     zIndex: 1000,
   },
   unmatchModal: {
-    marginHorizontal: 32,
-    borderRadius: 24,
-    padding: 32,
+    marginHorizontal: scale(32),
+    borderRadius: borderRadius.xl,
+    padding: scale(32),
     alignItems: 'center',
     elevation: 20,
   },
-  unmatchTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 12 },
-  unmatchText: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 32,
-    lineHeight: 24,
+  unmatchTitle: {
+    fontSize: moderateScale(22),
+    fontWeight: 'bold',
+    marginBottom: verticalScale(12),
   },
-  unmatchButtons: { flexDirection: 'row', gap: 16, width: '100%' },
+  unmatchText: {
+    fontSize: moderateScale(16),
+    textAlign: 'center',
+    marginBottom: verticalScale(32),
+    lineHeight: verticalScale(24),
+  },
+  unmatchButtons: { flexDirection: 'row', gap: scale(16), width: '100%' },
   unmatchCancel: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 16,
+    paddingVertical: verticalScale(14),
+    borderRadius: borderRadius.lg,
     alignItems: 'center',
     borderWidth: 1.5,
     backgroundColor: 'transparent',
   },
   unmatchConfirm: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 16,
+    paddingVertical: verticalScale(14),
+    borderRadius: borderRadius.lg,
     alignItems: 'center',
   },
-  unmatchConfirmText: { color: '#fff', fontWeight: '600', fontSize: 16 },
+  unmatchConfirmText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: moderateScale(16),
+  },
 });

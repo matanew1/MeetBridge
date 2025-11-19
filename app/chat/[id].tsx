@@ -270,7 +270,9 @@ const ChatScreen = () => {
             id: snap.id,
             ...data,
             createdAt: data.createdAt?.toDate() || new Date(),
-            dateOfBirth: data.dateOfBirth?.toDate() || new Date(),
+            dateOfBirth: data.dateOfBirth
+              ? new Date(data.dateOfBirth)
+              : new Date(),
             lastSeen: data.lastSeen?.toDate(),
             isOnline: data.isOnline || false,
           };

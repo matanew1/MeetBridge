@@ -11,9 +11,8 @@ import {
 import { ChevronLeft, Eye, Users, Lock } from 'lucide-react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
-import { Card, Button } from '../components/ui';
+import { Card } from '../components/ui';
 import { useAuth } from '../../contexts/AuthContext';
-import { User } from '../../store/types';
 import {
   scale,
   verticalScale,
@@ -25,7 +24,7 @@ import {
 interface PrivacySettingsModalProps {
   visible: boolean;
   onClose: () => void;
-  onSave: (settings: Partial<User['settings']>) => void;
+  onSave: (settings: any) => void;
 }
 
 interface PrivacyOptionProps {
@@ -109,8 +108,6 @@ const PrivacyOption: React.FC<PrivacyOptionProps> = ({
         <TouchableOpacity
           style={styles.selectContainer}
           onPress={() => {
-            // For select type, we'll show a modal or picker
-            // For now, cycle through options
             if (options) {
               const currentIndex = options.findIndex(
                 (opt) => opt.value === value
@@ -136,13 +133,13 @@ const PrivacySettingsModal: React.FC<PrivacySettingsModalProps> = ({
   onSave,
 }) => {
   const { isDarkMode } = useTheme();
-  const { user, updateProfile } = useAuth();
+  const { user } = useAuth();
   const theme = isDarkMode ? darkTheme : lightTheme;
 
-  // Initialize settings from user data
   const [settings, setSettings] = useState({
     showOnlineStatus: user?.settings?.privacy?.showOnlineStatus ?? true,
     profileVisibility: user?.settings?.privacy?.profileVisibility ?? 'public',
+    dataSharing: user?.settings?.privacy?.dataSharing ?? true,
   });
 
   // Update settings when user data changes
@@ -151,18 +148,14 @@ const PrivacySettingsModal: React.FC<PrivacySettingsModalProps> = ({
       setSettings({
         showOnlineStatus: user.settings.privacy.showOnlineStatus ?? true,
         profileVisibility: user.settings.privacy.profileVisibility ?? 'public',
+        dataSharing: user.settings.privacy.dataSharing ?? true,
       });
     }
-  }, [user?.settings?.privacy]);
+  }, [user?.settings?.privacy, visible]);
 
   const handleSave = async () => {
     try {
-      const updatedSettings = {
-        privacy: settings,
-      };
-
-      await updateProfile({ settings: updatedSettings });
-      onSave(updatedSettings);
+      await onSave({ privacy: settings });
       onClose();
     } catch (error) {
       console.error('Error saving privacy settings:', error);
@@ -186,7 +179,7 @@ const PrivacySettingsModal: React.FC<PrivacySettingsModalProps> = ({
         style={[styles.container, { backgroundColor: theme.background }]}
       >
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
           <TouchableOpacity
             style={[styles.backButton, { backgroundColor: theme.surface }]}
             onPress={onClose}
@@ -196,7 +189,7 @@ const PrivacySettingsModal: React.FC<PrivacySettingsModalProps> = ({
           <Text
             style={[
               styles.headerTitle,
-              { color: theme.text, ...theme.typography.h1 },
+              { color: theme.text, ...theme.typography.h2 },
             ]}
           >
             Privacy Settings
@@ -234,7 +227,10 @@ const PrivacySettingsModal: React.FC<PrivacySettingsModalProps> = ({
               subtitle="Let others see when you're online"
               value={settings.showOnlineStatus}
               onValueChange={(value) =>
-                setSettings((prev) => ({ ...prev, showOnlineStatus: value }))
+                setSettings((prev) => ({
+                  ...prev,
+                  showOnlineStatus: value as boolean,
+                }))
               }
               type="toggle"
             />
@@ -245,7 +241,10 @@ const PrivacySettingsModal: React.FC<PrivacySettingsModalProps> = ({
               subtitle="Who can see your profile"
               value={settings.profileVisibility}
               onValueChange={(value) =>
-                setSettings((prev) => ({ ...prev, profileVisibility: value }))
+                setSettings((prev) => ({
+                  ...prev,
+                  profileVisibility: value as string,
+                }))
               }
               type="select"
               options={profileVisibilityOptions}
@@ -293,7 +292,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
   backButton: {
     width: scale(44),
@@ -305,6 +303,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     textAlign: 'center',
+    fontWeight: '700',
   },
   saveButton: {
     paddingHorizontal: spacing.md,
@@ -324,6 +323,7 @@ const styles = StyleSheet.create({
   description: {
     marginBottom: spacing.lg,
     textAlign: 'center',
+    lineHeight: moderateScale(22),
   },
   optionsCard: {
     marginBottom: spacing.lg,
@@ -341,6 +341,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    marginRight: spacing.md,
   },
   iconContainer: {
     width: scale(40),
@@ -353,10 +354,10 @@ const styles = StyleSheet.create({
   textContainer: {
     flex: 1,
   },
-  optionTitle: {},
-  optionSubtitle: {
-    marginTop: spacing.xs / 2,
+  optionTitle: {
+    marginBottom: spacing.xs / 2,
   },
+  optionSubtitle: {},
   toggle: {
     width: scale(44),
     height: scale(24),
@@ -375,7 +376,7 @@ const styles = StyleSheet.create({
   },
   selectValue: {
     fontSize: moderateScale(14),
-    fontWeight: '500',
+    fontWeight: '600',
   },
   infoCard: {
     padding: spacing.lg,
@@ -383,13 +384,15 @@ const styles = StyleSheet.create({
   infoHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
   },
   infoTitle: {
     marginLeft: spacing.sm,
     fontWeight: '600',
   },
-  infoText: {},
+  infoText: {
+    lineHeight: moderateScale(20),
+  },
 });
 
 export default PrivacySettingsModal;

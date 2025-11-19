@@ -172,6 +172,33 @@ class NotificationService {
           enableVibrate: true,
           showBadge: true,
         });
+
+        await Notifications.setNotificationChannelAsync('comments', {
+          name: 'Comments',
+          importance: Notifications.AndroidImportance.DEFAULT,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#9B59B6',
+          enableVibrate: true,
+          showBadge: true,
+        });
+
+        await Notifications.setNotificationChannelAsync('likes', {
+          name: 'Likes',
+          importance: Notifications.AndroidImportance.DEFAULT,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#E74C3C',
+          enableVibrate: true,
+          showBadge: true,
+        });
+
+        await Notifications.setNotificationChannelAsync('claims', {
+          name: 'Claims',
+          importance: Notifications.AndroidImportance.HIGH,
+          vibrationPattern: [0, 500, 250, 500],
+          lightColor: '#F39C12',
+          enableVibrate: true,
+          showBadge: true,
+        });
       }
 
       return tokenData.data;
@@ -328,6 +355,15 @@ class NotificationService {
         return;
       }
 
+      // Check if app is in foreground - if so, don't send push notification
+      const appState = AppState.currentState;
+      if (appState === 'active') {
+        console.log(
+          '🔕 Skipping push notification - app is active (match notification will be handled by toast)'
+        );
+        return;
+      }
+
       // Get the user's push token from Firebase
       const userRef = doc(db, 'users', userId);
       const userDoc = await safeGetDoc(userRef, `users:${userId}`);
@@ -396,6 +432,15 @@ class NotificationService {
       // Skip notifications on web platform (CORS issues + not supported)
       if (Platform.OS === 'web') {
         console.log('⚠️ Push notifications are not supported on web platform');
+        return;
+      }
+
+      // Check if app is in foreground - if so, don't send push notification
+      const appState = AppState.currentState;
+      if (appState === 'active') {
+        console.log(
+          '🔕 Skipping push notification - app is active (message notification will be handled by toast)'
+        );
         return;
       }
 
@@ -471,6 +516,252 @@ class NotificationService {
       console.log(`📢 Full notification result:`, result);
     } catch (error) {
       console.error('Error broadcasting message notification:', error);
+    }
+  }
+
+  /**
+   * Broadcast comment notification to a specific user via push token
+   * This is used to notify the post author when someone comments on their post
+   */
+  async broadcastCommentNotification(
+    userId: string,
+    commenterName: string,
+    connectionId: string
+  ) {
+    try {
+      // Skip notifications on web platform (CORS issues + not supported)
+      if (Platform.OS === 'web') {
+        console.log('⚠️ Push notifications are not supported on web platform');
+        return;
+      }
+
+      // Check if app is in foreground - if so, don't send push notification
+      const appState = AppState.currentState;
+      if (appState === 'active') {
+        console.log(
+          '🔕 Skipping push notification - app is active (comment notification will be handled by toast)'
+        );
+        return;
+      }
+
+      // Get the user's push token from Firebase
+      const userRef = doc(db, 'users', userId);
+      const userDoc = await safeGetDoc(userRef, `users:${userId}`);
+
+      if (!userDoc.exists()) {
+        console.log('User not found for broadcast notification');
+        return;
+      }
+
+      const userData = userDoc.data();
+      const pushToken = userData.pushToken;
+      const notificationsEnabled = userData.notificationsEnabled;
+
+      if (!pushToken || !notificationsEnabled) {
+        console.log(
+          'Push token not available or notifications disabled for user'
+        );
+        return;
+      }
+
+      console.log(`💬 Preparing comment notification:`, {
+        to: pushToken.substring(0, 20) + '...',
+        from: commenterName,
+        connectionId,
+      });
+
+      // Send push notification via Expo Push Notification service
+      const message = {
+        to: pushToken,
+        sound: 'default',
+        title: 'New Comment 💬',
+        body: `${commenterName} commented on your post`,
+        data: {
+          type: 'comment',
+          connectionId,
+        },
+        priority: 'high',
+        channelId: 'comments',
+      };
+
+      const response = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Accept-encoding': 'gzip, deflate',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(message),
+      });
+
+      const result = await response.json();
+      console.log(`💬 Comment notification sent to ${commenterName}:`, result);
+    } catch (error) {
+      console.error('Error broadcasting comment notification:', error);
+    }
+  }
+
+  /**
+   * Broadcast like notification to a specific user via push token
+   * This is used to notify the post author when someone likes their post
+   */
+  async broadcastLikeNotification(
+    userId: string,
+    likerName: string,
+    connectionId: string
+  ) {
+    try {
+      // Skip notifications on web platform (CORS issues + not supported)
+      if (Platform.OS === 'web') {
+        console.log('⚠️ Push notifications are not supported on web platform');
+        return;
+      }
+
+      // Check if app is in foreground - if so, don't send push notification
+      const appState = AppState.currentState;
+      if (appState === 'active') {
+        console.log(
+          '🔕 Skipping push notification - app is active (like notification will be handled by toast)'
+        );
+        return;
+      }
+
+      // Get the user's push token from Firebase
+      const userRef = doc(db, 'users', userId);
+      const userDoc = await safeGetDoc(userRef, `users:${userId}`);
+
+      if (!userDoc.exists()) {
+        console.log('User not found for broadcast notification');
+        return;
+      }
+
+      const userData = userDoc.data();
+      const pushToken = userData.pushToken;
+      const notificationsEnabled = userData.notificationsEnabled;
+
+      if (!pushToken || !notificationsEnabled) {
+        console.log(
+          'Push token not available or notifications disabled for user'
+        );
+        return;
+      }
+
+      console.log(`❤️ Preparing like notification:`, {
+        to: pushToken.substring(0, 20) + '...',
+        from: likerName,
+        connectionId,
+      });
+
+      // Send push notification via Expo Push Notification service
+      const message = {
+        to: pushToken,
+        sound: 'default',
+        title: 'New Like ❤️',
+        body: `${likerName} liked your post`,
+        data: {
+          type: 'like',
+          connectionId,
+        },
+        priority: 'high',
+        channelId: 'likes',
+      };
+
+      const response = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Accept-encoding': 'gzip, deflate',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(message),
+      });
+
+      const result = await response.json();
+      console.log(`❤️ Like notification sent to ${likerName}:`, result);
+    } catch (error) {
+      console.error('Error broadcasting like notification:', error);
+    }
+  }
+
+  /**
+   * Broadcast claim notification to a specific user via push token
+   * This is used to notify the post author when someone claims their post
+   */
+  async broadcastClaimNotification(
+    userId: string,
+    claimerName: string,
+    connectionId: string
+  ) {
+    try {
+      // Skip notifications on web platform (CORS issues + not supported)
+      if (Platform.OS === 'web') {
+        console.log('⚠️ Push notifications are not supported on web platform');
+        return;
+      }
+
+      // Check if app is in foreground - if so, don't send push notification
+      const appState = AppState.currentState;
+      if (appState === 'active') {
+        console.log(
+          '🔕 Skipping push notification - app is active (claim notification will be handled by toast)'
+        );
+        return;
+      }
+
+      // Get the user's push token from Firebase
+      const userRef = doc(db, 'users', userId);
+      const userDoc = await safeGetDoc(userRef, `users:${userId}`);
+
+      if (!userDoc.exists()) {
+        console.log('User not found for broadcast notification');
+        return;
+      }
+
+      const userData = userDoc.data();
+      const pushToken = userData.pushToken;
+      const notificationsEnabled = userData.notificationsEnabled;
+
+      if (!pushToken || !notificationsEnabled) {
+        console.log(
+          'Push token not available or notifications disabled for user'
+        );
+        return;
+      }
+
+      console.log(`🎯 Preparing claim notification:`, {
+        to: pushToken.substring(0, 20) + '...',
+        from: claimerName,
+        connectionId,
+      });
+
+      // Send push notification via Expo Push Notification service
+      const message = {
+        to: pushToken,
+        sound: 'default',
+        title: 'New Claim 🎯',
+        body: `${claimerName} thinks they know you!`,
+        data: {
+          type: 'claim',
+          connectionId,
+        },
+        priority: 'high',
+        channelId: 'claims',
+      };
+
+      const response = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Accept-encoding': 'gzip, deflate',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(message),
+      });
+
+      const result = await response.json();
+      console.log(`🎯 Claim notification sent to ${claimerName}:`, result);
+    } catch (error) {
+      console.error('Error broadcasting claim notification:', error);
     }
   }
 

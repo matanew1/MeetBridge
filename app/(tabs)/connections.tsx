@@ -40,6 +40,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
@@ -54,6 +55,14 @@ import { userStore, useUserStore } from '../../store/userStore';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase/config';
 import ProfileDetail from '../components/ProfileDetail';
+import {
+  scale,
+  verticalScale,
+  moderateScale,
+  spacing,
+  borderRadius,
+} from '../../utils/responsive';
+import { isRTL } from '../../i18n';
 
 // Helper function
 const formatRelativeTime = (date: Date): string => {
@@ -188,21 +197,23 @@ const ConnectionItem: React.FC<ConnectionItemProps> = React.memo(
           </View>
 
           {/* Tags */}
-          {connection.tags && connection.tags.length > 0 && (
+          {Array.isArray(connection.tags) && connection.tags.length > 0 && (
             <View style={styles.tagsRow}>
-              {connection.tags.slice(0, 3).map((tag: string) => (
-                <View
-                  key={tag}
-                  style={[
-                    styles.tag,
-                    { backgroundColor: `${theme.primary}15` },
-                  ]}
-                >
-                  <Text style={[styles.tagText, { color: theme.primary }]}>
-                    #{tag}
-                  </Text>
-                </View>
-              ))}
+              {connection.tags
+                .slice(0, 3)
+                .map((tag: string, tagIndex: number) => (
+                  <View
+                    key={`${tag}-${tagIndex}`}
+                    style={[
+                      styles.tag,
+                      { backgroundColor: `${theme.primary}15` },
+                    ]}
+                  >
+                    <Text style={[styles.tagText, { color: theme.primary }]}>
+                      #{tag}
+                    </Text>
+                  </View>
+                ))}
               {connection.tags.length > 3 && (
                 <Text
                   style={[styles.moreTagsText, { color: theme.textSecondary }]}
@@ -431,6 +442,7 @@ const ConnectionItem: React.FC<ConnectionItemProps> = React.memo(
 
 // Main Component
 export default function ConnectionsScreen() {
+  const { t } = useTranslation();
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
   const router = useRouter();
@@ -651,7 +663,10 @@ export default function ConnectionsScreen() {
       );
 
       if (!result.success) {
-        toastService.error('Error', result.message || 'Failed to like post');
+        toastService.error(
+          t('common.error'),
+          result.message || t('common.failedToLike')
+        );
         // Real-time listeners will handle state updates
       }
     },
@@ -689,7 +704,10 @@ export default function ConnectionsScreen() {
       );
 
       if (!result.success) {
-        toastService.error('Error', result.message || 'Failed to save post');
+        toastService.error(
+          t('common.error'),
+          result.message || t('common.failedToSave')
+        );
         // Real-time listeners will handle state updates
       }
     },
@@ -700,7 +718,7 @@ export default function ConnectionsScreen() {
     if (!createForm.description.trim() || !currentLocation) {
       toastService.error(
         'Error',
-        'Please fill in all required fields and ensure location is detected.'
+        t('connections.fillRequiredFieldsAndLocation')
       );
       return;
     }
@@ -725,8 +743,8 @@ export default function ConnectionsScreen() {
       if (result.success) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         toastService.success(
-          'Success!',
-          'Your missed connection has been posted!'
+          t('common.success'),
+          t('connections.missedConnectionPosted')
         );
         setShowCreateModal(false);
         setCreateForm({
@@ -740,10 +758,13 @@ export default function ConnectionsScreen() {
         });
         // Real-time listeners will update the list automatically
       } else {
-        toastService.error('Error', result.message || 'Failed to create post');
+        toastService.error(
+          t('common.error'),
+          result.message || t('common.failedToCreate')
+        );
       }
     } catch (error) {
-      toastService.error('Error', 'Failed to create post. Please try again.');
+      toastService.error(t('common.error'), t('common.failedToCreate'));
     } finally {
       setIsCreating(false);
     }
@@ -751,7 +772,7 @@ export default function ConnectionsScreen() {
 
   const handleEditPost = useCallback(async () => {
     if (!editingConnection || !editForm.description.trim()) {
-      toastService.error('Error', 'Please fill in all required fields.');
+      toastService.error('Error', t('connections.fillRequiredFields'));
       return;
     }
 
@@ -787,7 +808,7 @@ export default function ConnectionsScreen() {
           );
         }
 
-        toastService.success('Success!', 'Your post has been updated!');
+        toastService.success(t('common.success'), t('connections.postUpdated'));
 
         // Close modal and reset form
         setShowCreateModal(false);
@@ -799,11 +820,14 @@ export default function ConnectionsScreen() {
           isAnonymous: false,
         });
       } else {
-        toastService.error('Error', result.message || 'Failed to update post');
+        toastService.error(
+          t('common.error'),
+          result.message || t('common.failedToUpdate')
+        );
       }
     } catch (error) {
       console.error('Error updating post:', error);
-      toastService.error('Error', 'Failed to update post. Please try again.');
+      toastService.error(t('common.error'), t('common.failedToUpdate'));
     } finally {
       setIsCreating(false);
     }
@@ -854,7 +878,7 @@ export default function ConnectionsScreen() {
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
-      toastService.error('Error', 'Failed to load user profile');
+      toastService.error(t('common.error'), t('common.failedToLoadProfile'));
     }
   }, []);
 
@@ -924,7 +948,7 @@ export default function ConnectionsScreen() {
             } else {
               toastService.error(
                 'Error',
-                result.message || 'Failed to submit claim'
+                result.message || t('common.failedToSubmitClaim')
               );
             }
           }}
@@ -957,11 +981,14 @@ export default function ConnectionsScreen() {
               Haptics.notificationAsync(
                 Haptics.NotificationFeedbackType.Success
               );
-              toastService.success('Success', 'Post deleted successfully');
+              toastService.success(
+                t('common.success'),
+                t('connections.postDeleted')
+              );
             } else {
               toastService.error(
                 'Error',
-                result.message || 'Failed to delete post'
+                result.message || t('common.failedToDelete')
               );
             }
           }}
@@ -1015,16 +1042,16 @@ export default function ConnectionsScreen() {
   const renderEmptyState = useCallback(() => {
     const emptyMessages = {
       all: {
-        title: 'No missed connections yet',
-        subtitle: 'Be the first to share a missed connection!',
+        title: t('connections.noMissedConnections'),
+        subtitle: t('connections.shareFirstConnection'),
       },
       my: {
-        title: 'No posts yet',
-        subtitle: 'Create your first missed connection post',
+        title: t('connections.noPosts'),
+        subtitle: t('connections.createPost'),
       },
       saved: {
-        title: 'No saved posts',
-        subtitle: 'Save posts to view them here later',
+        title: t('connections.noSavedPosts'),
+        subtitle: t('connections.savePostsHere'),
       },
     };
 
@@ -1034,7 +1061,8 @@ export default function ConnectionsScreen() {
       <View style={styles.emptyState}>
         <Sparkles size={60} color={theme.textSecondary} />
         <Text style={[styles.emptyTitle, { color: theme.text }]}>
-          {message.title}{connections.length > 0 ? ` (${connections.length})` : ''}
+          {message.title}
+          {connections.length > 0 ? ` (${connections.length})` : ''}
         </Text>
         <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
           {message.subtitle}
@@ -1298,6 +1326,7 @@ export default function ConnectionsScreen() {
                     multiline
                     numberOfLines={4}
                     textAlignVertical="top"
+                    textAlign={isRTL() ? 'right' : 'left'}
                   />
                 </View>
 
@@ -1428,6 +1457,7 @@ export default function ConnectionsScreen() {
                         }}
                         returnKeyType="done"
                         maxLength={20}
+                        textAlign={isRTL() ? 'right' : 'left'}
                       />
                       <TouchableOpacity
                         style={[
@@ -1800,92 +1830,112 @@ export default function ConnectionsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  safeArea: { flex: 1, paddingTop: 20 },
+  safeArea: { flex: 1, paddingTop: verticalScale(20) },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 24,
+    paddingHorizontal: scale(24),
+    paddingTop: verticalScale(20),
+    paddingBottom: verticalScale(24),
   },
-  title: { fontSize: 24, fontWeight: '700', letterSpacing: -0.5 },
-  headerIcons: { flexDirection: 'row', gap: 10 },
+  title: {
+    fontSize: moderateScale(24),
+    fontWeight: '700',
+    letterSpacing: -0.5,
+  },
+  headerIcons: { flexDirection: 'row', gap: scale(10) },
   iconButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
+    width: scale(48),
+    height: scale(48),
+    borderRadius: borderRadius.lg,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: scale(2) },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: scale(4),
     elevation: 3,
   },
-  tabsContainer: { flexDirection: 'row', paddingHorizontal: 20 },
+  tabsContainer: { flexDirection: 'row', paddingHorizontal: scale(20) },
   tab: {
     flex: 1,
-    paddingVertical: 16,
+    paddingVertical: verticalScale(16),
     alignItems: 'center',
-    borderBottomWidth: 3,
+    borderBottomWidth: verticalScale(3),
     borderBottomColor: 'transparent',
   },
-  activeTab: { borderBottomWidth: 3 },
-  tabText: { fontSize: 15, fontWeight: '600' },
+  activeTab: { borderBottomWidth: verticalScale(3) },
+  tabText: { fontSize: moderateScale(15), fontWeight: '600' },
   list: { flex: 1 },
-  listContent: { paddingHorizontal: 20, paddingBottom: 120 }, // Increased to prevent content from being hidden by bottom tabs
+  listContent: {
+    paddingHorizontal: scale(20),
+    paddingBottom: verticalScale(120),
+  }, // Increased to prevent content from being hidden by bottom tabs
   connectionItem: {
     flexDirection: 'row',
-    paddingVertical: 16,
-    paddingHorizontal: 12,
+    paddingVertical: verticalScale(16),
+    paddingHorizontal: scale(12),
     paddingLeft: 0,
     borderWidth: 1,
-    borderRadius: 20,
-    marginVertical: 8,
-    shadowOffset: { width: 0, height: 4 },
+    borderRadius: borderRadius.xl,
+    marginVertical: verticalScale(8),
+    shadowOffset: { width: 0, height: scale(4) },
     shadowOpacity: 0.1,
-    shadowRadius: 12,
+    shadowRadius: scale(12),
     elevation: 4,
   },
-  accentBar: { width: 4, borderRadius: 2, marginRight: 8 },
-  connectionContent: { flex: 1, paddingRight: 4 },
+  accentBar: { width: scale(4), borderRadius: scale(2), marginRight: scale(8) },
+  connectionContent: { flex: 1, paddingRight: scale(4) },
   userSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
-    gap: 10,
+    marginBottom: verticalScale(10),
+    gap: scale(10),
   },
   userAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 2,
+    width: scale(48),
+    height: scale(48),
+    borderRadius: scale(24),
+    borderWidth: scale(2),
     borderColor: 'rgba(255, 255, 255, 0.9)',
   },
-  userInfo: { flex: 1, gap: 3 },
-  userName: { fontSize: 15, fontWeight: '700' },
-  locationText: { fontSize: 12, fontWeight: '500' },
-  rightColumn: { alignItems: 'flex-end', gap: 4 },
-  timeContainer: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  timeText: { fontSize: 10, fontWeight: '500' },
+  userInfo: { flex: 1, gap: verticalScale(3) },
+  userName: { fontSize: moderateScale(15), fontWeight: '700' },
+  locationText: { fontSize: moderateScale(12), fontWeight: '500' },
+  rightColumn: { alignItems: 'flex-end', gap: scale(4) },
+  timeContainer: { flexDirection: 'row', alignItems: 'center', gap: scale(3) },
+  timeText: { fontSize: moderateScale(10), fontWeight: '500' },
   hotBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
+    gap: scale(3),
+    paddingHorizontal: scale(6),
+    paddingVertical: verticalScale(2),
+    borderRadius: scale(8),
   },
-  hotBadgeText: { color: '#FFF', fontSize: 10, fontWeight: '700' },
-  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
-  tag: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
-  tagText: { fontSize: 11, fontWeight: '600' },
+  hotBadgeText: {
+    color: '#FFF',
+    fontSize: moderateScale(10),
+    fontWeight: '700',
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: scale(6),
+    marginBottom: verticalScale(8),
+  },
+  tag: {
+    paddingHorizontal: scale(8),
+    paddingVertical: verticalScale(4),
+    borderRadius: scale(10),
+  },
+  tagText: { fontSize: moderateScale(11), fontWeight: '600' },
   moreTagsText: {
-    fontSize: 11,
+    fontSize: moderateScale(11),
     fontWeight: '600',
-    paddingHorizontal: 6,
-    paddingVertical: 4,
+    paddingHorizontal: scale(6),
+    paddingVertical: verticalScale(4),
   },
   statsRow: {
     flexDirection: 'row',

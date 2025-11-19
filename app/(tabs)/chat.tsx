@@ -21,6 +21,13 @@ import { EnhancedEmptyState } from '../components/ui';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import { ChatItem as ChatItemType, Profile } from '../../types/chat';
+import {
+  scale,
+  verticalScale,
+  moderateScale,
+  spacing,
+  borderRadius,
+} from '../../utils/responsive';
 
 export default function ChatScreen() {
   const { t } = useTranslation();
@@ -280,31 +287,37 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     paddingTop:
-      Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 20 : 50,
+      Platform.OS === 'android'
+        ? (StatusBar.currentHeight || 0) + verticalScale(20)
+        : verticalScale(50),
   },
-  header: { paddingHorizontal: 24, paddingBottom: 24 },
-  title: { fontSize: 24, fontWeight: '700', letterSpacing: -0.5 },
+  header: { paddingHorizontal: scale(24), paddingBottom: verticalScale(24) },
+  title: {
+    fontSize: moderateScale(24),
+    fontWeight: '700',
+    letterSpacing: -0.5,
+  },
   tabs: {
     flexDirection: 'row',
-    paddingHorizontal: 24,
+    paddingHorizontal: scale(24),
     borderBottomWidth: 1,
-    marginBottom: 8,
+    marginBottom: verticalScale(8),
   },
   tab: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: verticalScale(12),
     alignItems: 'center',
     position: 'relative',
   },
   activeTab: {},
-  tabText: { fontSize: 15, fontWeight: '600' },
+  tabText: { fontSize: moderateScale(15), fontWeight: '600' },
   activeTabText: { fontWeight: '700' },
   indicator: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 3,
-    borderRadius: 3,
+    height: verticalScale(3),
+    borderRadius: borderRadius.sm,
   },
 });
