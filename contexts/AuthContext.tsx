@@ -844,6 +844,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           preferences: response.data.preferences,
         });
         setUser(response.data);
+
+        // Re-initialize presence service with updated settings
+        if (response.data.settings) {
+          await presenceService.initialize(
+            firebaseUser.uid,
+            response.data.settings
+          );
+        }
+
         console.log('✅ AuthContext: User state updated');
         return {
           success: true,

@@ -266,7 +266,7 @@ const ProfileDetail = ({
             {checkingMatch ? (
               <View style={styles.contentActionButton}>
                 <Text style={{ color: theme.textSecondary, fontSize: 16 }}>
-                  Loading...
+                  {t('common.loading')}
                 </Text>
               </View>
             ) : isMatched ? (

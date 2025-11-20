@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useUserStore } from '../../store';
 import { useChatData } from '../../hooks/useChatData';
+import { useMultiplePresence } from '../../hooks/usePresence';
 import { EnhancedEmptyState } from '../components/ui';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
@@ -103,6 +104,16 @@ export default function ChatScreen() {
   // Ensure data is loaded
   useChatData();
 
+  // Get presence data for all conversation participants
+  const conversationUserIds = useMemo(() => {
+    if (!currentUser) return [];
+    return conversations
+      .map((c) => c.participants.find((id) => id !== currentUser.id))
+      .filter(Boolean);
+  }, [conversations, currentUser]);
+
+  const presenceMap = useMultiplePresence(conversationUserIds);
+
   const processedChats = useMemo(() => {
     if (!currentUser) return [];
     return conversations.map((c) => {
@@ -110,6 +121,9 @@ export default function ChatScreen() {
       const profile =
         matchedProfilesData.find((p) => p.id === otherId) ||
         discoverProfiles.find((p) => p.id === otherId);
+
+      // Get real presence data
+      const presence = otherId ? presenceMap.get(otherId) : null;
 
       return {
         id: c.id,
@@ -119,15 +133,27 @@ export default function ChatScreen() {
         lastMessage: c.lastMessage?.text || t('chat.newMatch'),
         time: '2m', // In real app, use relative time util
         unread: (c.unreadCount || 0) > 0,
-        isOnline: Math.random() > 0.7, // Mock presence
+        isOnline: presence?.isOnline || false,
       };
     });
-  }, [conversations, matchedProfilesData, discoverProfiles, currentUser, t]);
+  }, [
+    conversations,
+    matchedProfilesData,
+    discoverProfiles,
+    currentUser,
+    t,
+    presenceMap,
+  ]);
 
-  const newMatches = useMemo(
-    () => matchedProfilesData.slice(0, 6),
-    [matchedProfilesData]
-  );
+  const newMatches = useMemo(() => {
+    return matchedProfilesData.slice(0, 6).map((user) => {
+      const presence = presenceMap.get(user.id);
+      return {
+        ...user,
+        isOnline: presence?.isOnline || false,
+      };
+    });
+  }, [matchedProfilesData, presenceMap]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>

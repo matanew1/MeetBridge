@@ -17,16 +17,45 @@ class PresenceService {
   private presenceRef: DatabaseReference | null = null;
   private unsubscribeCallbacks: Map<string, () => void> = new Map();
   private currentUserId: string | null = null;
-  private heartbeatInterval: NodeJS.Timeout | null = null;
+  private currentUserSettings: any = null;
+  private heartbeatInterval: NodeJS.Timeout | number | null = null;
   private isInitialized: boolean = false;
 
   /**
    * Initialize the presence service with Firebase Realtime Database
    */
   async initialize(userId: string, userSettings?: any): Promise<void> {
-    if (this.isInitialized && this.currentUserId === userId) {
+    // Check if user allows showing online status
+    const showOnlineStatus = userSettings?.privacy?.showOnlineStatus ?? true;
+
+    // If settings haven't changed and we're already initialized for this user, return
+    const settingsChanged =
+      JSON.stringify(this.currentUserSettings) !== JSON.stringify(userSettings);
+    if (
+      this.isInitialized &&
+      this.currentUserId === userId &&
+      !settingsChanged
+    ) {
       console.log('✅ Presence service already initialized for user:', userId);
       return;
+    }
+
+    // If online status is disabled, clean up and return
+    if (!showOnlineStatus) {
+      console.log('🔒 Online status disabled by user privacy settings');
+      await this.cleanup();
+      this.currentUserId = userId;
+      this.currentUserSettings = userSettings;
+      return;
+    }
+
+    // If we were previously disabled but now enabled, or settings changed, re-initialize
+    if (
+      this.isInitialized &&
+      (settingsChanged || !this.currentUserSettings?.privacy?.showOnlineStatus)
+    ) {
+      console.log('🔄 Re-initializing presence service due to settings change');
+      await this.cleanup();
     }
 
     // Check if user is authenticated before proceeding
@@ -34,13 +63,6 @@ class PresenceService {
       console.warn(
         '⚠️ Cannot initialize presence service - user not authenticated'
       );
-      return;
-    }
-
-    // Check if user allows showing online status
-    const showOnlineStatus = userSettings?.privacy?.showOnlineStatus ?? true;
-    if (!showOnlineStatus) {
-      console.log('🔒 Online status disabled by user privacy settings');
       return;
     }
 
@@ -92,21 +114,15 @@ class PresenceService {
 
         if (!isConnected) {
           console.warn(
-            '⚠️ Realtime Database connection failed. This usually means:'
+            '⚠️ Realtime Database connection failed. Falling back to Firestore-only mode.'
           );
           console.warn(
-            '  1. Realtime Database is not enabled in your Firebase project'
+            '  Note: Real-time presence updates will be limited. Presence will be updated periodically.'
           );
-          console.warn('  2. Network connectivity issues');
-          console.warn('  3. Incorrect Firebase configuration');
-          console.warn('');
-          console.warn(
-            '  To fix: Go to Firebase Console → Realtime Database → Create database'
-          );
-          console.warn(
-            '  Presence features will work in limited mode (online status only)'
-          );
-          return;
+          // Continue with Firestore-only mode
+          this.database = null; // Mark RTDB as unavailable
+        } else {
+          this.database = realtimeDb;
         }
       } catch (dbError: any) {
         console.warn('⚠️ Realtime Database test failed:', dbError.message);
@@ -124,11 +140,16 @@ class PresenceService {
       this.database = realtimeDb;
       this.currentUserId = userId;
 
-      // Validate database before creating reference
+      // If RTDB is not available, use Firestore-only mode
       if (!this.database) {
-        console.warn(
-          '⚠️ Database is null after assignment, skipping presence setup'
-        );
+        console.log('🔄 Using Firestore-only presence mode');
+        // Set user as online in Firestore
+        await this.setUserOnlineInFirestore();
+        // Start heartbeat for Firestore updates
+        this.startHeartbeat();
+        this.isInitialized = true;
+        this.currentUserSettings = userSettings;
+        console.log('✅ Presence service initialized in Firestore-only mode');
         return;
       }
 
@@ -143,7 +164,7 @@ class PresenceService {
       }
 
       // Set user as online
-      await this.setUserOnline();
+      await this.setUserOffline();
 
       // Setup disconnect handler - automatically set user offline when connection is lost
       try {
@@ -187,6 +208,8 @@ class PresenceService {
       this.startHeartbeat();
 
       this.isInitialized = true;
+      this.currentUserId = userId;
+      this.currentUserSettings = userSettings;
       console.log('✅ Presence service initialized successfully');
     } catch (error) {
       console.error('❌ Error initializing presence service:', error);
@@ -198,84 +221,28 @@ class PresenceService {
   /**
    * Set user status to online
    */
-  private async setUserOnline(): Promise<void> {
-    // Validate service initialization
-    if (!this.database || !this.currentUserId) {
-      console.warn(
-        '⚠️ Cannot set user online - service not initialized or user ID missing'
-      );
-      return;
-    }
-
+  private async setUserOnlineInFirestore(): Promise<void> {
     // Check if user is authenticated
-    if (!auth.currentUser) {
-      console.warn('⚠️ Cannot set user online - user not authenticated');
-      return;
-    }
-
-    // Additional validation to ensure currentUserId is a valid string
-    if (
-      typeof this.currentUserId !== 'string' ||
-      this.currentUserId.trim() === ''
-    ) {
-      console.error(
-        '❌ Invalid currentUserId in setUserOnline:',
-        this.currentUserId
+    if (!auth.currentUser || !this.currentUserId) {
+      console.warn(
+        '⚠️ Cannot set user online - user not authenticated or ID missing'
       );
       return;
     }
 
     try {
-      const userId = this.currentUserId; // Store in local variable to avoid race conditions
-
-      // Create a fresh reference to avoid stale references
-      const presenceRef = ref(this.database, `presence/${userId}`);
-
-      if (!presenceRef) {
-        console.warn(
-          '⚠️ Cannot create presence reference - database may not be initialized'
-        );
-        return;
+      const userDocRef = doc(db, 'users', this.currentUserId);
+      await updateDoc(userDocRef, {
+        isOnline: true,
+        lastSeen: new Date(),
+      });
+      console.log('✅ User set to online in Firestore');
+    } catch (error: any) {
+      if (error?.code === 'permission-denied') {
+        console.warn('⚠️ Permission denied updating Firestore online status');
+      } else {
+        console.warn('⚠️ Error updating Firestore online status:', error);
       }
-
-      const presenceData = {
-        status: 'online',
-        lastSeen: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
-
-      // Update Realtime Database
-      try {
-        await set(presenceRef, presenceData);
-      } catch (rtdbError) {
-        console.warn('⚠️ Error updating RTDB online status:', rtdbError);
-      }
-
-      // Update Firestore with additional null check and error handling
-      if (db && userId) {
-        try {
-          const userDocRef = doc(db, 'users', userId);
-          await updateDoc(userDocRef, {
-            isOnline: true,
-            lastSeen: new Date(),
-          });
-        } catch (firestoreError: any) {
-          if (firestoreError?.code === 'permission-denied') {
-            console.warn(
-              '⚠️ Permission denied updating Firestore online status'
-            );
-          } else {
-            console.warn(
-              '⚠️ Error updating Firestore online status:',
-              firestoreError
-            );
-          }
-        }
-      }
-
-      console.log('✅ User set to online');
-    } catch (error) {
-      console.error('❌ Error setting user online:', error);
     }
   }
 
@@ -284,10 +251,8 @@ class PresenceService {
    */
   async setUserOffline(): Promise<void> {
     // Validate service initialization
-    if (!this.database || !this.currentUserId) {
-      console.warn(
-        '⚠️ Cannot set user offline - service not initialized or user ID missing'
-      );
+    if (!this.currentUserId) {
+      console.warn('⚠️ Cannot set user offline - user ID missing');
       return;
     }
 
@@ -309,23 +274,25 @@ class PresenceService {
     try {
       const userId = this.currentUserId; // Store in local variable to avoid race conditions
 
-      // Create a fresh reference to avoid stale references
-      const presenceRef = ref(this.database, `presence/${userId}`);
+      if (this.database) {
+        // RTDB mode: Update both RTDB and Firestore
+        const presenceRef = ref(this.database, `presence/${userId}`);
 
-      const presenceData = {
-        status: 'offline',
-        lastSeen: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
+        const presenceData = {
+          status: 'offline',
+          lastSeen: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        };
 
-      // Update Realtime Database first
-      try {
-        await set(presenceRef, presenceData);
-      } catch (rtdbError) {
-        console.warn('⚠️ Error updating RTDB offline status:', rtdbError);
+        // Update Realtime Database first
+        try {
+          await set(presenceRef, presenceData);
+        } catch (rtdbError) {
+          console.warn('⚠️ Error updating RTDB offline status:', rtdbError);
+        }
       }
 
-      // Update Firestore with additional null check and error handling
+      // Update Firestore (works in both modes)
       if (db && userId) {
         try {
           const userDocRef = doc(db, 'users', userId);
@@ -438,7 +405,7 @@ class PresenceService {
     }
 
     this.heartbeatInterval = setInterval(async () => {
-      if (!this.database || !this.currentUserId) return;
+      if (!this.currentUserId) return;
 
       // Check if user is still authenticated
       if (!auth.currentUser) {
@@ -460,29 +427,33 @@ class PresenceService {
 
       try {
         const userId = this.currentUserId; // Store in local variable
-        const presenceRef = ref(this.database, `presence/${userId}`);
 
-        // Check if user is still connected to Realtime Database
-        const snapshot = await get(presenceRef);
-        const presenceData = snapshot.val();
+        if (this.database) {
+          // RTDB mode: Check RTDB and update Firestore
+          const presenceRef = ref(this.database, `presence/${userId}`);
+          const snapshot = await get(presenceRef);
+          const presenceData = snapshot.val();
 
-        if (presenceData?.status === 'online' && db && userId) {
-          // Update Firestore to keep it in sync
-          const userDocRef = doc(db, 'users', userId);
-          await updateDoc(userDocRef, {
-            isOnline: true,
-            lastSeen: new Date(),
-          });
-
-          // Update Realtime Database timestamp
-          await set(this.presenceRef, {
-            status: 'online',
-            lastSeen: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-          });
-
-          console.log('💓 Heartbeat: Presence synced');
+          if (presenceData?.status === 'online' && db && userId) {
+            // Update Firestore to keep it in sync
+            const userDocRef = doc(db, 'users', userId);
+            await updateDoc(userDocRef, {
+              isOnline: true,
+              lastSeen: new Date(),
+            });
+          }
+        } else {
+          // Firestore-only mode: Update Firestore directly
+          if (db && userId) {
+            const userDocRef = doc(db, 'users', userId);
+            await updateDoc(userDocRef, {
+              isOnline: true,
+              lastSeen: new Date(),
+            });
+          }
         }
+
+        console.log('💓 Heartbeat: Presence synced');
       } catch (error) {
         console.warn('⚠️ Heartbeat error:', error);
       }
@@ -498,8 +469,30 @@ class PresenceService {
     callback: (isOnline: boolean, lastSeen: Date | null) => void
   ): () => void {
     if (!this.database) {
-      console.warn('⚠️ Cannot listen to presence - database not initialized');
-      return () => {};
+      // Firestore-only mode: Set up periodic checks
+      console.log(
+        `👁️ Listening to presence for ${userId} in Firestore-only mode`
+      );
+
+      // Initial fetch
+      this.getUserPresenceFromFirestore(userId).then(
+        ({ isOnline, lastSeen }) => {
+          callback(isOnline, lastSeen);
+        }
+      );
+
+      // Set up periodic checks every 30 seconds
+      const interval = setInterval(() => {
+        this.getUserPresenceFromFirestore(userId).then(
+          ({ isOnline, lastSeen }) => {
+            callback(isOnline, lastSeen);
+          }
+        );
+      }, 30000);
+
+      return () => {
+        clearInterval(interval);
+      };
     }
 
     const userPresenceRef = ref(this.database, `presence/${userId}`);
@@ -790,6 +783,7 @@ class PresenceService {
       this.database = null;
       this.presenceRef = null;
       this.currentUserId = null;
+      this.currentUserSettings = null;
       this.isInitialized = false;
 
       console.log('✅ Presence service cleaned up');
@@ -799,6 +793,7 @@ class PresenceService {
       this.database = null;
       this.presenceRef = null;
       this.currentUserId = null;
+      this.currentUserSettings = null;
       this.isInitialized = false;
       this.unsubscribeCallbacks.clear();
       if (this.heartbeatInterval) {

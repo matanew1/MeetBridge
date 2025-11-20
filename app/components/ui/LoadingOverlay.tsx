@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../../constants/theme';
+import { useTranslation } from 'react-i18next';
 
 export interface LoadingOverlayProps {
   visible: boolean;
@@ -20,14 +21,17 @@ export interface LoadingOverlayProps {
 
 export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
   visible,
-  message = 'Loading...',
+  message,
   transparent = true,
   fullScreen = true,
 }) => {
   const { isDarkMode } = useTheme();
+  const { t } = useTranslation();
   const theme = isDarkMode ? darkTheme : lightTheme;
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const scaleAnim = React.useRef(new Animated.Value(0.8)).current;
+
+  const displayMessage = message || t('common.loading');
 
   React.useEffect(() => {
     if (visible) {
@@ -76,9 +80,9 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
             ]}
           >
             <ActivityIndicator size="large" color={theme.primary} />
-            {message && (
+            {displayMessage && (
               <Text style={[styles.loadingText, { color: theme.text }]}>
-                {message}
+                {displayMessage}
               </Text>
             )}
           </Animated.View>
@@ -98,9 +102,9 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
       ]}
     >
       <ActivityIndicator size="large" color={theme.primary} />
-      {message && (
+      {displayMessage && (
         <Text style={[styles.loadingText, { color: theme.text }]}>
-          {message}
+          {displayMessage}
         </Text>
       )}
     </Animated.View>

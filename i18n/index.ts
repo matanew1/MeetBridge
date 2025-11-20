@@ -59,6 +59,7 @@ const resources = {
           'Are you sure you want to unmatch {{name}}? This cannot be undone.',
         newMatch: "It's a match! Say hi 👋",
         unmatchDetected: 'This conversation has ended.',
+        uploading: 'Uploading...',
       },
 
       // Loved/Liked Screen
@@ -457,6 +458,9 @@ const resources = {
         failedToLoadProfile: 'Failed to load user profile',
         failedToSubmitClaim: 'Failed to submit claim',
         failedToDelete: 'Failed to delete post',
+        notFoundTitle: 'Oops!',
+        notFoundMessage: "This screen doesn't exist.",
+        goHome: 'Go to home screen!',
       },
     },
   },
@@ -512,6 +516,7 @@ const resources = {
           'האם אתה בטוח שברצונך לבטל התאמה עם {{name}}? לא ניתן לבטל פעולה זו.',
         newMatch: 'יש התאמה! אמור שלום 👋',
         unmatchDetected: 'השיחה הזו הסתיימה.',
+        uploading: 'מעלה...',
       },
 
       // Profile Screen
@@ -751,6 +756,9 @@ const resources = {
         failedToLoadProfile: 'נכשל בטעינת פרופיל משתמש',
         failedToSubmitClaim: 'נכשל בשליחת תביעה',
         failedToDelete: 'נכשל במחיקת פוסט',
+        notFoundTitle: 'אופס!',
+        notFoundMessage: 'המסך הזה לא קיים.',
+        goHome: 'חזור למסך הבית!',
       },
 
       // Onboarding Tutorial

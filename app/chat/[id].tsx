@@ -993,7 +993,7 @@ const ChatScreen = () => {
         </View>
       </Modal>
 
-      <LoadingOverlay visible={uploadingImage} message="Uploading..." />
+      <LoadingOverlay visible={uploadingImage} message={t('chat.uploading')} />
     </KeyboardAvoidingView>
   );
 };

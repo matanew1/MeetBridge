@@ -1,5 +1,6 @@
+// <DOCUMENT filename="index.tsx">
 import React, { useState, useEffect, useCallback } from 'react';
-import { Platform } from 'react-native';
+import { Platform, StatusBar as RNStatusBar } from 'react-native';
 import {
   View,
   Text,
@@ -8,18 +9,16 @@ import {
   TouchableOpacity,
   Switch,
   Modal,
-  FlatList,
-  ActivityIndicator,
   Image,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import {
-  ChevronRight,
   ChevronLeft,
+  ChevronRight,
   User,
   Lock,
   Bell,
@@ -28,33 +27,23 @@ import {
   Globe,
   Moon,
   Sun,
-  Info,
   LogOut,
   Trash2,
   Eye,
-  Mail,
-  Zap,
 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Contexts & Services
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
 import toastService from '../../services/toastService';
-import blockReportService from '../../services/blockReportService';
-import { useUserStore } from '../../store/userStore';
-import { User as UserType } from '../../store/types';
 
-// Components
 import EditProfileModal from '../components/EditProfileModal';
 import ChangePasswordModal from '../components/ChangePasswordModal';
 import DeleteAccountModal from '../components/DeleteAccountModal';
 import PrivacySettingsModal from '../components/PrivacySettingsModal';
 import LanguageSettingsModal from '../components/LanguageSettingsModal';
 
-// Utils
 import {
   scale,
   verticalScale,
@@ -62,8 +51,6 @@ import {
   spacing,
   borderRadius,
 } from '../../utils/responsive';
-
-// --- Components ---
 
 const SettingSection = ({ title, children, delay = 0 }: any) => {
   const { isDarkMode } = useTheme();
@@ -93,6 +80,7 @@ interface SettingItemProps {
   variant?: 'default' | 'danger';
   isLast?: boolean;
   color?: string;
+  loading?: boolean;
 }
 
 const SettingItem = ({
@@ -104,6 +92,7 @@ const SettingItem = ({
   variant = 'default',
   isLast = false,
   color,
+  loading = false,
 }: SettingItemProps) => {
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? darkTheme : lightTheme;
@@ -120,9 +109,10 @@ const SettingItem = ({
           borderBottomWidth: 1,
           borderBottomColor: theme.borderLight,
         },
+        loading && { opacity: 0.7 },
       ]}
-      onPress={onPress}
-      disabled={!onPress && !rightElement}
+      onPress={loading ? undefined : onPress}
+      disabled={!onPress || loading}
       activeOpacity={0.7}
     >
       <View
@@ -151,8 +141,13 @@ const SettingItem = ({
         )}
       </View>
 
-      {rightElement ||
-        (onPress && <ChevronRight size={20} color={theme.textTertiary} />)}
+      {loading ? (
+        <ActivityIndicator size="small" color={theme.primary} />
+      ) : rightElement ? (
+        rightElement
+      ) : onPress ? (
+        <ChevronRight size={20} color={theme.textTertiary} />
+      ) : null}
     </TouchableOpacity>
   );
 };
@@ -160,30 +155,26 @@ const SettingItem = ({
 export default function SettingsScreen() {
   const { t } = useTranslation();
   const { isDarkMode, toggleDarkMode } = useTheme();
-  const { user, logout, updateProfile, refreshUserProfile, deleteAccount } =
-    useAuth();
+  const { user, logout, updateProfile } = useAuth();
   const router = useRouter();
   const theme = isDarkMode ? darkTheme : lightTheme;
 
-  // State Management
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [showOnlineStatus, setShowOnlineStatus] = useState(true);
+  // === Local state with loading indicators ===
+  const [notificationsEnabled, setNotificationsEnabled] =
+    useState<boolean>(true);
+  const [showOnlineStatus, setShowOnlineStatus] = useState<boolean>(true);
+  const [isTogglingNotifications, setIsTogglingNotifications] = useState(false);
+  const [isTogglingOnlineStatus, setIsTogglingOnlineStatus] = useState(false);
 
   // Modals
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
-  const [showBlockedUsers, setShowBlockedUsers] = useState(false);
   const [showPrivacySettings, setShowPrivacySettings] = useState(false);
   const [showLanguageSettings, setShowLanguageSettings] = useState(false);
+  const [showBlockedUsers, setShowBlockedUsers] = useState(false);
 
-  // Blocked Users Data
-  const [blockedUsersProfiles, setBlockedUsersProfiles] = useState<UserType[]>(
-    []
-  );
-  const [loadingBlockedUsers, setLoadingBlockedUsers] = useState(false);
-
-  // Initialize settings from user object
+  // Initialize from user object
   useEffect(() => {
     if (user?.settings) {
       setNotificationsEnabled(user.settings.notifications?.pushEnabled ?? true);
@@ -191,7 +182,6 @@ export default function SettingsScreen() {
     }
   }, [user]);
 
-  // Handlers
   const handleLogout = () => {
     toastService.info(
       t('settings.logoutConfirmTitle'),
@@ -210,62 +200,79 @@ export default function SettingsScreen() {
     );
   };
 
-  // Toggle Handlers with Optimistic Updates
-  const handleToggleNotifications = async (val: boolean) => {
-    setNotificationsEnabled(val);
+  // === BEST-PRACTICE TOGGLE HANDLERS WITH OPTIMISTIC UI + ROLLBACK ===
+  const handleToggleNotifications = async (value: boolean) => {
+    if (isTogglingNotifications) return;
+
+    setIsTogglingNotifications(true);
+    const previous = notificationsEnabled;
+    setNotificationsEnabled(value);
+
     try {
       await updateProfile({
         settings: {
-          ...user?.settings,
-          notifications: { ...user?.settings?.notifications, pushEnabled: val },
+          notifications: { pushEnabled: value },
         },
       });
-    } catch (e) {
-      setNotificationsEnabled(!val); // Revert
-      toastService.error(t('common.error'), 'Failed to update settings');
+      toastService.success(
+        t('common.success'),
+        t('settings.notificationsUpdated')
+      );
+    } catch (error) {
+      setNotificationsEnabled(previous);
+      toastService.error(t('common.error'), t('settings.updateFailed'));
+    } finally {
+      setIsTogglingNotifications(false);
     }
   };
 
-  const handleToggleOnlineStatus = async (val: boolean) => {
-    setShowOnlineStatus(val);
+  const handleToggleOnlineStatus = async (value: boolean) => {
+    if (isTogglingOnlineStatus) return;
+
+    setIsTogglingOnlineStatus(true);
+    const previous = showOnlineStatus;
+    setShowOnlineStatus(value);
+
     try {
       await updateProfile({
         settings: {
-          ...user?.settings,
-          privacy: { ...user?.settings?.privacy, showOnlineStatus: val },
+          privacy: { showOnlineStatus: value },
         },
       });
-    } catch (e) {
-      setShowOnlineStatus(!val); // Revert
-      toastService.error(t('common.error'), 'Failed to update settings');
+      toastService.success(t('common.success'), t('settings.privacyUpdated'));
+    } catch (error) {
+      setShowOnlineStatus(previous);
+      toastService.error(t('common.error'), t('settings.updateFailed'));
+    } finally {
+      setIsTogglingOnlineStatus(false);
     }
   };
-
-  // Load Blocked Users (Simplified for brevity, keeping core logic)
-  useEffect(() => {
-    if (showBlockedUsers) {
-      // ... (Keep existing logic for loading blocked users)
-      // For UI demo purposes, assume logic exists
-    }
-  }, [showBlockedUsers]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
 
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: theme.surface }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <ChevronLeft size={24} color={theme.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>
-          {t('settings.title')}
-        </Text>
-        <View style={{ width: 24 }} />
-      </View>
+      {/* === RESPONSIVE HEADER - FIXED FOR TABLET === */}
+      <SafeAreaView edges={['top']} style={{ backgroundColor: theme.surface }}>
+        <View style={[styles.header, { backgroundColor: theme.surface }]}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <ChevronLeft size={28} color={theme.text} />
+          </TouchableOpacity>
+
+          <Text style={[styles.headerTitle, { color: theme.text }]}>
+            {t('settings.title')}
+          </Text>
+
+          {/* Invisible placeholder to perfectly center title */}
+          <View style={styles.backButton}>
+            <View style={{ width: 28, height: 28 }} />
+          </View>
+        </View>
+      </SafeAreaView>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -306,36 +313,40 @@ export default function SettingsScreen() {
             icon={<User />}
             title={t('settings.editProfile')}
             onPress={() => setShowEditProfile(true)}
-            color="#4F46E5" // Indigo
+            color="#4F46E5"
           />
           <SettingItem
             icon={<Lock />}
             title={t('settings.changePassword')}
             onPress={() => setShowChangePassword(true)}
             isLast
-            color="#F59E0B" // Amber
+            color="#F59E0B"
           />
         </SettingSection>
 
-        {/* Privacy */}
+        {/* Privacy & Security */}
         <SettingSection title={t('settings.privacySecurity')} delay={200}>
           <SettingItem
             icon={<Shield />}
             title={t('settings.privacySettings')}
             onPress={() => setShowPrivacySettings(true)}
-            color="#10B981" // Emerald
+            color="#10B981"
           />
           <SettingItem
             icon={<Eye />}
             title={t('settings.showOnlineStatus')}
-            subtitle={showOnlineStatus ? 'Visible' : 'Hidden'}
-            color="#06B6D4" // Cyan
+            subtitle={
+              showOnlineStatus ? t('settings.visible') : t('settings.hidden')
+            }
+            color="#06B6D4"
+            loading={isTogglingOnlineStatus}
             rightElement={
               <Switch
                 value={showOnlineStatus}
                 onValueChange={handleToggleOnlineStatus}
                 trackColor={{ false: theme.border, true: theme.primary }}
                 thumbColor="#fff"
+                disabled={isTogglingOnlineStatus}
               />
             }
           />
@@ -344,7 +355,7 @@ export default function SettingsScreen() {
             title={t('settings.blockedUsers')}
             onPress={() => setShowBlockedUsers(true)}
             isLast
-            color="#EF4444" // Red
+            color="#EF4444"
           />
         </SettingSection>
 
@@ -353,20 +364,22 @@ export default function SettingsScreen() {
           <SettingItem
             icon={<Bell />}
             title={t('settings.pushNotifications')}
-            color="#EC4899" // Pink
+            color="#EC4899"
+            loading={isTogglingNotifications}
             rightElement={
               <Switch
                 value={notificationsEnabled}
                 onValueChange={handleToggleNotifications}
                 trackColor={{ false: theme.border, true: theme.primary }}
                 thumbColor="#fff"
+                disabled={isTogglingNotifications}
               />
             }
           />
           <SettingItem
             icon={isDarkMode ? <Moon /> : <Sun />}
             title={t('settings.darkMode')}
-            color="#8B5CF6" // Violet
+            color="#8B5CF6"
             rightElement={
               <Switch
                 value={isDarkMode}
@@ -381,7 +394,7 @@ export default function SettingsScreen() {
             title={t('settings.language')}
             onPress={() => setShowLanguageSettings(true)}
             isLast
-            color="#3B82F6" // Blue
+            color="#3B82F6"
           />
         </SettingSection>
 
@@ -407,7 +420,7 @@ export default function SettingsScreen() {
         </Text>
       </ScrollView>
 
-      {/* Keep Modals as they are or styled similarly */}
+      {/* Modals */}
       <EditProfileModal
         visible={showEditProfile}
         onClose={() => setShowEditProfile(false)}
@@ -420,7 +433,7 @@ export default function SettingsScreen() {
       <DeleteAccountModal
         visible={showDeleteAccount}
         onClose={() => setShowDeleteAccount(false)}
-        onConfirm={deleteAccount}
+        onConfirm={() => {}} // Handled inside modal
       />
       <PrivacySettingsModal
         visible={showPrivacySettings}
@@ -432,19 +445,6 @@ export default function SettingsScreen() {
         onClose={() => setShowLanguageSettings(false)}
         onSave={() => {}}
       />
-
-      {/* Simplified Blocked Users Modal (Full implementation available if needed) */}
-      <Modal
-        visible={showBlockedUsers}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowBlockedUsers(false)}
-      >
-        {/* ... Same internal logic as original but styled with the new theme variables ... */}
-        <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
-          {/* Implementation similar to original but using theme colors */}
-        </SafeAreaView>
-      </Modal>
     </View>
   );
 }
@@ -458,21 +458,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     paddingTop:
-      Platform.OS === 'android' ? StatusBar.currentHeight + 10 : spacing.md,
+      Platform.OS === 'android' ? RNStatusBar.currentHeight! + 10 : spacing.md,
   },
   backButton: {
-    padding: spacing.xs,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: moderateScale(18),
     fontWeight: '700',
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    textAlign: 'center',
+    zIndex: -1,
   },
   scrollContent: {
     padding: spacing.lg,
     paddingBottom: spacing.xxl,
   },
-
-  // Profile Header
   profileHeader: {
     alignItems: 'center',
     marginBottom: spacing.xl,
@@ -508,8 +515,6 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(14),
     opacity: 0.6,
   },
-
-  // Sections
   section: {
     marginBottom: spacing.lg,
   },
@@ -525,8 +530,6 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.xl,
     overflow: 'hidden',
   },
-
-  // Items
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -535,7 +538,7 @@ const styles = StyleSheet.create({
   iconBox: {
     width: scale(36),
     height: scale(36),
-    borderRadius: 10, // Squircle-ish
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.md,
@@ -555,7 +558,6 @@ const styles = StyleSheet.create({
   versionText: {
     textAlign: 'center',
     fontSize: moderateScale(12),
-    marginTop: spacing.md,
-    marginBottom: spacing.xl,
+    marginTop: spacing.xxl,
   },
 });
