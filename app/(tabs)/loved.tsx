@@ -145,6 +145,12 @@ export default function LovedScreen() {
         <Text style={[styles.headerTitle, { color: theme.text }]}>
           {t('loved.title')}
         </Text>
+        <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
+          {matchedProfilesData.length}{' '}
+          {matchedProfilesData.length === 1
+            ? t('loved.oneMatch')
+            : t('loved.multipleMatches')}
+        </Text>
         <SegmentedControl
           activeTab={activeTab}
           onTabChange={setActiveTab}
@@ -202,14 +208,21 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
     paddingHorizontal: spacing.lg,
-    paddingTop: verticalScale(10), // Match 10pt top padding
-    paddingBottom: spacing.md,
+    paddingTop: verticalScale(20), // Increased top padding
+    paddingBottom: spacing.lg, // Increased bottom padding
+    alignItems: 'center', // Center the title and subtitle
   },
   // SYNCED TITLE
   headerTitle: {
     fontSize: moderateScale(22),
     fontWeight: '800',
     letterSpacing: -0.5,
+    marginBottom: spacing.sm, // Reduced margin since subtitle is added
+    textAlign: 'center', // Center the title
+  },
+  headerSubtitle: {
+    fontSize: moderateScale(14),
+    fontWeight: '500',
     marginBottom: spacing.md,
   },
   segmentContainer: {

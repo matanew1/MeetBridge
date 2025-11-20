@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import Platform from 'react-native';
+import { Platform } from 'react-native';
 import {
   View,
   Text,
@@ -370,7 +370,7 @@ export default function SettingsScreen() {
             rightElement={
               <Switch
                 value={isDarkMode}
-                onValueChange={handleToggleDarkMode}
+                onValueChange={toggleDarkMode}
                 trackColor={{ false: theme.border, true: theme.primary }}
                 thumbColor="#fff"
               />

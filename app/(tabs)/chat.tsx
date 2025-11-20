@@ -15,7 +15,7 @@ import { useChatData } from '../../hooks/useChatData';
 import { EnhancedEmptyState } from '../components/ui';
 import { useTheme } from '../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../constants/theme';
-import ProfileModal from '../components/ProfileModal';
+import ProfileDetail from '../components/ProfileDetail';
 import {
   scale,
   verticalScale,
@@ -97,7 +97,7 @@ export default function ChatScreen() {
     useUserStore();
 
   // Profile modal state
-  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showProfileDetail, setShowProfileDetail] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState(null);
 
   // Ensure data is loaded
@@ -138,6 +138,12 @@ export default function ChatScreen() {
         <Text style={[styles.headerTitle, { color: theme.text }]}>
           {t('chat.title')}
         </Text>
+        <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
+          {processedChats.length}{' '}
+          {processedChats.length === 1
+            ? t('chat.oneConversation')
+            : t('chat.multipleConversations')}
+        </Text>
       </View>
 
       <ScrollView
@@ -163,7 +169,7 @@ export default function ChatScreen() {
                   theme={theme}
                   onPress={() => {
                     setSelectedProfile(match);
-                    setShowProfileModal(true);
+                    setShowProfileDetail(true);
                   }}
                 />
               ))}
@@ -196,12 +202,16 @@ export default function ChatScreen() {
       </ScrollView>
 
       {/* Profile Modal */}
-      {selectedProfile && (
-        <ProfileModal
-          visible={showProfileModal}
-          onClose={() => setShowProfileModal(false)}
-          user={selectedProfile}
-        />
+      {showProfileDetail && selectedProfile && (
+        <View style={StyleSheet.absoluteFill}>
+          <ProfileDetail
+            user={selectedProfile}
+            onClose={() => setShowProfileDetail(false)}
+            onLike={() => {}}
+            onDislike={() => {}}
+            onMessage={() => {}}
+          />
+        </View>
       )}
     </View>
   );
@@ -213,12 +223,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: verticalScale(10), // Match 10pt top padding
     paddingBottom: spacing.md,
+    alignItems: 'center', // Center the title and subtitle
   },
   // SYNCED TITLE
   headerTitle: {
     fontSize: moderateScale(22),
     fontWeight: '800',
     letterSpacing: -0.5,
+    marginBottom: spacing.sm, // Reduced margin since subtitle is added
+    textAlign: 'center', // Center the title
+  },
+  headerSubtitle: {
+    fontSize: moderateScale(14),
+    fontWeight: '500',
+    marginBottom: spacing.md,
   },
   sectionTitle: {
     fontSize: moderateScale(13),

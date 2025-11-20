@@ -1,6 +1,12 @@
 // Simplified connections screen with better performance
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from 'react';
 import {
   View,
   Text,
@@ -16,6 +22,7 @@ import {
   Platform,
   ActivityIndicator,
   ScrollView,
+  StatusBar,
 } from 'react-native';
 import {
   Sparkles,
@@ -34,6 +41,7 @@ import {
   Bookmark,
   Send,
   ChevronDown,
+  Search,
 } from 'lucide-react-native';
 import { MapPin, Users } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -61,6 +69,7 @@ import {
   moderateScale,
   spacing,
   borderRadius,
+  width,
 } from '../../utils/responsive';
 import { isRTL } from '../../i18n';
 
@@ -131,11 +140,11 @@ const ConnectionItem: React.FC<ConnectionItemProps> = React.memo(
             borderColor: theme.borderLight,
           },
         ]}
-        activeOpacity={0.7}
+        activeOpacity={0.9}
         onPress={onPress}
       >
-        {/* Accent Bar */}
-        <View style={[styles.accentBar, { backgroundColor: theme.primary }]} />
+        {/* Accent Bar - Removed for cleaner look matching Search/Loved, optional to keep */}
+        {/* <View style={[styles.accentBar, { backgroundColor: theme.primary }]} /> */}
 
         {/* Content */}
         <View style={styles.connectionContent}>
@@ -180,7 +189,7 @@ const ConnectionItem: React.FC<ConnectionItemProps> = React.memo(
             </View>
             <View style={styles.rightColumn}>
               <View style={styles.timeContainer}>
-                <Clock size={11} color={theme.textSecondary} />
+                <Clock size={12} color={theme.textSecondary} />
                 <Text style={[styles.timeText, { color: theme.textSecondary }]}>
                   {formatRelativeTime(connection.createdAt)}
                 </Text>
@@ -227,13 +236,13 @@ const ConnectionItem: React.FC<ConnectionItemProps> = React.memo(
           {/* Stats */}
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Eye size={12} color={theme.textSecondary} />
+              <Eye size={14} color={theme.textSecondary} />
               <Text style={[styles.statText, { color: theme.textSecondary }]}>
                 {connection.views || 0}
               </Text>
             </View>
             <View style={styles.statItem}>
-              <TrendingUp size={12} color={theme.textSecondary} />
+              <TrendingUp size={14} color={theme.textSecondary} />
               <Text style={[styles.statText, { color: theme.textSecondary }]}>
                 {connection.likes + (connection.comments || 0)}
               </Text>
@@ -250,7 +259,6 @@ const ConnectionItem: React.FC<ConnectionItemProps> = React.memo(
 
           {/* Images */}
           {(() => {
-            console.log('Connection images:', connection.id, connection.images);
             return connection.images && connection.images.length > 0;
           })() && (
             <View style={styles.postImagesContainer}>
@@ -294,7 +302,7 @@ const ConnectionItem: React.FC<ConnectionItemProps> = React.memo(
               }}
             >
               <Heart
-                size={16}
+                size={18}
                 color={theme.primary}
                 fill={isLiked ? theme.primary : 'none'}
               />
@@ -313,7 +321,7 @@ const ConnectionItem: React.FC<ConnectionItemProps> = React.memo(
                 onComment();
               }}
             >
-              <MessageCircle size={16} color={theme.textSecondary} />
+              <MessageCircle size={18} color={theme.textSecondary} />
               <Text style={[styles.actionText, { color: theme.text }]}>
                 {connection.comments || 0}
               </Text>
@@ -334,7 +342,7 @@ const ConnectionItem: React.FC<ConnectionItemProps> = React.memo(
               }}
             >
               <Bookmark
-                size={16}
+                size={18}
                 color={isSaved ? theme.primary : theme.textSecondary}
                 fill={isSaved ? theme.primary : 'none'}
               />
@@ -353,7 +361,7 @@ const ConnectionItem: React.FC<ConnectionItemProps> = React.memo(
                     setShowOptions(!showOptions);
                   }}
                 >
-                  <MoreVertical size={16} color={theme.textSecondary} />
+                  <MoreVertical size={18} color={theme.textSecondary} />
                 </TouchableOpacity>
 
                 {showOptions && (
@@ -411,7 +419,7 @@ const ConnectionItem: React.FC<ConnectionItemProps> = React.memo(
                   onClaim();
                 }}
               >
-                <Sparkles size={14} color="#FFF" />
+                <Sparkles size={16} color="#FFF" />
                 <Text style={styles.claimButtonText}>That's Me!</Text>
               </TouchableOpacity>
             )}
@@ -440,6 +448,50 @@ const ConnectionItem: React.FC<ConnectionItemProps> = React.memo(
   }
 );
 
+// --- Components ---
+
+const SegmentedControl = ({ activeTab, onTabChange, theme, counts }: any) => {
+  return (
+    <View style={[styles.segmentContainer, { backgroundColor: theme.surface }]}>
+      {['all', 'my', 'saved'].map((tab) => {
+        const isActive = activeTab === tab;
+        return (
+          <TouchableOpacity
+            key={tab}
+            style={[
+              styles.segmentButton,
+              isActive && {
+                backgroundColor: theme.cardBackground,
+                shadowColor: theme.shadow,
+                shadowOpacity: 0.1,
+                shadowRadius: 4,
+                elevation: 2,
+              },
+            ]}
+            onPress={() => onTabChange(tab)}
+          >
+            <Text
+              style={[
+                styles.segmentText,
+                {
+                  color: isActive ? theme.primary : theme.textSecondary,
+                  fontWeight: isActive ? '700' : '500',
+                },
+              ]}
+            >
+              {tab === 'all'
+                ? 'All Posts'
+                : tab === 'my'
+                ? 'My Posts'
+                : 'Saved'}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+};
+
 // Main Component
 export default function ConnectionsScreen() {
   const { t } = useTranslation();
@@ -455,6 +507,9 @@ export default function ConnectionsScreen() {
   const [activeTab, setActiveTab] = useState<'all' | 'my' | 'saved'>('all');
   const [unsubscribe, setUnsubscribe] = useState<(() => void) | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const [editingConnection, setEditingConnection] =
     useState<MissedConnection | null>(null);
   const [editForm, setEditForm] = useState({
@@ -484,17 +539,17 @@ export default function ConnectionsScreen() {
   const [showFullScreenImage, setShowFullScreenImage] = useState(false);
   const [fullScreenImages, setFullScreenImages] = useState<string[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isCreating, setIsCreating] = useState(false);
 
   // Helper function to get location with address
   const getCurrentLocationWithAddress = async () => {
+    // ... (Existing implementation preserved)
     setIsLocationLoading(true);
     try {
       const location = await smartLocationManager.getCurrentLocation(true);
       if (!location) {
         return null;
       }
-
-      // Try to get address via reverse geocoding
       let address: string | null = null;
       try {
         const geocode = await Location.reverseGeocodeAsync({
@@ -514,7 +569,6 @@ export default function ConnectionsScreen() {
         }
       } catch (geocodeError) {
         console.warn('Could not get address:', geocodeError);
-        // Address is optional, continue without it
       }
 
       return {
@@ -565,26 +619,19 @@ export default function ConnectionsScreen() {
     }
   }, [showCreateModal]);
 
-  // Refresh connections when screen comes into focus (e.g., returning from comments)
   useFocusEffect(
     useCallback(() => {
       console.log('🔄 Connections tab focused - refreshing data from Firebase');
-      // Real-time listeners handle updates automatically, but we can trigger a refresh
       if (user?.id && activeTab === 'my') {
-        // Reload user's own posts
         setIsLoading(true);
       } else if (user?.id && activeTab === 'saved') {
-        // Reload saved posts
         setIsLoading(true);
       }
       return () => {};
     }, [user?.id, activeTab])
   );
 
-  const [isCreating, setIsCreating] = useState(false);
-
   useEffect(() => {
-    // Clean up previous subscription
     if (unsubscribe) {
       unsubscribe();
     }
@@ -622,12 +669,29 @@ export default function ConnectionsScreen() {
     }
 
     setUnsubscribe(() => newUnsubscribe);
-    setIsLoading(false); // Set loading to false after setting up the listener
+    setIsLoading(false);
 
     return () => newUnsubscribe();
   }, [activeTab, user?.id]);
 
-  // Handlers
+  // Debounce search query
+  useEffect(() => {
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+
+    searchDebounceRef.current = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300); // 300ms debounce delay
+
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+    };
+  }, [searchQuery]);
+
+  // --- Handlers (All Logic Preserved) ---
   const handleLike = useCallback(
     async (connectionId: string) => {
       if (!isAuthenticated) {
@@ -637,10 +701,7 @@ export default function ConnectionsScreen() {
         );
         return;
       }
-
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-      // Optimistic update
       setConnections((prev) =>
         prev.map((conn) => {
           if (conn.id === connectionId) {
@@ -656,18 +717,15 @@ export default function ConnectionsScreen() {
           return conn;
         })
       );
-
       const result = await missedConnectionsService.toggleLike(
         connectionId,
         user?.id || ''
       );
-
       if (!result.success) {
         toastService.error(
           t('common.error'),
           result.message || t('common.failedToLike')
         );
-        // Real-time listeners will handle state updates
       }
     },
     [isAuthenticated, user?.id]
@@ -679,10 +737,7 @@ export default function ConnectionsScreen() {
         toastService.error('Sign In Required', 'Please sign in to save posts.');
         return;
       }
-
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-      // Optimistic update
       setConnections((prev) =>
         prev.map((conn) => {
           if (conn.id === connectionId) {
@@ -697,18 +752,15 @@ export default function ConnectionsScreen() {
           return conn;
         })
       );
-
       const result = await missedConnectionsService.toggleSave(
         connectionId,
         user?.id || ''
       );
-
       if (!result.success) {
         toastService.error(
           t('common.error'),
           result.message || t('common.failedToSave')
         );
-        // Real-time listeners will handle state updates
       }
     },
     [isAuthenticated, user?.id]
@@ -722,7 +774,6 @@ export default function ConnectionsScreen() {
       );
       return;
     }
-
     setIsCreating(true);
     try {
       const result = await missedConnectionsService.createConnection({
@@ -731,7 +782,7 @@ export default function ConnectionsScreen() {
           lng: currentLocation.coordinates.longitude,
           landmark: currentLocation.address || 'Current Location',
           category: createForm.category,
-          icon: '📍', // Default icon
+          icon: '📍',
         },
         description: createForm.description,
         timeOccurred: createForm.timeOccurred,
@@ -756,7 +807,6 @@ export default function ConnectionsScreen() {
           images: [],
           currentTag: '',
         });
-        // Real-time listeners will update the list automatically
       } else {
         toastService.error(
           t('common.error'),
@@ -775,7 +825,6 @@ export default function ConnectionsScreen() {
       toastService.error('Error', t('connections.fillRequiredFields'));
       return;
     }
-
     setIsCreating(true);
     try {
       const result = await missedConnectionsService.updateConnection(
@@ -792,25 +841,19 @@ export default function ConnectionsScreen() {
 
       if (result.success) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-        // Fetch the updated connection immediately
         const updatedConnection =
           await missedConnectionsService.getConnectionById(
             editingConnection.id
           );
 
         if (updatedConnection.success && updatedConnection.data) {
-          // Update local state immediately with the fresh data
           setConnections((prev) =>
             prev.map((conn) =>
               conn.id === editingConnection.id ? updatedConnection.data! : conn
             )
           );
         }
-
         toastService.success(t('common.success'), t('connections.postUpdated'));
-
-        // Close modal and reset form
         setShowCreateModal(false);
         setEditingConnection(null);
         setEditForm({
@@ -956,7 +999,6 @@ export default function ConnectionsScreen() {
             router.push(`/connections/comments/${connection.id}`)
           }
           onEdit={() => {
-            // Always get the latest connection data from state
             const latestConnection = getLatestConnection(connection.id);
             if (latestConnection) {
               setEditingConnection(latestConnection);
@@ -977,7 +1019,6 @@ export default function ConnectionsScreen() {
               connection.id
             );
             if (result.success) {
-              // Real-time listeners will remove the post automatically
               Haptics.notificationAsync(
                 Haptics.NotificationFeedbackType.Success
               );
@@ -1027,7 +1068,6 @@ export default function ConnectionsScreen() {
             editingConnection.timeOccurred.getTime() ||
           latestConnection.isAnonymous !== editingConnection.isAnonymous)
       ) {
-        // Update with latest data
         setEditingConnection(latestConnection);
         setEditForm({
           description: latestConnection.description,
@@ -1062,150 +1102,153 @@ export default function ConnectionsScreen() {
         <Sparkles size={60} color={theme.textSecondary} />
         <Text style={[styles.emptyTitle, { color: theme.text }]}>
           {message.title}
-          {connections.length > 0 ? ` (${connections.length})` : ''}
+          {filteredConnections.length > 0
+            ? ` (${filteredConnections.length})`
+            : ''}
         </Text>
         <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
           {message.subtitle}
         </Text>
       </View>
     );
-  }, [activeTab, theme]);
+  }, [activeTab, theme, filteredConnections]);
+
+  const tabCounts = useMemo(() => {
+    return {
+      all: connections.length,
+      my: connections.filter((c) => c.userId === user?.id).length,
+      saved: connections.filter((c) => c.savedBy?.includes(user?.id || ''))
+        .length,
+    };
+  }, [connections, user?.id]);
+
+  const filteredConnections = useMemo(() => {
+    let filtered = connections;
+    if (activeTab === 'my') {
+      filtered = filtered.filter((c) => c.userId === user?.id);
+    } else if (activeTab === 'saved') {
+      filtered = filtered.filter((c) => c.savedBy?.includes(user?.id || ''));
+    }
+    if (debouncedSearchQuery.trim()) {
+      const query = debouncedSearchQuery.toLowerCase().trim();
+      filtered = filtered.filter(
+        (c) =>
+          (c.description?.toLowerCase() || '').includes(query) ||
+          (c.category?.toLowerCase() || '').includes(query) ||
+          (c.userName?.toLowerCase() || '').includes(query) ||
+          c.tags?.some((tag) => tag?.toLowerCase().includes(query)) ||
+          (c.location?.landmark?.toLowerCase() || '').includes(query)
+      );
+    }
+    return filtered;
+  }, [connections, activeTab, debouncedSearchQuery, user?.id]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <SafeAreaView style={styles.safeArea}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.titleContainer}>
-            <Text style={[styles.title, { color: theme.text }]}>
-              {t('connections.title')}
-            </Text>
-            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-              {activeTab === 'all'
-                ? `${connections.length} ${
-                    connections.length === 1
-                      ? t('connections.post')
-                      : t('connections.posts')
-                  }`
-                : activeTab === 'my'
-                ? `${
-                    connections.filter((c) => c.userId === user?.id).length
-                  } ${t('connections.myPosts')}`
-                : `${
-                    connections.filter((c) =>
-                      c.savedBy?.includes(user?.id || '')
-                    ).length
-                  } ${t('connections.savedPosts')}`}
-            </Text>
-          </View>
-          <View style={styles.headerIcons}>
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+
+      {/* Header (Synced with Search/Chat) */}
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>
+            {t('connections.title')}
+          </Text>
+          <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
+            {activeTab === 'all'
+              ? `${filteredConnections.length} ${
+                  filteredConnections.length === 1
+                    ? t('connections.post')
+                    : t('connections.posts')
+                }`
+              : activeTab === 'my'
+              ? `${filteredConnections.length} ${t('connections.myPosts')}`
+              : `${filteredConnections.length} ${t('connections.savedPosts')}`}
+          </Text>
+        </View>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={[
+              styles.iconButton,
+              {
+                backgroundColor: theme.surface,
+                borderColor: theme.borderLight,
+              },
+            ]}
+            onPress={() => {
+              if (!isAuthenticated) {
+                toastService.error(
+                  'Sign In Required',
+                  'Please sign in to create a post.'
+                );
+                return;
+              }
+              setShowCreateModal(true);
+            }}
+          >
+            <Plus size={24} color={theme.primary} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Tabs */}
+      <SegmentedControl
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        theme={theme}
+        counts={tabCounts}
+      />
+
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <View
+          style={[
+            styles.searchInputContainer,
+            { backgroundColor: theme.surface, borderColor: theme.border },
+          ]}
+        >
+          <Search
+            size={18}
+            color={theme.textSecondary}
+            style={{ marginRight: scale(10) }}
+          />
+          <TextInput
+            style={[styles.searchInput, { color: theme.text }]}
+            placeholder={
+              t('connections.searchPlaceholder') || 'Search posts...'
+            }
+            placeholderTextColor={theme.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {searchQuery.length > 0 && (
             <TouchableOpacity
-              style={[
-                styles.iconButton,
-                { backgroundColor: theme.surface, borderColor: theme.border },
-              ]}
-              onPress={() => {
-                if (!isAuthenticated) {
-                  toastService.error(
-                    'Sign In Required',
-                    'Please sign in to create a post.'
-                  );
-                  return;
-                }
-                setShowCreateModal(true);
-              }}
+              onPress={() => setSearchQuery('')}
+              style={styles.clearSearchButton}
             >
-              <Plus size={20} color={theme.primary} />
+              <X size={16} color={theme.textSecondary} />
             </TouchableOpacity>
-          </View>
+          )}
         </View>
+      </View>
 
-        {/* Tabs */}
-        <View style={styles.tabsContainer}>
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              activeTab === 'all' && [
-                styles.activeTab,
-                { borderBottomColor: theme.primary },
-              ],
-            ]}
-            onPress={() => setActiveTab('all')}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                {
-                  color:
-                    activeTab === 'all' ? theme.primary : theme.textSecondary,
-                },
-              ]}
-            >
-              All Posts
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              activeTab === 'my' && [
-                styles.activeTab,
-                { borderBottomColor: theme.primary },
-              ],
-            ]}
-            onPress={() => setActiveTab('my')}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                {
-                  color:
-                    activeTab === 'my' ? theme.primary : theme.textSecondary,
-                },
-              ]}
-            >
-              My Posts
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              activeTab === 'saved' && [
-                styles.activeTab,
-                { borderBottomColor: theme.primary },
-              ],
-            ]}
-            onPress={() => setActiveTab('saved')}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                {
-                  color:
-                    activeTab === 'saved' ? theme.primary : theme.textSecondary,
-                },
-              ]}
-            >
-              Saved
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Content */}
-        <FlatList
-          data={connections}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id}
-          ListEmptyComponent={renderEmptyState}
-          style={styles.list}
-          contentContainerStyle={
-            connections.length === 0 ? { flex: 1 } : styles.listContent
-          }
-          showsVerticalScrollIndicator={false}
-          removeClippedSubviews={true}
-          maxToRenderPerBatch={5}
-          windowSize={5}
-        />
-      </SafeAreaView>
+      {/* Content */}
+      <FlatList
+        data={filteredConnections}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id}
+        ListEmptyComponent={renderEmptyState}
+        style={styles.list}
+        contentContainerStyle={
+          filteredConnections.length === 0 ? { flex: 1 } : styles.listContent
+        }
+        showsVerticalScrollIndicator={false}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={5}
+        windowSize={5}
+      />
 
       {/* Create Post Modal */}
       <Modal
@@ -1349,14 +1392,13 @@ export default function ConnectionsScreen() {
                   />
                 </View>
 
-                {/* Tags Section */}
+                {/* Tags Section (Code preserved) */}
                 <View style={styles.formSection}>
                   <View style={styles.sectionHeader}>
                     <Text style={[styles.sectionTitle, { color: theme.text }]}>
                       Tags (optional)
                     </Text>
                   </View>
-
                   {/* Current Tags Display */}
                   {(editingConnection ? editForm.tags : createForm.tags)
                     .length > 0 && (
@@ -1406,8 +1448,7 @@ export default function ConnectionsScreen() {
                       ))}
                     </View>
                   )}
-
-                  {/* Tag Input */}
+                  {/* Tag Input (Code preserved) */}
                   {(editingConnection ? editForm.tags : createForm.tags)
                     .length < 5 && (
                     <View style={styles.tagInputContainer}>
@@ -1524,12 +1565,6 @@ export default function ConnectionsScreen() {
                       </TouchableOpacity>
                     </View>
                   )}
-
-                  <Text
-                    style={[styles.helperText, { color: theme.textSecondary }]}
-                  >
-                    Tags help others find your post. Max 5 tags.
-                  </Text>
                 </View>
 
                 {/* Images Section */}
@@ -1632,12 +1667,6 @@ export default function ConnectionsScreen() {
                       </TouchableOpacity>
                     )}
                   </View>
-                  <Text
-                    style={[styles.helperText, { color: theme.textSecondary }]}
-                  >
-                    Add up to 3 photos to help others recognize the person. Max
-                    3 photos.
-                  </Text>
                 </View>
 
                 {/* Time Section */}
@@ -1657,7 +1686,6 @@ export default function ConnectionsScreen() {
                       },
                     ]}
                     onPress={() => {
-                      // Could implement time picker here
                       toastService.info(
                         'Time Picker',
                         'Time picker coming soon'
@@ -1849,401 +1877,423 @@ export default function ConnectionsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  safeArea: { flex: 1, paddingTop: verticalScale(20) },
+
+  // Header - Matches Search/Chat/Loved
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: scale(24),
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
     paddingTop: verticalScale(20),
-    paddingBottom: verticalScale(24),
+    paddingBottom: spacing.lg,
   },
-  titleContainer: {
+  headerContent: {
     flex: 1,
     alignItems: 'center',
+    marginLeft: scale(42), // Offset for the right action button to center title
   },
-  title: {
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerTitle: {
     fontSize: moderateScale(22),
-    fontWeight: '700',
+    fontWeight: '800',
     letterSpacing: -0.5,
+    lineHeight: moderateScale(34),
+    textAlign: 'center',
   },
-  subtitle: {
+  headerSubtitle: {
     fontSize: moderateScale(14),
     fontWeight: '500',
     opacity: 0.7,
-    marginTop: verticalScale(4),
+    textAlign: 'center',
   },
-  headerIcons: { flexDirection: 'row', gap: scale(10) },
   iconButton: {
-    width: scale(48),
-    height: scale(48),
-    borderRadius: borderRadius.lg,
-    alignItems: 'center',
+    width: scale(42),
+    height: scale(42),
+    borderRadius: 12,
     justifyContent: 'center',
-    borderWidth: 1.5,
-    shadowOffset: { width: 0, height: scale(2) },
-    shadowOpacity: 0.1,
-    shadowRadius: scale(4),
-    elevation: 3,
-  },
-  tabsContainer: { flexDirection: 'row', paddingHorizontal: scale(20) },
-  tab: {
-    flex: 1,
-    paddingVertical: verticalScale(16),
     alignItems: 'center',
-    borderBottomWidth: verticalScale(3),
-    borderBottomColor: 'transparent',
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  activeTab: { borderBottomWidth: verticalScale(3) },
-  tabText: { fontSize: moderateScale(15), fontWeight: '600' },
+
+  // Tabs
+  segmentContainer: {
+    flexDirection: 'row',
+    padding: 4,
+    borderRadius: borderRadius.lg,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  segmentButton: {
+    flex: 1,
+    paddingVertical: verticalScale(8),
+    alignItems: 'center',
+    borderRadius: borderRadius.md,
+  },
+  segmentText: { fontSize: moderateScale(14) },
+
+  // Search
+  searchContainer: {
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: verticalScale(10),
+    height: verticalScale(46),
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: moderateScale(15),
+    height: '100%',
+  },
+  clearSearchButton: {
+    padding: 4,
+  },
+
+  // List
   list: { flex: 1 },
   listContent: {
-    paddingHorizontal: scale(20),
+    paddingHorizontal: spacing.lg,
     paddingBottom: verticalScale(120),
-  }, // Increased to prevent content from being hidden by bottom tabs
-  connectionItem: {
-    flexDirection: 'row',
-    paddingVertical: verticalScale(16),
-    paddingHorizontal: scale(12),
-    paddingLeft: 0,
-    borderWidth: 1,
-    borderRadius: borderRadius.xl,
-    marginVertical: verticalScale(8),
-    shadowOffset: { width: 0, height: scale(4) },
-    shadowOpacity: 0.1,
-    shadowRadius: scale(12),
-    elevation: 4,
   },
-  accentBar: { width: scale(4), borderRadius: scale(2), marginRight: scale(8) },
-  connectionContent: { flex: 1, paddingRight: scale(4) },
+
+  // Connection Item (Card)
+  connectionItem: {
+    borderRadius: borderRadius.xl, // Match Search/Loved cards (24)
+    borderWidth: 1,
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+    overflow: 'hidden',
+  },
+  connectionContent: {
+    flex: 1,
+  },
   userSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: verticalScale(10),
-    gap: scale(10),
+    marginBottom: spacing.sm,
   },
   userAvatar: {
-    width: scale(48),
-    height: scale(48),
-    borderRadius: scale(24),
-    borderWidth: scale(2),
-    borderColor: 'rgba(255, 255, 255, 0.9)',
+    width: scale(44),
+    height: scale(44),
+    borderRadius: scale(22),
+    marginRight: spacing.sm,
   },
-  userInfo: { flex: 1, gap: verticalScale(3) },
-  userName: { fontSize: moderateScale(15), fontWeight: '700' },
-  locationText: { fontSize: moderateScale(12), fontWeight: '500' },
-  rightColumn: { alignItems: 'flex-end', gap: scale(4) },
-  timeContainer: { flexDirection: 'row', alignItems: 'center', gap: scale(3) },
-  timeText: { fontSize: moderateScale(10), fontWeight: '500' },
+  userInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  userName: {
+    fontSize: moderateScale(16),
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  locationText: {
+    fontSize: moderateScale(12),
+    fontWeight: '500',
+  },
+  rightColumn: {
+    alignItems: 'flex-end',
+  },
+  timeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  timeText: {
+    fontSize: moderateScale(11),
+    fontWeight: '500',
+    marginLeft: 4,
+  },
   hotBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scale(3),
-    paddingHorizontal: scale(6),
-    paddingVertical: verticalScale(2),
-    borderRadius: scale(8),
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    gap: 2,
   },
   hotBadgeText: {
     color: '#FFF',
     fontSize: moderateScale(10),
     fontWeight: '700',
   },
+
+  // Tags
   tagsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: scale(6),
-    marginBottom: verticalScale(8),
+    marginBottom: spacing.sm,
+    gap: 6,
   },
   tag: {
-    paddingHorizontal: scale(8),
-    paddingVertical: verticalScale(4),
-    borderRadius: scale(10),
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
-  tagText: { fontSize: moderateScale(11), fontWeight: '600' },
-  moreTagsText: {
+  tagText: {
     fontSize: moderateScale(11),
     fontWeight: '600',
-    paddingHorizontal: scale(6),
-    paddingVertical: verticalScale(4),
+  },
+  moreTagsText: {
+    fontSize: moderateScale(11),
+    fontWeight: '500',
+    alignSelf: 'center',
+    marginLeft: 4,
+  },
+
+  // Description & Stats
+  descriptionText: {
+    fontSize: moderateScale(14),
+    lineHeight: moderateScale(22),
+    marginBottom: spacing.md,
+    marginTop: spacing.xs,
   },
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: spacing.sm,
     gap: 12,
-    marginBottom: 8,
   },
-  statItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  statText: { fontSize: 12, fontWeight: '600' },
-  descriptionText: { fontSize: 14, lineHeight: 20, marginBottom: 10 },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statText: {
+    fontSize: moderateScale(12),
+    fontWeight: '500',
+  },
+
+  // Images
+  postImagesContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: spacing.md,
+  },
+  postImage: {
+    width: scale(70),
+    height: scale(70),
+    borderRadius: borderRadius.md,
+    backgroundColor: '#f0f0f0',
+  },
+  moreImagesOverlay: {
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'absolute',
+  },
+  moreImagesText: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+
+  // Actions
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 12,
+    gap: 5,
   },
-  actionText: { fontSize: 13, fontWeight: '600' },
-  optionsMenu: { position: 'relative' },
+  actionText: {
+    fontSize: moderateScale(12),
+    fontWeight: '600',
+  },
+  claimButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 'auto',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+  },
+  claimButtonText: {
+    color: '#fff',
+    fontSize: moderateScale(12),
+    fontWeight: '700',
+  },
+
+  // Options
+  optionsMenu: {
+    position: 'relative',
+  },
   optionsDropdown: {
     position: 'absolute',
-    bottom: 45,
+    bottom: 40,
     right: 0,
-    minWidth: 140,
-    borderRadius: 12,
+    minWidth: 120,
     borderWidth: 1,
-    overflow: 'hidden',
-    zIndex: 1000,
+    borderRadius: 12,
+    zIndex: 999,
   },
   optionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    padding: 10,
+    gap: 8,
   },
-  optionText: { fontSize: 14, fontWeight: '600' },
-  optionDivider: { height: 1 },
-  claimButton: {
-    marginLeft: 'auto',
-    flexDirection: 'row',
+  optionText: {
+    fontSize: moderateScale(13),
+    fontWeight: '600',
+  },
+  optionDivider: {
+    height: 1,
+  },
+
+  // Empty State
+  emptyState: {
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 18,
+    paddingVertical: verticalScale(60),
+    paddingHorizontal: spacing.xl,
   },
-  claimButtonText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
-  // Modal styles
+  emptyTitle: {
+    fontSize: moderateScale(18),
+    fontWeight: '700',
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  emptyText: {
+    fontSize: moderateScale(14),
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+
+  // Modal (Form)
   modalContainer: { flex: 1 },
   modalHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
+    borderBottomColor: 'rgba(0,0,0,0.05)',
   },
-  modalCloseButton: { padding: 8 },
-  modalTitle: { fontSize: 18, fontWeight: '700' },
-  modalHeaderSpacer: { width: 40 },
+  modalTitle: {
+    fontSize: moderateScale(16),
+    fontWeight: '700',
+  },
+  modalCloseButton: { padding: 4 },
+  modalHeaderSpacer: { width: 32 },
   modalScrollContent: { flex: 1 },
   modalScrollContainer: { paddingBottom: 100 },
-  formContainer: { padding: 20 },
-  formSection: { marginBottom: 24 },
+  formContainer: { padding: spacing.lg },
+  formSection: { marginBottom: spacing.xl },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: spacing.md,
     gap: 8,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: moderateScale(15),
     fontWeight: '600',
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
   },
   textArea: {
     borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    fontSize: moderateScale(15),
     height: 120,
     textAlignVertical: 'top',
   },
-  textInput: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-  },
-  timeSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
-  },
-  timeSelectorText: { fontSize: 16, flex: 1 },
   checkboxContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
   },
   checkbox: {
-    width: 24,
-    height: 24,
+    width: 22,
+    height: 22,
     borderWidth: 2,
     borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 2,
   },
-  checkmark: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
+  checkmark: { color: '#FFF', fontSize: 14, fontWeight: 'bold' },
   checkboxContent: { flex: 1 },
-  checkboxLabel: { fontSize: 16, fontWeight: '600', marginBottom: 4 },
-  checkboxSubtext: { fontSize: 14, fontWeight: '400' },
-  locationDisplay: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
-    minHeight: 50,
-    justifyContent: 'center',
+  checkboxLabel: {
+    fontSize: moderateScale(15),
+    fontWeight: '600',
+    marginBottom: 2,
   },
-  locationLoading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  locationContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  locationError: {
-    alignItems: 'center',
-  },
-  locationText: { fontSize: 16, flex: 1 },
+  checkboxSubtext: { fontSize: moderateScale(13) },
   modalBottomBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: Platform.OS === 'ios' ? 34 : spacing.md,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.1)',
+    borderTopColor: 'rgba(0,0,0,0.05)',
   },
   cancelButton: {
     flex: 1,
     paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
+    borderRadius: borderRadius.xl,
     borderWidth: 1,
     alignItems: 'center',
     marginRight: 12,
   },
-  cancelButtonText: { fontSize: 16, fontWeight: '600' },
+  cancelButtonText: { fontSize: moderateScale(15), fontWeight: '600' },
   postButton: {
     flex: 2,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
     paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
+    borderRadius: borderRadius.xl,
+    gap: 8,
   },
-  postButtonText: { color: '#FFF', fontSize: 16, fontWeight: '600' },
+  postButtonText: {
+    color: '#FFF',
+    fontSize: moderateScale(15),
+    fontWeight: '600',
+  },
+
+  // Location Helper
   locationDisplay: {
     borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    justifyContent: 'center',
     minHeight: 50,
-    justifyContent: 'center',
   },
-  locationLoading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  locationContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  locationError: {
-    alignItems: 'center',
-  },
-  locationText: { fontSize: 16, flex: 1 },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 40,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginTop: 20,
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  emptyText: {
-    fontSize: 16,
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  imagesContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  imageWrapper: {
-    position: 'relative',
-  },
-  imagePreview: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-  },
-  removeImageButton: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    backgroundColor: '#FF4444',
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addImageButton: {
-    width: 80,
-    height: 80,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  addImageText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  postImagesContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 12,
-  },
-  postImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-  },
-  moreImagesOverlay: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  moreImagesText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  locationLoading: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  locationContent: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  locationError: { alignItems: 'center' },
+  locationText: { fontSize: moderateScale(14), flex: 1 },
+
+  // Tags Helper
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -2258,42 +2308,67 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 16,
   },
-  tagChipText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  tagRemoveButton: {
-    padding: 2,
-  },
-  tagInputContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-  },
+  tagChipText: { fontSize: moderateScale(13), fontWeight: '600' },
+  tagRemoveButton: { padding: 2 },
+  tagInputContainer: { flexDirection: 'row', gap: 8 },
   tagInput: {
     flex: 1,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    fontSize: 16,
+    fontSize: moderateScale(14),
   },
   addTagButton: {
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
-    alignItems: 'center',
     justifyContent: 'center',
   },
   addTagButtonText: {
     color: '#FFF',
-    fontSize: 14,
     fontWeight: '600',
+    fontSize: moderateScale(13),
   },
-  fullScreenContainer: {
-    flex: 1,
-    backgroundColor: '#000',
+
+  // Images Helper
+  imagesContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  imageWrapper: { position: 'relative' },
+  imagePreview: { width: 80, height: 80, borderRadius: 8 },
+  removeImageButton: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#FF4444',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  addImageButton: {
+    width: 80,
+    height: 80,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  addImageText: { fontSize: moderateScale(11), fontWeight: '500' },
+  timeSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+  },
+  timeSelectorText: { fontSize: moderateScale(15), flex: 1 },
+
+  // FullScreen Image
+  fullScreenContainer: { flex: 1, backgroundColor: '#000' },
   fullScreenHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -2301,44 +2376,26 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingHorizontal: 20,
     paddingBottom: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
-  fullScreenCloseButton: {
-    padding: 10,
-  },
-  imageCounter: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  fullScreenCloseButton: { padding: 8 },
+  imageCounter: { color: '#FFF', fontSize: 16, fontWeight: '600' },
   fullScreenImageContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  fullScreenImage: {
-    width: '100%',
-    height: '100%',
-  },
+  fullScreenImage: { width: '100%', height: '100%' },
   navButton: {
     position: 'absolute',
     top: '50%',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 25,
-    width: 50,
-    height: 50,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  prevButton: {
-    left: 20,
-  },
-  nextButton: {
-    right: 20,
-  },
-  navButtonText: {
-    color: '#FFF',
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
+  prevButton: { left: 20 },
+  nextButton: { right: 20 },
+  navButtonText: { color: '#FFF', fontSize: 24 },
 });

@@ -231,10 +231,11 @@ export default function SearchScreen() {
   const { width: screenWidth } = useWindowDimensions();
 
   // Responsive Dimensions
+  // Responsive Dimensions
   const cardWidth =
     (screenWidth - HORIZONTAL_PADDING * 2 - ITEM_GAP * (NUM_COLUMNS - 1)) /
     NUM_COLUMNS;
-  const cardHeight = cardWidth * 1.35;
+  const cardHeight = cardWidth * 1.2; // Reduced from 1.35 to 1.2 for smaller cards
   const itemTotalHeight = cardHeight + spacing.md;
 
   // State
@@ -482,7 +483,7 @@ export default function SearchScreen() {
 
       {/* SYNCED HEADER */}
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerTextContainer}>
           <Text style={[styles.headerTitle, { color: theme.text }]}>
             {t('search.title')}
           </Text>
@@ -625,14 +626,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: spacing.xl,
-    paddingTop: verticalScale(10), // Match 10pt top padding
-    paddingBottom: spacing.md,
+    paddingTop: verticalScale(20), // Increased top padding
+    paddingBottom: spacing.lg, // Increased bottom padding
+  },
+  headerTextContainer: {
+    alignItems: 'center', // Center the title and subtitle
   },
   headerTitle: {
     fontSize: moderateScale(22), // Match 22pt font size
     fontWeight: '800', // Match 800 weight
     letterSpacing: -0.5,
     lineHeight: moderateScale(34),
+    textAlign: 'center', // Center the title
   },
   headerSubtitle: {
     fontSize: moderateScale(14),
@@ -660,7 +665,7 @@ const styles = StyleSheet.create({
   // Grid
   listContent: {
     paddingBottom: verticalScale(30),
-    paddingTop: spacing.xs,
+    paddingTop: spacing.md,
   },
   emptyListContent: { flexGrow: 1 },
   columnWrapper: {

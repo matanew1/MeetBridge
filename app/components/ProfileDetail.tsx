@@ -155,7 +155,7 @@ const ProfileDetail = ({
         ]}
       >
         <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-          <ArrowRight size={24} color={theme.text} />
+          <X size={24} color={theme.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.text }]}>
           {user.name}
@@ -401,7 +401,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   closeButton: {
-    padding: scale(5),
+    padding: scale(8),
+    borderRadius: scale(20),
+    backgroundColor: 'rgba(0,0,0,0.1)',
   },
   headerTitle: {
     fontSize: moderateScale(18),

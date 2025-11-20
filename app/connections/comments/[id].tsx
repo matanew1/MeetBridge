@@ -33,6 +33,13 @@ import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { lightTheme, darkTheme } from '../../../constants/theme';
 import { useAuth } from '../../../contexts/AuthContext';
+import {
+  scale,
+  verticalScale,
+  moderateScale,
+  spacing,
+  borderRadius,
+} from '../../../utils/responsive';
 import missedConnectionsService, {
   MissedConnection,
 } from '../../../services/firebase/missedConnectionsService';
@@ -335,37 +342,6 @@ export default function CommentsScreen() {
       return;
     }
 
-    /**
-     * VERIFICATION SYSTEM IDEAS:
-     *
-     * 1. Location History Verification (Privacy-Aware)
-     *    - Check if user's location history shows they were within 100m radius
-     *    - Only checks if user has location tracking enabled
-     *    - Uses geohash matching for privacy
-     *
-     * 2. Time-Based Verification
-     *    - Check if claim time matches post time ±2 hours
-     *    - Cross-reference with user's app usage timestamps
-     *
-     * 3. Creator Confirmation
-     *    - Post creator gets notification with claimer's profile
-     *    - Can approve/reject the claim
-     *    - Both get matched if approved
-     *
-     * 4. Reputation System
-     *    - Track successful vs. false claims
-     *    - Lower credibility = claims require more verification
-     *    - Good reputation = instant matches
-     *
-     * 5. Photo Verification (Future)
-     *    - Optional: Upload a photo from that time/location
-     *    - Check EXIF data for location & timestamp
-     *
-     * 6. Mutual Friends/Connections
-     *    - If claimer and creator have mutual matches
-     *    - Higher trust score
-     */
-
     // Show verification info and confirmation
     toastService.info(
       t('comments.claimConfirmTitle'),
@@ -509,23 +485,65 @@ export default function CommentsScreen() {
                     {connection.description}
                   </Text>
 
-                  {/* Stats */}
+                  {/* Stats Bubbles */}
                   <View style={styles.postStats}>
-                    <View style={styles.statItem}>
-                      <Heart size={14} color={theme.primary} />
-                      <Text style={[styles.statText, { color: theme.text }]}>
+                    {/* Likes Bubble */}
+                    <View
+                      style={[
+                        styles.statBubble,
+                        {
+                          backgroundColor: theme.surface,
+                          borderColor: theme.borderLight,
+                        },
+                      ]}
+                    >
+                      <Heart
+                        size={16}
+                        color={theme.primary}
+                        fill={theme.primary}
+                      />
+                      <Text
+                        style={[styles.statText, { color: theme.text }]}
+                        numberOfLines={1}
+                      >
                         {connection.likes}
                       </Text>
                     </View>
-                    <View style={styles.statItem}>
-                      <Eye size={14} color={theme.textSecondary} />
-                      <Text style={[styles.statText, { color: theme.text }]}>
+
+                    {/* Views Bubble */}
+                    <View
+                      style={[
+                        styles.statBubble,
+                        {
+                          backgroundColor: theme.surface,
+                          borderColor: theme.borderLight,
+                        },
+                      ]}
+                    >
+                      <Eye size={16} color={theme.textSecondary} />
+                      <Text
+                        style={[styles.statText, { color: theme.text }]}
+                        numberOfLines={1}
+                      >
                         {connection.views || 0}
                       </Text>
                     </View>
-                    <View style={styles.statItem}>
-                      <MessageCircle size={14} color={theme.textSecondary} />
-                      <Text style={[styles.statText, { color: theme.text }]}>
+
+                    {/* Comments Bubble */}
+                    <View
+                      style={[
+                        styles.statBubble,
+                        {
+                          backgroundColor: theme.surface,
+                          borderColor: theme.borderLight,
+                        },
+                      ]}
+                    >
+                      <MessageCircle size={16} color={theme.textSecondary} />
+                      <Text
+                        style={[styles.statText, { color: theme.text }]}
+                        numberOfLines={1}
+                      >
                         {connection.comments || 0}
                       </Text>
                     </View>
@@ -698,9 +716,11 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.xl,
+    paddingTop: verticalScale(20),
+    paddingBottom: spacing.lg,
     borderBottomWidth: 1,
   },
   backButton: {
@@ -710,20 +730,23 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
-    marginLeft: 8,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: moderateScale(22),
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    lineHeight: moderateScale(34),
+    textAlign: 'center',
   },
   headerRight: {
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   commentCount: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: moderateScale(14),
+    fontWeight: '500',
   },
   loadingContainer: {
     flex: 1,
@@ -732,7 +755,7 @@ const styles = StyleSheet.create({
   },
   postContainer: {
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingVertical: 16,
   },
   postCard: {
     borderRadius: 16,
@@ -780,21 +803,29 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 12,
   },
+  // Updated Stats Styles
   postStats: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    flexWrap: 'wrap', // Allows wrapping on small screens
+    gap: 8,
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: 'rgba(0,0,0,0.05)',
   },
-  statItem: {
+  statBubble: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    minWidth: 60, // Ensures bubble doesn't collapse too small
   },
   statText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
   },
   commentsList: {

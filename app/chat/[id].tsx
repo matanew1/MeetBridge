@@ -1065,13 +1065,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     elevation: 0,
     shadowOpacity: 0,
-    padding: 0,
-    minHeight: 50,
-    minWidth: 50,
+    padding: 5, // Added padding to prevent edge clipping
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'visible', // Ensure container doesn't clip
   },
-  heartText: { fontSize: 40 },
+  heartText: {
+    fontSize: 45, // Increased slightly for better visibility
+    lineHeight: 55, // CRITICAL FIX: Set line height larger than font size
+    textAlign: 'center',
+  },
   imageMessage: {
     backgroundColor: 'transparent',
     padding: 0,
@@ -1079,7 +1082,12 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
   },
   messageImage: { width: scale(200), height: scale(200), borderRadius: 16 },
-  messageText: { fontSize: moderateScale(16), lineHeight: 22 },
+  messageText: {
+    fontSize: moderateScale(16),
+    // Changed from 22 to moderateScale(26) to prevent clipping (especially in Hebrew)
+    lineHeight: moderateScale(26),
+    textAlignVertical: 'center', // Helps center text vertically on Android
+  },
   messageTime: { fontSize: moderateScale(10), marginTop: 4, opacity: 0.7 },
   myMessageTime: { textAlign: 'right' },
   otherMessageTime: { textAlign: 'left' },
