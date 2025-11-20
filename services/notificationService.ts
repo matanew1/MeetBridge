@@ -74,12 +74,14 @@ class NotificationService {
   /**
    * Initialize notification service
    */
-  async initialize(userId?: string) {
+  async initialize(userId?: string, userSettings?: any) {
     try {
-      // Load settings from storage
-      await this.loadSettings();
+      // Check user settings from Firebase first, fallback to storage
+      const pushEnabled =
+        userSettings?.notifications?.pushEnabled ??
+        (await this.loadSettingsFromStorage());
 
-      if (!this.settings.enabled) {
+      if (!pushEnabled) {
         console.log('📴 Notifications are disabled by user');
         return null;
       }
@@ -762,6 +764,23 @@ class NotificationService {
       console.log(`🎯 Claim notification sent to ${claimerName}:`, result);
     } catch (error) {
       console.error('Error broadcasting claim notification:', error);
+    }
+  }
+
+  /**
+   * Load notification enabled setting from storage (legacy method)
+   */
+  async loadSettingsFromStorage(): Promise<boolean> {
+    try {
+      const settingsJson = await AsyncStorage.getItem(STORAGE_KEY);
+      if (settingsJson) {
+        const settings = JSON.parse(settingsJson);
+        return settings.enabled ?? true;
+      }
+      return true; // Default to enabled
+    } catch (error) {
+      console.error('Error loading notification settings from storage:', error);
+      return true;
     }
   }
 

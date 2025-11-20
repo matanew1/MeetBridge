@@ -326,32 +326,37 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   };
 
   const pickAdditionalImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      toastService.error(
-        'Permission Required',
-        'Please grant camera roll permissions to upload photos.'
-      );
-      return;
+    const { status, granted } =
+      await ImagePicker.getMediaLibraryPermissionsAsync();
+    if (!granted) {
+      const { status: requestStatus } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (requestStatus !== 'granted') {
+        toastService.error(
+          'Permission Required',
+          'Please grant camera roll permissions to upload photos.'
+        );
+        return;
+      }
     }
 
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 5],
+        mediaTypes: 'images',
         quality: 0.8,
+        base64: false,
       });
 
-      if (!result.canceled && result.assets[0]) {
+      if (result && !result.canceled && result.assets && result.assets[0]) {
         const imageUri = result.assets[0].uri;
         setFormData((prev) => ({
           ...prev,
           images: [...prev.images, imageUri],
         }));
       }
-    } catch {
-      toastService.error('Error', 'Failed to pick image');
+    } catch (error) {
+      console.error('Error picking additional image:', error);
+      toastService.error('Error', 'Failed to pick image. Please try again.');
     }
   };
 

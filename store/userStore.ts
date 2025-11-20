@@ -550,10 +550,18 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   likeProfile: async (profileId) => {
     console.log('Store likeProfile called for:', profileId);
-    const { currentUser } = get();
+    const { currentUser, isLoadingLike } = get();
     console.log('Current user:', currentUser);
     if (!currentUser) {
       console.log('No current user found, returning false');
+      return { isMatch: false };
+    }
+
+    // Prevent multiple simultaneous like calls
+    if (isLoadingLike) {
+      console.log(
+        'Like operation already in progress, skipping duplicate call'
+      );
       return { isMatch: false };
     }
 

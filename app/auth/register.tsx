@@ -129,7 +129,7 @@ const RegisterScreen = () => {
           'Success',
           "Account created successfully! Let's set up your profile."
         );
-        router.replace('/auth/complete-profile');
+        router.replace('/(tabs)/search');
       } else {
         toastService.error(
           'Registration Failed',

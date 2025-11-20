@@ -21,6 +21,7 @@ export const useRealtimeClaims = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
   const previousClaimsRef = useRef<Claim[]>([]);
+  const isInitialLoad = useRef(true);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -76,16 +77,24 @@ export const useRealtimeClaims = () => {
           );
 
           if (isNewClaim) {
-            // Show claim notification
-            toastService.info(
-              t('toasts.newClaimTitle'),
-              t('toasts.newClaimBody', { name: claim.claimerName })
-            );
+            // If this is initial load and there are many claims, don't show toasts
+            if (!(isInitialLoad.current && claims.length > 3)) {
+              // Show claim notification
+              toastService.info(
+                t('toasts.newClaimTitle'),
+                t('toasts.newClaimBody', { name: claim.claimerName })
+              );
+            }
           }
         });
 
         // Update previous claims reference
         previousClaimsRef.current = claims;
+
+        // Mark as not initial after first update
+        if (isInitialLoad.current) {
+          isInitialLoad.current = false;
+        }
 
         if (__DEV__) {
           console.log('Realtime claims update:', claims.length);

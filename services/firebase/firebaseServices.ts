@@ -261,7 +261,7 @@ export class FirebaseUserProfileService implements IUserProfileService {
         }
       });
 
-      // Handle nested preferences with dot notation
+      // Handle nested preferences and settings with dot notation
       const updateData: Record<string, any> = { updatedAt: serverTimestamp() };
 
       Object.keys(dataToUpdate).forEach((key) => {
@@ -269,6 +269,22 @@ export class FirebaseUserProfileService implements IUserProfileService {
           const prefs = dataToUpdate[key] as Record<string, any>;
           Object.keys(prefs).forEach((prefKey) => {
             updateData[`preferences.${prefKey}`] = prefs[prefKey];
+          });
+        } else if (
+          key === 'settings' &&
+          typeof dataToUpdate[key] === 'object'
+        ) {
+          const settings = dataToUpdate[key] as Record<string, any>;
+          Object.keys(settings).forEach((settingsKey) => {
+            if (typeof settings[settingsKey] === 'object') {
+              const subSettings = settings[settingsKey] as Record<string, any>;
+              Object.keys(subSettings).forEach((subKey) => {
+                updateData[`settings.${settingsKey}.${subKey}`] =
+                  subSettings[subKey];
+              });
+            } else {
+              updateData[`settings.${settingsKey}`] = settings[settingsKey];
+            }
           });
         } else {
           updateData[key] = dataToUpdate[key];
@@ -2213,7 +2229,6 @@ export class FirebaseAuthService implements IAuthService {
           'Registration successful. Please check your email to verify your account.',
       };
     } catch (error) {
-      console.error('Error during registration:', error);
       let errorMessage = 'Registration failed';
 
       if (error instanceof Error) {

@@ -72,7 +72,7 @@ async function deleteAllMockUsers() {
 
   const results = [];
 
-  for (let i = 1; i <= 20; i++) {
+  for (let i = 1; i <= 100; i++) {
     const result = await deleteMockUser(i);
     results.push(result);
 

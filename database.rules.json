@@ -4,7 +4,7 @@
             "$uid": {
                 ".read": "auth != null",
                 ".write": "auth != null && $uid === auth.uid",
-                ".validate": "newData.hasChildren(['isOnline', 'lastSeen']) && newData.child('isOnline').isBoolean() && newData.child('lastSeen').isNumber()"
+                ".validate": "newData.hasChildren(['status', 'lastSeen', 'updatedAt']) && newData.child('status').isString() && newData.child('lastSeen').isNumber() && newData.child('updatedAt').isNumber()"
             }
         },
         ".read": false,

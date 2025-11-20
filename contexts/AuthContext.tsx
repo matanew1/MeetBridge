@@ -127,7 +127,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const loadConversations = useUserStore((s) => s.loadConversations);
 
-  // Initialize notifications and start location tracking when user is authenticated
+  // Initialize services when user is authenticated
   useEffect(() => {
     if (!firebaseUser) return;
 
@@ -136,24 +136,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('🧹 Starting cleanup service...');
       cleanupService.startPeriodicCleanup(60); // Run every 60 minutes
       console.log('✅ Cleanup service started');
-
-      // Initialize presence service with Realtime Database
-      console.log('👁️ Initializing presence service...');
-      try {
-        await presenceService.initialize(firebaseUser.uid);
-        console.log('✅ Presence service initialized');
-      } catch (error) {
-        console.error('Error initializing presence service:', error);
-      }
-
-      // Initialize push notifications
-      console.log('🔔 Initializing push notifications...');
-      try {
-        await notificationService.initialize(firebaseUser.uid);
-        console.log('✅ Notifications initialized');
-      } catch (error) {
-        console.error('Error initializing notifications:', error);
-      }
 
       // Start location tracking - remove permission restrictions
       console.log('📍 Starting location services...');
@@ -289,6 +271,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       cleanupService.stopPeriodicCleanup();
     };
   }, [firebaseUser]);
+
+  // Initialize presence service when user data is loaded
+  useEffect(() => {
+    if (!user) return;
+
+    const initializePresence = async () => {
+      console.log('👁️ Initializing presence service with user settings...');
+      try {
+        await presenceService.initialize(user.id, user.settings);
+        console.log('✅ Presence service initialized with user settings');
+      } catch (error) {
+        console.error('Error initializing presence service:', error);
+      }
+    };
+
+    initializePresence();
+  }, [user]);
+
+  // Initialize notifications when user data is loaded
+  useEffect(() => {
+    if (!user) return;
+
+    const initializeNotifications = async () => {
+      console.log('🔔 Initializing push notifications with user settings...');
+      try {
+        await notificationService.initialize(user.id, user.settings);
+        console.log('✅ Notifications initialized with user settings');
+      } catch (error) {
+        console.error('Error initializing notifications:', error);
+      }
+    };
+
+    initializeNotifications();
+  }, [user]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {

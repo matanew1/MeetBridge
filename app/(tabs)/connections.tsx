@@ -1076,9 +1076,28 @@ export default function ConnectionsScreen() {
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={[styles.title, { color: theme.text }]}>
-            Board ({connections.length})
-          </Text>
+          <View style={styles.titleContainer}>
+            <Text style={[styles.title, { color: theme.text }]}>
+              {t('connections.title')}
+            </Text>
+            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+              {activeTab === 'all'
+                ? `${connections.length} ${
+                    connections.length === 1
+                      ? t('connections.post')
+                      : t('connections.posts')
+                  }`
+                : activeTab === 'my'
+                ? `${
+                    connections.filter((c) => c.userId === user?.id).length
+                  } ${t('connections.myPosts')}`
+                : `${
+                    connections.filter((c) =>
+                      c.savedBy?.includes(user?.id || '')
+                    ).length
+                  } ${t('connections.savedPosts')}`}
+            </Text>
+          </View>
           <View style={styles.headerIcons}>
             <TouchableOpacity
               style={[
@@ -1839,10 +1858,20 @@ const styles = StyleSheet.create({
     paddingTop: verticalScale(20),
     paddingBottom: verticalScale(24),
   },
+  titleContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
   title: {
-    fontSize: moderateScale(24),
+    fontSize: moderateScale(22),
     fontWeight: '700',
     letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontSize: moderateScale(14),
+    fontWeight: '500',
+    opacity: 0.7,
+    marginTop: verticalScale(4),
   },
   headerIcons: { flexDirection: 'row', gap: scale(10) },
   iconButton: {

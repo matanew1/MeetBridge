@@ -31,13 +31,18 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({
   const [isUploading, setIsUploading] = useState(false);
 
   const requestPermissions = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      toastService.warning(
-        'Permission Required',
-        'Please grant camera roll permissions to upload photos.'
-      );
-      return false;
+    const { status, granted } =
+      await ImagePicker.getMediaLibraryPermissionsAsync();
+    if (!granted) {
+      const { status: requestStatus } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (requestStatus !== 'granted') {
+        toastService.warning(
+          'Permission Required',
+          'Please grant camera roll permissions to upload photos.'
+        );
+        return false;
+      }
     }
     return true;
   };
@@ -50,14 +55,12 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({
       setIsUploading(true);
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
+        mediaTypes: 'images',
         quality: 0.8,
         base64: false,
       });
 
-      if (!result.canceled && result.assets[0]) {
+      if (result && !result.canceled && result.assets && result.assets[0]) {
         const imageUri = result.assets[0].uri;
         onImageSelected(imageUri);
       }
@@ -70,26 +73,28 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({
   };
 
   const takePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      toastService.warning(
-        'Permission Required',
-        'Please grant camera permissions to take photos.'
-      );
-      return;
+    const { status, granted } = await ImagePicker.getCameraPermissionsAsync();
+    if (!granted) {
+      const { status: requestStatus } =
+        await ImagePicker.requestCameraPermissionsAsync();
+      if (requestStatus !== 'granted') {
+        toastService.warning(
+          'Permission Required',
+          'Please grant camera permissions to take photos.'
+        );
+        return;
+      }
     }
 
     try {
       setIsUploading(true);
 
       const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: [1, 1],
         quality: 0.8,
         base64: false,
       });
 
-      if (!result.canceled && result.assets[0]) {
+      if (result && !result.canceled && result.assets && result.assets[0]) {
         const imageUri = result.assets[0].uri;
         onImageSelected(imageUri);
       }

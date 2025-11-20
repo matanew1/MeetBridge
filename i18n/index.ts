@@ -30,6 +30,7 @@ const resources = {
         adjustFilters: 'Adjust Filters',
         refresh: 'Refresh',
         checkBackLater: 'Try adjusting your filters',
+        loadingMore: 'Loading more profiles...',
       },
 
       // Chat Screen
@@ -476,6 +477,7 @@ const resources = {
           'לא הצלחנו למצוא פרופילים התואמים את ההעדפות שלך. נסה לשנות את המסננים או להגדיל את טווח המרחק.',
         adjustFilters: 'התאם פילטרים',
         refresh: 'רענן',
+        loadingMore: 'טוען פרופילים נוספים...',
       },
 
       // Chat Screen

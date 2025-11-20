@@ -19,9 +19,6 @@ export default function RootLayout() {
 
     // Force RTL for Hebrew, LTR for English
     I18nManager.forceRTL(isRTL());
-
-    // Clear session toasts on app start
-    toastService.clearSessionToasts();
   }, []);
 
   // Listen to language changes and update RTL

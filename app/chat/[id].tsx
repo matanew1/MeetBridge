@@ -41,6 +41,8 @@ import Animated, {
   withSpring,
   withTiming,
   interpolate,
+  FadeInUp,
+  Layout,
 } from 'react-native-reanimated';
 import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
@@ -57,6 +59,13 @@ import { safeGetDoc } from '../../services/firebase/firestoreHelpers';
 import IcebreakerSuggestions from '../components/IcebreakerSuggestions';
 import { storageService } from '../../services';
 import { imageCompressionService } from '../../services';
+import {
+  scale,
+  verticalScale,
+  moderateScale,
+  spacing,
+  borderRadius,
+} from '../../utils/responsive';
 
 interface Message {
   id: string;
@@ -72,8 +81,6 @@ interface MessageItemProps {
 
 const MessageItem: React.FC<MessageItemProps> = memo(
   ({ message, theme }) => {
-    const messageAnim = useSharedValue(0);
-    const fadeAnim = useSharedValue(0);
     const isHeartMessage = message.text === '❤️';
     const isImageMessage = useMemo(() => {
       const text = message.text.trim();
@@ -84,29 +91,12 @@ const MessageItem: React.FC<MessageItemProps> = memo(
       );
     }, [message.text]);
 
-    useEffect(() => {
-      const timer1 = setTimeout(() => {
-        messageAnim.value = withSpring(1, { damping: 20, stiffness: 180 });
-      }, 0);
-      const timer2 = setTimeout(() => {
-        fadeAnim.value = withTiming(1, { duration: 300 });
-      }, 0);
-      return () => {
-        clearTimeout(timer1);
-        clearTimeout(timer2);
-      };
-    }, [messageAnim, fadeAnim]);
-
+    // Simple entrance animation
     const animatedStyle = useAnimatedStyle(() => ({
-      transform: [
-        {
-          translateX: message.isFromCurrentUser
-            ? interpolate(messageAnim.value, [0, 1], [50, 0])
-            : interpolate(messageAnim.value, [0, 1], [-50, 0]),
-        },
-        { scale: interpolate(messageAnim.value, [0, 1], [0.8, 1]) },
-      ],
-      opacity: fadeAnim.value,
+      // Opacity and scale are handled by Layout animations in FlatList ideally,
+      // but for individual bubble pop-in we can use Reanimated entering props
+      // in the parent or simple inline styles if preferred.
+      // We'll rely on the Animated.View wrapping below.
     }));
 
     const bubbleStyle = [
@@ -129,7 +119,7 @@ const MessageItem: React.FC<MessageItemProps> = memo(
               backgroundColor:
                 isHeartMessage || isImageMessage
                   ? 'transparent'
-                  : theme.surface,
+                  : theme.surface, // Changed to surface for better contrast
             },
           ],
     ];
@@ -161,12 +151,14 @@ const MessageItem: React.FC<MessageItemProps> = memo(
 
     return (
       <Animated.View
+        entering={FadeInUp.springify().damping(20)}
+        layout={Layout.springify()}
         style={[
           styles.messageContainer,
+          isHeartMessage && styles.heartMessageContainer,
           message.isFromCurrentUser
             ? styles.myMessageContainer
             : styles.otherMessageContainer,
-          animatedStyle,
         ]}
       >
         <View style={bubbleStyle}>
@@ -230,7 +222,7 @@ const ChatScreen = () => {
   const keyboardDidShowListener = useRef<any>(null);
   const keyboardDidHideListener = useRef<any>(null);
 
-  // Animation
+  // Animations
   const headerSlideAnim = useSharedValue(-50);
   const headerFadeAnim = useSharedValue(0);
   const inputSlideAnim = useSharedValue(50);
@@ -503,7 +495,7 @@ const ChatScreen = () => {
       'keyboardDidShow',
       () => {
         scrollToBottom(false);
-        setShowAttachMenu(false); // Close attach menu when keyboard shows
+        setShowAttachMenu(false);
       }
     );
     keyboardDidHideListener.current = Keyboard.addListener(
@@ -521,7 +513,7 @@ const ChatScreen = () => {
   const handleSendMessage = useCallback(async () => {
     if (!inputText.trim() || !id || !currentUser || sending) return;
     setSending(true);
-    setShowAttachMenu(false); // Close attach menu when sending message
+    setShowAttachMenu(false);
     try {
       await sendMessage(id as string, inputText.trim());
       setInputText('');
@@ -533,7 +525,7 @@ const ChatScreen = () => {
   const handleSendHeart = useCallback(async () => {
     if (!id || !currentUser || sending) return;
     setSending(true);
-    setShowAttachMenu(false); // Close attach menu when sending heart
+    setShowAttachMenu(false);
     try {
       heartScale.value = withSpring(
         1.4,
@@ -549,20 +541,26 @@ const ChatScreen = () => {
   const handlePickImage = useCallback(async () => {
     if (!id || !currentUser || sending) return;
     setShowAttachMenu(false);
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      toastService.warning(
-        t('toasts.permissionNeededTitle'),
-        t('toasts.grantPhotoAccess')
-      );
-      return;
+    const { status, granted } =
+      await ImagePicker.getMediaLibraryPermissionsAsync();
+    if (!granted) {
+      const { status: requestStatus } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (requestStatus !== 'granted') {
+        toastService.warning(
+          t('toasts.permissionNeededTitle'),
+          t('toasts.grantPhotoAccess')
+        );
+        return;
+      }
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
+      mediaTypes: 'images',
       quality: 0.8,
+      base64: false,
     });
-    if (result.canceled || !result.assets[0]) return;
+    if (!result || result.canceled || !result.assets || !result.assets[0])
+      return;
     setUploadingImage(true);
     try {
       const compressed = await imageCompressionService.compressChatImage(
@@ -606,13 +604,7 @@ const ChatScreen = () => {
     []
   );
 
-  const heartStyle = useAnimatedStyle(
-    () => ({
-      transform: [{ scale: heartScale.value }],
-    }),
-    []
-  );
-
+  // Loading State
   if (!otherUser && !loadingTimeout) {
     return (
       <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -687,7 +679,7 @@ const ChatScreen = () => {
               >
                 <Text
                   style={{
-                    fontSize: 20,
+                    fontSize: moderateScale(18),
                     color: theme.textSecondary,
                     fontWeight: 'bold',
                   }}
@@ -706,14 +698,14 @@ const ChatScreen = () => {
                 <View
                   style={[
                     styles.onlineIndicatorSmall,
-                    { backgroundColor: '#4CAF50' },
+                    { backgroundColor: '#10B981' },
                   ]}
                 />
               )}
               <Text
                 style={[
                   styles.userStatus,
-                  { color: isOnline ? '#4CAF50' : theme.textSecondary },
+                  { color: isOnline ? '#10B981' : theme.textSecondary },
                 ]}
               >
                 {lastSeenText}
@@ -725,7 +717,7 @@ const ChatScreen = () => {
           onPress={() => setShowOptionsMenu(true)}
           style={styles.actionButton}
         >
-          <Ellipsis size={20} color={theme.textSecondary} />
+          <Ellipsis size={24} color={theme.textSecondary} />
         </TouchableOpacity>
       </Animated.View>
 
@@ -745,7 +737,6 @@ const ChatScreen = () => {
         maxToRenderPerBatch={10}
         windowSize={10}
         initialNumToRender={15}
-        // === AUTO-SCROLL BEST PRACTICES ===
         onContentSizeChange={onContentSizeChange}
         onLayout={onLayout}
         maintainVisibleContentPosition={{
@@ -810,7 +801,7 @@ const ChatScreen = () => {
             disabled={!inputText.trim() || sending}
           >
             <Send
-              size={18}
+              size={20}
               color={
                 inputText.trim() ? theme.textOnPrimary : theme.textSecondary
               }
@@ -820,6 +811,7 @@ const ChatScreen = () => {
 
         {showAttachMenu && (
           <Animated.View
+            entering={FadeInUp.springify()}
             style={[
               styles.attachMenuBubble,
               { backgroundColor: theme.surface, shadowColor: theme.shadow },
@@ -839,7 +831,7 @@ const ChatScreen = () => {
                     { backgroundColor: '#FF6B9D' },
                   ]}
                 >
-                  <ImageIcon size={22} color="#FFF" />
+                  <ImageIcon size={20} color="#FFF" />
                 </View>
                 <Text style={[styles.attachButtonText, { color: theme.text }]}>
                   Photo
@@ -864,16 +856,13 @@ const ChatScreen = () => {
                     { backgroundColor: '#FF3B5C' },
                   ]}
                 >
-                  <Heart size={22} color="#FFF" />
+                  <Heart size={20} color="#FFF" />
                 </View>
                 <Text style={[styles.attachButtonText, { color: theme.text }]}>
                   Heart
                 </Text>
               </TouchableOpacity>
             </View>
-            <View
-              style={[styles.bubbleArrow, { borderTopColor: theme.surface }]}
-            />
           </Animated.View>
         )}
       </Animated.View>
@@ -1007,30 +996,37 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: spacing.lg,
   },
-  loadingText: { fontSize: 16, textAlign: 'center', marginBottom: 16 },
+  loadingText: { fontSize: 16, textAlign: 'center', marginBottom: spacing.md },
   retryButton: {
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 8,
-    marginTop: 16,
+    borderRadius: borderRadius.md,
+    marginTop: spacing.md,
   },
   retryButtonText: { color: '#FFF', fontSize: 16, fontWeight: '600' },
+
+  // Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 50 : 12,
-    paddingBottom: 12,
+    paddingHorizontal: spacing.lg,
+    paddingTop: Platform.OS === 'ios' ? verticalScale(50) : verticalScale(20),
+    paddingBottom: spacing.md,
     borderBottomWidth: 1,
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  backButton: { padding: 8, marginRight: 8 },
-  avatar: { width: 40, height: 40, borderRadius: 20, marginRight: 12 },
+  backButton: { padding: spacing.xs, marginRight: spacing.sm },
+  avatar: {
+    width: scale(42),
+    height: scale(42),
+    borderRadius: scale(21),
+    marginRight: spacing.sm,
+  },
   userInfo: { flex: 1 },
-  userName: { fontSize: 16, fontWeight: '600' },
+  userName: { fontSize: moderateScale(16), fontWeight: '700' },
   statusContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1038,10 +1034,19 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   onlineIndicatorSmall: { width: 8, height: 8, borderRadius: 4 },
-  userStatus: { fontSize: 12 },
-  actionButton: { padding: 8 },
-  messagesContent: { paddingVertical: 16, paddingHorizontal: 16 },
-  messageContainer: { marginBottom: 16, maxWidth: '75%' },
+  userStatus: { fontSize: moderateScale(12), fontWeight: '500' },
+  actionButton: { padding: spacing.xs },
+
+  // Content
+  messagesContent: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingBottom: verticalScale(20),
+  },
+
+  // Messages
+  messageContainer: { marginBottom: spacing.md, maxWidth: '75%' },
+  heartMessageContainer: { maxWidth: scale(80) }, // Allow heart to be larger
   myMessageContainer: { alignSelf: 'flex-end', alignItems: 'flex-end' },
   otherMessageContainer: { alignSelf: 'flex-start', alignItems: 'flex-start' },
   messageBubble: {
@@ -1054,96 +1059,95 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
-  myMessage: { borderBottomRightRadius: 6 },
-  otherMessage: { borderBottomLeftRadius: 6 },
+  myMessage: { borderBottomRightRadius: 4 },
+  otherMessage: { borderBottomLeftRadius: 4 },
   heartMessage: {
     backgroundColor: 'transparent',
     elevation: 0,
     shadowOpacity: 0,
-    padding: 12,
+    padding: 0,
     minHeight: 50,
     minWidth: 50,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  heartText: { fontSize: 32, lineHeight: 36 },
+  heartText: { fontSize: 40 },
   imageMessage: {
     backgroundColor: 'transparent',
     padding: 0,
     overflow: 'hidden',
+    borderRadius: borderRadius.lg,
   },
-  messageImage: { width: 200, height: 200, borderRadius: 16 },
-  messageText: { fontSize: 16, lineHeight: 22 },
-  messageTime: { fontSize: 11, marginTop: 4 },
+  messageImage: { width: scale(200), height: scale(200), borderRadius: 16 },
+  messageText: { fontSize: moderateScale(16), lineHeight: 22 },
+  messageTime: { fontSize: moderateScale(10), marginTop: 4, opacity: 0.7 },
   myMessageTime: { textAlign: 'right' },
   otherMessageTime: { textAlign: 'left' },
+
+  // Input
   inputContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 12,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: Platform.OS === 'ios' ? spacing.xl : spacing.sm,
     borderTopWidth: 1,
   },
-  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  attachButton: { padding: 8 },
+  inputRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  attachButton: { padding: spacing.xs },
   textInput: {
     flex: 1,
     borderWidth: 1,
-    borderRadius: 20,
+    borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    fontSize: 18,
+    fontSize: moderateScale(16),
     maxHeight: 100,
     textAlignVertical: 'center',
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
+
+  // Attachment Menu
   attachMenuBubble: {
     position: 'absolute',
-    bottom: 60,
-    left: 16,
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    bottom: verticalScale(70),
+    left: spacing.lg,
+    borderRadius: borderRadius.xl,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xs,
     elevation: 8,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
-    minWidth: 180,
+    minWidth: scale(160),
   },
   attachMenuContent: { gap: 4 },
   attachMenuButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: borderRadius.lg,
   },
   attachIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  attachButtonText: { fontSize: 16, fontWeight: '500', marginLeft: 12 },
-  attachMenuDivider: { height: 1, marginHorizontal: 12, marginVertical: 4 },
-  bubbleArrow: {
-    position: 'absolute',
-    bottom: -8,
-    left: 20,
-    width: 0,
-    height: 0,
-    borderLeftWidth: 8,
-    borderRightWidth: 8,
-    borderTopWidth: 8,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
+  attachButtonText: {
+    fontSize: moderateScale(14),
+    fontWeight: '600',
+    marginLeft: 12,
   },
+  attachMenuDivider: { height: 1, marginHorizontal: 12, marginVertical: 2 },
+
+  // Modals
   optionsModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -1151,9 +1155,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   optionsMenu: {
-    borderRadius: 12,
-    paddingVertical: 8,
-    marginHorizontal: 40,
+    borderRadius: borderRadius.xl,
+    paddingVertical: spacing.sm,
+    minWidth: scale(200),
     elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -1163,10 +1167,14 @@ const styles = StyleSheet.create({
   optionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 14,
     paddingHorizontal: 20,
   },
-  optionText: { fontSize: 16, marginLeft: 12, fontWeight: '500' },
+  optionText: {
+    fontSize: moderateScale(16),
+    marginLeft: 12,
+    fontWeight: '500',
+  },
   optionDivider: { height: 1, marginHorizontal: 20 },
   modalOverlay: {
     position: 'absolute',
@@ -1187,11 +1195,11 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   confirmationModal: {
-    borderRadius: 16,
-    padding: 24,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
     alignItems: 'center',
     maxWidth: 320,
-    width: '100%',
+    width: '90%',
     elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -1208,28 +1216,32 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   confirmationTitle: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: moderateScale(20),
+    fontWeight: '700',
     textAlign: 'center',
     marginBottom: 8,
   },
   confirmationText: {
-    fontSize: 16,
+    fontSize: moderateScale(15),
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 22,
     marginBottom: 24,
   },
   confirmationButtons: { flexDirection: 'row', gap: 12, width: '100%' },
   confirmButton: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: borderRadius.lg,
     alignItems: 'center',
   },
   cancelButton: { borderWidth: 1 },
-  cancelButtonText: { fontSize: 16, fontWeight: '500' },
+  cancelButtonText: { fontSize: moderateScale(15), fontWeight: '600' },
   deleteButton: {},
-  deleteButtonText: { fontSize: 16, fontWeight: '600', color: '#FFF' },
+  deleteButtonText: {
+    fontSize: moderateScale(15),
+    fontWeight: '600',
+    color: '#FFF',
+  },
 });
 
 export default ChatScreen;

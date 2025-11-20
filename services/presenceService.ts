@@ -10,7 +10,7 @@ import {
   get,
 } from 'firebase/database';
 import { doc, updateDoc } from 'firebase/firestore';
-import { db, realtimeDb } from './firebase/config';
+import { db, realtimeDb, auth } from './firebase/config';
 
 class PresenceService {
   private database: Database | null = null;
@@ -23,9 +23,24 @@ class PresenceService {
   /**
    * Initialize the presence service with Firebase Realtime Database
    */
-  async initialize(userId: string): Promise<void> {
+  async initialize(userId: string, userSettings?: any): Promise<void> {
     if (this.isInitialized && this.currentUserId === userId) {
       console.log('✅ Presence service already initialized for user:', userId);
+      return;
+    }
+
+    // Check if user is authenticated before proceeding
+    if (!auth.currentUser) {
+      console.warn(
+        '⚠️ Cannot initialize presence service - user not authenticated'
+      );
+      return;
+    }
+
+    // Check if user allows showing online status
+    const showOnlineStatus = userSettings?.privacy?.showOnlineStatus ?? true;
+    if (!showOnlineStatus) {
+      console.log('🔒 Online status disabled by user privacy settings');
       return;
     }
 
@@ -35,8 +50,73 @@ class PresenceService {
       // Check if Realtime Database is initialized
       if (!realtimeDb) {
         console.warn(
-          '⚠️ Realtime Database not initialized, skipping presence service'
+          '⚠️ Realtime Database not initialized, skipping presence service. Check EXPO_PUBLIC_FIREBASE_DATABASE_URL in your environment variables.'
         );
+        return;
+      }
+
+      // Test if the database is actually available and provide helpful guidance
+      try {
+        console.log('🔍 Testing Realtime Database connectivity...');
+        const testRef = ref(realtimeDb, '.info/connected');
+
+        // Test connection with timeout
+        const isConnected = await new Promise<boolean>((resolve) => {
+          const timeout = setTimeout(() => {
+            console.warn('⚠️ Database connection test timed out (10s)');
+            resolve(false);
+          }, 10000);
+
+          onValue(
+            testRef,
+            (snap) => {
+              clearTimeout(timeout);
+              const connected = snap.val() === true;
+              console.log(
+                `📡 Database connection status: ${
+                  connected ? '✅ Connected' : '❌ Disconnected'
+                }`
+              );
+              resolve(connected);
+            },
+            (error) => {
+              clearTimeout(timeout);
+              console.warn(
+                '⚠️ Database connection test failed:',
+                error.message
+              );
+              resolve(false);
+            }
+          );
+        });
+
+        if (!isConnected) {
+          console.warn(
+            '⚠️ Realtime Database connection failed. This usually means:'
+          );
+          console.warn(
+            '  1. Realtime Database is not enabled in your Firebase project'
+          );
+          console.warn('  2. Network connectivity issues');
+          console.warn('  3. Incorrect Firebase configuration');
+          console.warn('');
+          console.warn(
+            '  To fix: Go to Firebase Console → Realtime Database → Create database'
+          );
+          console.warn(
+            '  Presence features will work in limited mode (online status only)'
+          );
+          return;
+        }
+      } catch (dbError: any) {
+        console.warn('⚠️ Realtime Database test failed:', dbError.message);
+        console.warn(
+          '  This commonly occurs when Realtime Database is not enabled in Firebase'
+        );
+        console.warn(
+          '  To enable: Firebase Console → Realtime Database → Create database'
+        );
+        console.warn('  The app will continue with limited presence features');
         return;
       }
 
@@ -67,16 +147,36 @@ class PresenceService {
 
       // Setup disconnect handler - automatically set user offline when connection is lost
       try {
+        console.log('🔌 Setting up disconnect handler...');
         const disconnectRef = onDisconnect(this.presenceRef);
-        if (disconnectRef) {
+
+        if (disconnectRef && typeof disconnectRef.set === 'function') {
           await disconnectRef.set({
             status: 'offline',
             lastSeen: serverTimestamp(),
             updatedAt: serverTimestamp(),
           });
+          console.log('✅ Disconnect handler set up successfully');
+        } else {
+          console.warn(
+            '⚠️ Disconnect reference is invalid - this may indicate database permission issues'
+          );
+          console.warn(
+            '  Check your Realtime Database security rules in Firebase Console'
+          );
         }
-      } catch (disconnectError) {
-        console.warn('⚠️ Failed to setup disconnect handler:', disconnectError);
+      } catch (disconnectError: any) {
+        console.warn(
+          '⚠️ Failed to setup disconnect handler:',
+          disconnectError.message
+        );
+        console.warn('  This may be due to:');
+        console.warn('  - Insufficient database permissions');
+        console.warn('  - Network connectivity issues');
+        console.warn('  - Realtime Database configuration problems');
+        console.warn(
+          '  Presence will still work for online status, but automatic offline detection may be limited'
+        );
         // Continue initialization even if disconnect handler fails
       }
 
@@ -107,6 +207,12 @@ class PresenceService {
       return;
     }
 
+    // Check if user is authenticated
+    if (!auth.currentUser) {
+      console.warn('⚠️ Cannot set user online - user not authenticated');
+      return;
+    }
+
     // Additional validation to ensure currentUserId is a valid string
     if (
       typeof this.currentUserId !== 'string' ||
@@ -124,6 +230,13 @@ class PresenceService {
 
       // Create a fresh reference to avoid stale references
       const presenceRef = ref(this.database, `presence/${userId}`);
+
+      if (!presenceRef) {
+        console.warn(
+          '⚠️ Cannot create presence reference - database may not be initialized'
+        );
+        return;
+      }
 
       const presenceData = {
         status: 'online',
@@ -175,6 +288,12 @@ class PresenceService {
       console.warn(
         '⚠️ Cannot set user offline - service not initialized or user ID missing'
       );
+      return;
+    }
+
+    // Check if user is authenticated
+    if (!auth.currentUser) {
+      console.warn('⚠️ Cannot set user offline - user not authenticated');
       return;
     }
 
@@ -320,6 +439,12 @@ class PresenceService {
 
     this.heartbeatInterval = setInterval(async () => {
       if (!this.database || !this.currentUserId) return;
+
+      // Check if user is still authenticated
+      if (!auth.currentUser) {
+        console.warn('⚠️ Heartbeat skipped - user not authenticated');
+        return;
+      }
 
       // Validate currentUserId is a valid string
       if (
@@ -535,6 +660,92 @@ class PresenceService {
     if (diffDays < 7) return `${diffDays}d ago`;
 
     return 'Long time ago';
+  }
+
+  /**
+   * Check if Realtime Database is properly configured and available
+   * Returns detailed status information for debugging
+   */
+  async checkDatabaseStatus(): Promise<{
+    isAvailable: boolean;
+    isConnected: boolean;
+    hasPermissions: boolean;
+    error?: string;
+    recommendations?: string[];
+  }> {
+    const status = {
+      isAvailable: false,
+      isConnected: false,
+      hasPermissions: false,
+      error: undefined as string | undefined,
+      recommendations: [] as string[],
+    };
+
+    try {
+      // Check if Realtime Database is initialized
+      if (!realtimeDb) {
+        status.error = 'Realtime Database not initialized';
+        status.recommendations.push(
+          'Check EXPO_PUBLIC_FIREBASE_DATABASE_URL in your environment variables'
+        );
+        return status;
+      }
+
+      status.isAvailable = true;
+
+      // Test connection
+      const connectedRef = ref(realtimeDb, '.info/connected');
+      const isConnected = await new Promise<boolean>((resolve) => {
+        const timeout = setTimeout(() => resolve(false), 5000);
+
+        onValue(
+          connectedRef,
+          (snap) => {
+            clearTimeout(timeout);
+            resolve(snap.val() === true);
+          },
+          () => {
+            clearTimeout(timeout);
+            resolve(false);
+          }
+        );
+      });
+
+      status.isConnected = isConnected;
+
+      if (!isConnected) {
+        status.error = 'Database not connected';
+        status.recommendations.push(
+          'Enable Realtime Database in Firebase Console',
+          'Check network connectivity',
+          'Verify Firebase configuration'
+        );
+        return status;
+      }
+
+      // Test permissions by trying to read/write
+      try {
+        const testRef = ref(realtimeDb, `test-${Date.now()}`);
+        await set(testRef, { test: true });
+        // Clean up test data
+        await set(testRef, null);
+        status.hasPermissions = true;
+      } catch (permError: any) {
+        status.error = `Permission error: ${permError.message}`;
+        status.recommendations.push(
+          'Check Realtime Database security rules in Firebase Console',
+          'Ensure user is authenticated',
+          'Verify database permissions allow read/write access'
+        );
+      }
+    } catch (error: any) {
+      status.error = error.message;
+      status.recommendations.push(
+        'Check Firebase configuration and network connectivity'
+      );
+    }
+
+    return status;
   }
 
   /**

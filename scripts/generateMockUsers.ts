@@ -533,8 +533,12 @@ async function createMockPosts(
   console.log('\n\n📝 Creating mock posts...');
   const createdPosts: string[] = [];
 
-  for (let i = 0; i < mockPosts.length; i++) {
-    const postData = mockPosts[i];
+  // Create 500 posts by repeating the mockPosts array
+  const targetPosts = 500;
+  const postsToCreate = Math.max(targetPosts, mockPosts.length);
+
+  for (let i = 0; i < postsToCreate; i++) {
+    const postData = mockPosts[i % mockPosts.length]; // Cycle through available posts
     const randomUser = users[Math.floor(Math.random() * users.length)];
 
     // Generate location near base
@@ -554,11 +558,13 @@ async function createMockPosts(
         },
         description: postData.description,
         tags: postData.tags,
-        timeOccurred: new Date(),
+        timeOccurred: new Date(
+          Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000
+        ), // Random time in last 30 days
         createdAt: serverTimestamp(),
-        likes: Math.floor(Math.random() * 10), // Random likes 0-9
+        likes: Math.floor(Math.random() * 50), // Random likes 0-49
         likedBy: [],
-        views: Math.floor(Math.random() * 20), // Random views 0-19
+        views: Math.floor(Math.random() * 100), // Random views 0-99
         viewedBy: [],
         claims: 0,
         comments: 0,
@@ -574,9 +580,9 @@ async function createMockPosts(
       );
 
       createdPosts.push(docRef.id);
-      console.log(
-        `✅ Post ${i + 1}/${mockPosts.length} created by ${randomUser.userName}`
-      );
+      if ((i + 1) % 50 === 0) {
+        console.log(`✅ Created ${i + 1}/${postsToCreate} posts...`);
+      }
     } catch (error: any) {
       console.error(`❌ Error creating post ${i + 1}:`, error.message);
     }
@@ -780,14 +786,63 @@ async function generateAllMockUsers() {
   console.log(`   Longitude: ${BASE_LON}`);
   console.log(`   Location: ${userLocation.locationName}`);
   console.log(`   Geohash: ${geohashForLocation([BASE_LAT, BASE_LON], 10)}`);
-  console.log(`\n📊 Creating ${mockUsers.length} mock users...\n`);
+  // Create users - 25 women and 25 men
+  const targetUsers = 50;
+  const womenCount = 25;
+  const menCount = 25;
+
+  // Separate male and female templates
+  const femaleTemplates = mockUsers.filter((user) => user.gender === 'female');
+  const maleTemplates = mockUsers.filter((user) => user.gender === 'male');
+
+  const usersToCreate = [];
+
+  // Create 25 women
+  for (let i = 0; i < womenCount; i++) {
+    const templateIndex = i % femaleTemplates.length;
+    const baseUser = femaleTemplates[templateIndex];
+
+    // Create variation for repeated users
+    const variation = Math.floor(i / femaleTemplates.length);
+    const variedUser = {
+      ...baseUser,
+      name: variation > 0 ? `${baseUser.name}${variation}` : baseUser.name,
+      age: baseUser.age + Math.floor(Math.random() * 5) - 2, // ±2 years variation
+      distanceMeters:
+        baseUser.distanceMeters + Math.floor(Math.random() * 100) - 50, // ±50m variation
+    };
+
+    usersToCreate.push(variedUser);
+  }
+
+  // Create 25 men
+  for (let i = 0; i < menCount; i++) {
+    const templateIndex = i % maleTemplates.length;
+    const baseUser = maleTemplates[templateIndex];
+
+    // Create variation for repeated users
+    const variation = Math.floor(i / maleTemplates.length);
+    const variedUser = {
+      ...baseUser,
+      name: variation > 0 ? `${baseUser.name}${variation}` : baseUser.name,
+      age: baseUser.age + Math.floor(Math.random() * 5) - 2, // ±2 years variation
+      distanceMeters:
+        baseUser.distanceMeters + Math.floor(Math.random() * 100) - 50, // ±50m variation
+    };
+
+    usersToCreate.push(variedUser);
+  }
+
+  console.log(
+    `📊 Creating ${usersToCreate.length} mock users (${womenCount} women, ${menCount} men)...\n`
+  );
 
   const results = [];
 
   // Step 1: Create users with progress tracking
-  for (let i = 0; i < mockUsers.length; i++) {
+  for (let i = 0; i < usersToCreate.length; i++) {
     const result = await createMockUser(
-      mockUsers[i],
+      usersToCreate[i],
       i,
       userLocation.locationName
     );
@@ -814,7 +869,7 @@ async function generateAllMockUsers() {
 
   if (successful > 0) {
     console.log('\n📝 Login Credentials:');
-    console.log('   Email: mock[1-20]@meetbridge.test');
+    console.log('   Email: mock[1-50]@meetbridge.test');
     console.log('   Password: Test1234!');
 
     console.log('\n📏 Distance Configuration:');

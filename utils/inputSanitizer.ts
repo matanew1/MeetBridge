@@ -2,6 +2,27 @@
 // [SECURITY] Input sanitization and validation utilities
 
 /**
+ * [SECURITY] Validate and sanitize numeric values
+ */
+function sanitizeNumber(value: any, min?: number, max?: number): number | null {
+  const num = typeof value === 'number' ? value : parseFloat(value);
+
+  if (isNaN(num) || !isFinite(num)) {
+    return null;
+  }
+
+  if (min !== undefined && num < min) {
+    return min;
+  }
+
+  if (max !== undefined && num > max) {
+    return max;
+  }
+
+  return num;
+}
+
+/**
  * [SECURITY] Sanitize object keys to prevent prototype pollution
  */
 export function sanitizeObjectKeys<T extends Record<string, any>>(
@@ -95,22 +116,18 @@ function sanitizeString(input: string, maxLength: number = 1000): string {
 }
 
 /**
- * [SECURITY] Validate and sanitize numeric values
+ * [SECURITY] Validate and sanitize coordinates
  */
-function sanitizeNumber(value: any, min?: number, max?: number): number | null {
-  const num = typeof value === 'number' ? value : parseFloat(value);
+export function sanitizeCoordinates(
+  latitude: any,
+  longitude: any
+): { latitude: number; longitude: number } | null {
+  const lat = sanitizeNumber(latitude, -90, 90);
+  const lng = sanitizeNumber(longitude, -180, 180);
 
-  if (isNaN(num) || !isFinite(num)) {
+  if (lat === null || lng === null) {
     return null;
   }
 
-  if (min !== undefined && num < min) {
-    return min;
-  }
-
-  if (max !== undefined && num > max) {
-    return max;
-  }
-
-  return num;
+  return { latitude: lat, longitude: lng };
 }
