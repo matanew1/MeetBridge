@@ -754,6 +754,14 @@ const ChatScreen = () => {
         />
       )}
 
+      {showAttachMenu && (
+        <TouchableOpacity
+          style={styles.attachMenuOverlay}
+          activeOpacity={1}
+          onPress={() => setShowAttachMenu(false)}
+        />
+      )}
+
       {/* Input */}
       <Animated.View
         style={[
@@ -1120,6 +1128,14 @@ const styles = StyleSheet.create({
   },
 
   // Attachment Menu
+  attachMenuOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+  },
   attachMenuBubble: {
     position: 'absolute',
     bottom: verticalScale(70),
